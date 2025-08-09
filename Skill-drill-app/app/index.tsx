@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useMemo, useRef, useState, useEffect } from "react";
-import { Dimensions, Text, View, StyleSheet, Animated as RNAnimated } from "react-native";
+import { Dimensions, Text, View, StyleSheet, Animated as RNAnimated, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import SplashOverlay from "./components/SplashOverlay";
@@ -20,6 +20,7 @@ const BRAND = "#0A66C2"; // keep consistent with splash
 
 export default function App() {
   const [isSplashDone, setSplashDone] = useState(false);
+  const [navigating, setNavigating] = useState(false);
   const router = useRouter();
 
 
@@ -27,7 +28,8 @@ export default function App() {
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch {}
-    router.push("/home");
+    setNavigating(true);
+    router.push("/auth/login");
   };
 
   const handleSkip = async () => {
@@ -43,6 +45,11 @@ export default function App() {
       {!isSplashDone && (
         <View style={StyleSheet.absoluteFillObject}>
           <SplashOverlay onFinish={() => setSplashDone(true)} />
+        </View>
+      )}
+      {navigating && (
+        <View style={[StyleSheet.absoluteFillObject, { alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.25)" }]}>
+          <ActivityIndicator size="large" color="#ffffff" />
         </View>
       )}
     </View>

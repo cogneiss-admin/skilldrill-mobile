@@ -42,13 +42,11 @@ export default function RootLayout() {
   const segments = useSegments();
   const [routeOverlayVisible, setRouteOverlayVisible] = useState(false);
 
-  // Show a very brief branded overlay on any route segment change to mask default spinners
+  // Disable previous blue flash overlay during navigation for smoother transitions
   const segmentKey = useMemo(() => segments.join("/"), [segments]);
   useEffect(() => {
     if (!segmentKey) return;
-    setRouteOverlayVisible(true);
-    const t = setTimeout(() => setRouteOverlayVisible(false), 450);
-    return () => clearTimeout(t);
+    setRouteOverlayVisible(false);
   }, [segmentKey]);
   return (
     <ReduxProvider store={store}>
@@ -58,14 +56,7 @@ export default function RootLayout() {
             <Suspense fallback={<View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: BRAND }}><SmallLogo /></View>}>
               <Slot />
             </Suspense>
-            {routeOverlayVisible && (
-              <View
-                pointerEvents="none"
-                style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, alignItems: "center", justifyContent: "center", backgroundColor: BRAND }}
-              >
-                <SmallLogo />
-              </View>
-            )}
+            {/* Removed the blue navigation overlay */}
           </>
         ) : (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: BRAND }}>
