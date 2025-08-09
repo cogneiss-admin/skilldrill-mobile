@@ -17,9 +17,17 @@ const { width, height } = Dimensions.get("window");
 
 interface SplashOverlayProps {
   onFinish: () => void;
+  /**
+   * Size of the logo relative to screen width. Defaults to 0.4 (40% of width)
+   */
+  logoSizePct?: number;
+  /**
+   * Target opacity for the logo during the intro (0..1). Defaults to 0.95
+   */
+  logoOpacityTarget?: number;
 }
 
-export default function SplashOverlay({ onFinish }: SplashOverlayProps) {
+export default function SplashOverlay({ onFinish, logoSizePct = 0.4, logoOpacityTarget = 1 }: SplashOverlayProps) {
   // Animate logo with React Native Animated to guarantee visibility
   const rnLogoScale = useRef(new RNAnimated.Value(0.5)).current;
   const rnLogoOpacity = useRef(new RNAnimated.Value(0)).current;
@@ -27,30 +35,39 @@ export default function SplashOverlay({ onFinish }: SplashOverlayProps) {
   const particleRadius = useSharedValue(0);
 
   useEffect(() => {
-    RNAnimated.timing(rnLogoOpacity, {
+    const opacityAnim = RNAnimated.timing(rnLogoOpacity, {
+      toValue: logoOpacityTarget,
+      duration: 800,
+      delay: 300,
+      useNativeDriver: true,
+    });
+    const scaleAnim = RNAnimated.timing(rnLogoScale, {
       toValue: 1,
       duration: 800,
       delay: 300,
       useNativeDriver: true,
-    }).start();
-    RNAnimated.timing(rnLogoScale, {
-      toValue: 1,
-      duration: 800,
-      delay: 300,
-      useNativeDriver: true,
-    }).start();
+    });
+    opacityAnim.start();
+    scaleAnim.start();
 
     // Particle burst after logo appears
-    setTimeout(() => {
+    const particleTimeout = setTimeout(() => {
       particleRadius.value = withTiming(width * 0.8, { duration: 1000 });
     }, 1200);
 
     // Fade out after particles
-    setTimeout(() => {
+    const fadeTimeout = setTimeout(() => {
       fadeOut.value = withTiming(0, { duration: 800 }, () => {
         runOnJS(onFinish)();
       });
     }, 2500);
+    return () => {
+      // stop animations and clear timers to avoid leaks on fast nav
+      rnLogoOpacity.stopAnimation?.();
+      rnLogoScale.stopAnimation?.();
+      clearTimeout(particleTimeout);
+      clearTimeout(fadeTimeout);
+    };
   }, []);
 
   const logoStyle = {
@@ -84,7 +101,7 @@ export default function SplashOverlay({ onFinish }: SplashOverlayProps) {
       {/* Animated Logo */}
       <AnimatedLogo
         source={logoSrc}
-        style={[styles.logo, logoStyle]}
+        style={[styles.logo, { width: width * logoSizePct, height: width * logoSizePct }, logoStyle]}
         resizeMode="contain"
       />
     </Animated.View>
