@@ -1,108 +1,394 @@
 // @ts-nocheck
 import React, { useMemo, useState } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, View, Image, ScrollView, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Button, Text, TextInput, IconButton } from "react-native-paper";
+import { TextInput } from "react-native-paper";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
-import { AntDesign } from "@expo/vector-icons";
-import Animated, { FadeInDown, FadeIn, FadeOut } from "react-native-reanimated";
+import { AntDesign, MaterialIcons } from "@expo/vector-icons";
+import Svg, { Path } from "react-native-svg";
+import { StatusBar } from "expo-status-bar";
+
+const logoSrc = require("../../assets/images/logo.png");
 
 const BRAND = "#0A66C2";
+import { detectInputType, isValidEmail, isValidPhone, validationMessageFor } from "../../components/validators";
 
 export default function LoginScreen() {
   const router = useRouter();
-  const [phone, setPhone] = useState("");
+  const [emailOrPhone, setEmailOrPhone] = useState("");
   const [busy, setBusy] = useState(false);
+  const [validationMessage, setValidationMessage] = useState("");
+
+  // Detect if input is email or phone number (simple, user-friendly heuristic)
+  const inputType = useMemo(() => detectInputType(emailOrPhone), [emailOrPhone]);
+
+  const isValidInput = useMemo(() => {
+    const msg = validationMessageFor(emailOrPhone);
+    setValidationMessage(msg);
+    if (!emailOrPhone.trim()) return false;
+    if (inputType === "email") return isValidEmail(emailOrPhone);
+    if (inputType === "phone") return isValidPhone(emailOrPhone);
+    return false;
+  }, [emailOrPhone, inputType]);
 
   const sendOtp = async () => {
-    if (busy) return;
-    const value = phone.replace(/\s|-/g, "");
-    if (!/^\+?\d{8,15}$/.test(value)) return;
+    if (busy || !isValidInput) return;
+    
     try {
       setBusy(true);
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      router.push({ pathname: "/auth/otp", params: { phone: value } });
+      
+      // Pass both email and phone, backend will determine which to use
+      const params = inputType === "email" 
+        ? { email: emailOrPhone.trim() }
+        : { phone: emailOrPhone.replace(/[^0-9+]/g, "") };
+        
+      router.push({ pathname: "/auth/otp", params });
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#0B0F14" }}>
-      <View style={{ flex: 1, justifyContent: "center" }}>
-        <View style={{ paddingHorizontal: 20 }}>
-          <Animated.View entering={FadeIn.duration(300)}>
-            <Text variant="headlineLarge" style={{ fontWeight: "800", color: "#fff", letterSpacing: 0.3 }}>
-              Log In
-            </Text>
-            <Text style={{ marginTop: 6, color: "#cbd5e1" }}>
-              Log in to your Skill Drill account
-            </Text>
-          </Animated.View>
+    <SafeAreaView style={{ flex: 1, backgroundColor: BRAND }}>
+      <StatusBar style="light" />
+      
+      {/* Top half - Colorful section like Zomato */}
+      <View style={{ 
+        height: "40%",
+        backgroundColor: "#E23744", // Zomato red color for reference, we'll use our brand
+        paddingHorizontal: 20,
+        justifyContent: "center",
+        alignItems: "center",
+        position: "relative",
+      }}>
+        {/* Background pattern/illustrations similar to Zomato */}
+        <View style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: BRAND, // Our brand blue
+        }}>
+          {/* Decorative elements */}
+          <View style={{
+            position: "absolute",
+            top: 50,
+            right: 30,
+            width: 40,
+            height: 40,
+            backgroundColor: "rgba(255,255,255,0.1)",
+            borderRadius: 20,
+          }} />
+          <View style={{
+            position: "absolute",
+            top: 120,
+            left: 40,
+            width: 25,
+            height: 25,
+            backgroundColor: "rgba(255,255,255,0.15)",
+            borderRadius: 12.5,
+          }} />
+          <View style={{
+            position: "absolute",
+            bottom: 100,
+            right: 60,
+            width: 30,
+            height: 30,
+            backgroundColor: "rgba(255,255,255,0.1)",
+            borderRadius: 15,
+          }} />
+        </View>
+        
+        {/* Logo (larger) */}
+        <Image
+          source={logoSrc}
+          style={{
+            width: 180,
+            height: 180,
+            marginBottom: 10,
+            alignSelf: "center",
+          }}
+          resizeMode="contain"
+        />
+      </View>
 
-          <View style={{ height: 24 }} />
+      {/* Bottom half - White section with form */}
+      <View style={{ 
+        flex: 1,
+        backgroundColor: "#ffffff",
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        marginTop: -20,
+      }}>
+        <ScrollView
+          contentContainerStyle={{
+            paddingTop: 24,
+            paddingHorizontal: 24,
+            paddingBottom: 20,
+            alignItems: "center",
+          }}
+          showsVerticalScrollIndicator={false}
+        >
+        
 
-          <Animated.View entering={FadeInDown.duration(350)}>
-            <TextInput
-              mode="outlined"
-              label="Mobile Number"
-              keyboardType="phone-pad"
-              value={phone}
-              onChangeText={setPhone}
-              left={<TextInput.Affix text="📱" />}
-              style={{ backgroundColor: "#0f1620" }}
-              textColor="#e2e8f0"
-            />
-          </Animated.View>
 
-          <View style={{ height: 18 }} />
+        {/* Login heading */}
+        <View style={{ width: "100%", alignItems: "center", marginBottom: 8 }}>
+          <Text style={{
+            fontSize: 28,
+            fontWeight: "700",
+            color: "#1a1a1a",
+            marginBottom: 8,
+          }}>
+            Welcome Back!
+          </Text>
+          <Text style={{
+            fontSize: 16,
+            color: "#666666",
+            marginBottom: 24,
+            textAlign: "center",
+          }}>
+            Log in or sign up to continue
+          </Text>
+        </View>
 
-          <Button
-            mode="contained"
-            onPress={sendOtp}
-            loading={busy}
-            disabled={busy}
-            contentStyle={{ height: 52 }}
-            style={{ borderRadius: 26 }}
-          >
-            Send OTP
-          </Button>
-
-          <View style={{ height: 26 }} />
-          <View style={{ alignItems: "center", flexDirection: "row" }}>
-            <View style={{ flex: 1, height: 1, backgroundColor: "#223042" }} />
-            <Text style={{ marginHorizontal: 10, color: "#9aa7b4" }}>or continue with</Text>
-            <View style={{ flex: 1, height: 1, backgroundColor: "#223042" }} />
-          </View>
-
-          <View style={{ height: 14 }} />
-          <View style={{ flexDirection: "row", justifyContent: "center", gap: 16 }}>
-            <IconButton
-              mode="contained-tonal"
-              icon={(props) => <AntDesign name="apple1" size={22} color="#fff" />}
-              containerColor="#1f2937"
-              onPress={() => {}}
-            />
-            <IconButton
-              mode="contained-tonal"
-              icon={(props) => <AntDesign name="google" size={22} color="#fff" />}
-              containerColor="#1f2937"
-              onPress={() => {}}
-            />
-            <IconButton
-              mode="contained-tonal"
-              icon={(props) => <AntDesign name="linkedin-square" size={22} color="#fff" />}
-              containerColor={BRAND}
-              onPress={() => {}}
-            />
+        {/* Phone number input - Centered like Mindvalley */}
+        <View style={{ width: "100%", marginBottom: 16 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
+            <View style={{
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: "#f8f9fa",
+              borderWidth: 1,
+              borderColor: "#e9ecef",
+              borderRadius: 8,
+              paddingHorizontal: 12,
+              paddingVertical: 14,
+              marginRight: 8,
+              minWidth: 60,
+              justifyContent: "center",
+            }}>
+              <Text style={{ fontSize: 20 }}>🇮🇳</Text>
+            </View>
+            
+            <View style={{ flex: 1, maxWidth: 280 }}>
+              <TextInput
+                mode="outlined"
+                placeholder="Enter Phone Number or Email"
+                keyboardType="default"
+                autoCapitalize="none"
+                autoCorrect={false}
+                textContentType={inputType === "phone" ? "telephoneNumber" : "emailAddress"}
+                value={emailOrPhone}
+                onChangeText={setEmailOrPhone}
+                style={{ 
+                  backgroundColor: "#ffffff",
+                  height: 50,
+                }}
+                textColor="#333333"
+                placeholderTextColor="#999999"
+                outlineColor="#e9ecef"
+                activeOutlineColor={BRAND}
+                contentStyle={{
+                  paddingVertical: 0,
+                  fontSize: 16,
+                  textAlign: "left",
+                }}
+                theme={{
+                  colors: {
+                    onSurfaceVariant: "#666666",
+                  }
+                }}
+              />
+            </View>
           </View>
         </View>
 
-        <View style={{ paddingHorizontal: 20, paddingTop: 24 }}>
-          <Pressable onPress={() => router.push("/auth/signup")}> 
-            <Text style={{ color: "#9aa7b4", textAlign: "center" }}>
-              New to Skill Drill? <Text style={{ color: BRAND, fontWeight: "700" }}>Sign up</Text>
+
+        {/* Validation message */}
+        {validationMessage ? (
+          <View style={{ width: 348, alignSelf: "center", marginTop: -8, marginBottom: 8 }}>
+            <Text style={{ color: "#E23744", fontSize: 12 }}>{validationMessage}</Text>
+          </View>
+        ) : null}
+
+
+
+        <View style={{ width: "100%", alignItems: "center" }}>
+          <View style={{ flexDirection: "row", justifyContent: "center" }}>
+            <Pressable
+              onPress={sendOtp}
+              disabled={busy || !isValidInput}
+              style={{
+                height: 54,
+                borderRadius: 12,
+                backgroundColor: BRAND, // Using brand blue color
+                alignItems: "center",
+                justifyContent: "center",
+                marginTop: 20,
+                marginBottom: 16,
+                width: 348, // 60 (flag) + 8 (margin) + 280 (input) = 348
+                opacity: isValidInput ? 1 : 0.5,
+                shadowColor: BRAND,
+                shadowOffset: {
+                  width: 0,
+                  height: 4,
+                },
+                shadowOpacity: isValidInput ? 0.3 : 0,
+                shadowRadius: 12,
+                elevation: isValidInput ? 8 : 0,
+              }}
+            >
+              <Text style={{
+                fontSize: 17,
+                fontWeight: "700",
+                color: "#ffffff",
+                letterSpacing: 0.5,
+              }}>
+                {busy ? "Please wait..." : "Continue"}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Divider */}
+        <View style={{ 
+          alignItems: "center", 
+          flexDirection: "row", 
+          marginTop: 20,
+          marginBottom: 20, 
+          width: "100%",
+          maxWidth: 350,
+        }}>
+          <View style={{ flex: 1, height: 1, backgroundColor: "#e9ecef" }} />
+          <Text style={{ 
+            marginHorizontal: 20, 
+            color: "#666666", 
+            fontSize: 14,
+            fontWeight: "500",
+          }}>
+            or
+          </Text>
+          <View style={{ flex: 1, height: 1, backgroundColor: "#e9ecef" }} />
+        </View>
+
+        {/* OAuth buttons - Google and LinkedIn only */}
+        <View style={{ 
+          flexDirection: "row", 
+          justifyContent: "center", 
+          gap: 20, 
+          marginBottom: 20,
+          width: "100%",
+          alignItems: "center",
+        }}>
+          {/* Google Sign-in */}
+          <Pressable
+            style={({ pressed }) => [
+              {
+                width: 60,
+                height: 60,
+                borderRadius: 16,
+                backgroundColor: "#ffffff",
+                borderWidth: 2,
+                borderColor: "#d1d5db",
+                alignItems: "center",
+                justifyContent: "center",
+                transform: [{ scale: pressed ? 0.95 : 1 }],
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 3 },
+                shadowOpacity: 0.12,
+                shadowRadius: 10,
+                elevation: 5,
+              }
+            ]}
+            onPress={() => {}}
+          >
+            <Svg width={26} height={26} viewBox="0 0 18 18">
+              <Path fill="#EA4335" d="M9 3.48c1.69 0 3.22.58 4.42 1.71l3.3-3.3C14.86.5 12.11 0 9 0 5.48 0 2.44 1.64 .64 4.04l3.78 2.94C5.2 5.11 6.96 3.48 9 3.48z" />
+              <Path fill="#4285F4" d="M17.64 9.2c0-.74-.06-1.47-.18-2.16H9v4.09h4.84c-.21 1.1-.84 2.03-1.79 2.66l2.73 2.12c1.59-1.47 2.51-3.64 2.51-6.71z" />
+              <Path fill="#FBBC05" d="M3.42 10.96a5.5 5.5 0 010-3.92L-.36 4.1a9 9 0 000 9.8l3.78-2.94z" />
+              <Path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.73-2.12c-.76.51-1.74.82-3.23.82-2.47 0-4.57-1.67-5.32-3.92L-.64 13.9C1.16 16.36 4.03 18 9 18z" />
+            </Svg>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [
+              {
+                width: 60,
+                height: 60,
+                borderRadius: 16,
+                backgroundColor: "#ffffff",
+                borderWidth: 2,
+                borderColor: "#d1d5db",
+                alignItems: "center",
+                justifyContent: "center",
+                transform: [{ scale: pressed ? 0.95 : 1 }],
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 3 },
+                shadowOpacity: 0.12,
+                shadowRadius: 10,
+                elevation: 5,
+              }
+            ]}
+            onPress={() => {}}
+          >
+            <AntDesign name="linkedin-square" size={26} color="#0e76a8" />
+          </Pressable>
+        </View>
+
+
+        </ScrollView>
+        
+        {/* Footer - Terms and signup link */}
+        <View style={{
+          paddingHorizontal: 24,
+          paddingBottom: 20,
+          paddingTop: 10,
+          backgroundColor: "#ffffff",
+        }}>
+          {/* Terms and privacy */}
+          <Text style={{
+            fontSize: 12,
+            color: "#999999",
+            textAlign: "center",
+            lineHeight: 18,
+            marginBottom: 12,
+          }}>
+            By continuing, you agree to our{"\n"}
+            <Text style={{ color: "#666666", textDecorationLine: "underline" }}>Terms of Service</Text>
+            {" "}
+            <Text style={{ color: "#666666", textDecorationLine: "underline" }}>Privacy Policy</Text>
+            {" "}
+            <Text style={{ color: "#666666", textDecorationLine: "underline" }}>Content Policy</Text>
+          </Text>
+
+          {/* Bottom signup link */}
+          <Pressable 
+            onPress={() => router.push("/auth/signup")}
+            style={({ pressed }) => [
+              { 
+                transform: [{ scale: pressed ? 0.98 : 1 }],
+                paddingVertical: 8,
+                alignItems: "center",
+              }
+            ]}
+          > 
+            <Text style={{ 
+              color: "#666666", 
+              textAlign: "center",
+              fontSize: 14,
+              lineHeight: 20,
+            }}>
+              New to Skill Drill? {" "}
+              <Text style={{ 
+                color: BRAND,
+                fontWeight: "600", 
+              }}>
+                Sign up
+              </Text>
             </Text>
           </Pressable>
         </View>
