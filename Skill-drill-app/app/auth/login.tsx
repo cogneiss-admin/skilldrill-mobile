@@ -248,7 +248,7 @@ export default function LoginScreen() {
                 color: "#ffffff",
                 letterSpacing: 0.5,
               }}>
-                {busy ? "Please wait..." : "Continue"}
+                {busy ? "Please wait..." : "Send OTP"}
               </Text>
             </Pressable>
           </View>

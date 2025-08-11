@@ -27,4 +27,7 @@ export function validationMessage(value: string): string {
   return "";
 }
 
+// Provide a default export placeholder to satisfy expo-router route checks
+export default {};
+
 

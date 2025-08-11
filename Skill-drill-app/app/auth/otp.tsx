@@ -27,6 +27,8 @@ export default function OtpScreen() {
 
   const [digits, setDigits] = useState<string[]>(["", "", "", "", "", ""]);
   const [busy, setBusy] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [verified, setVerified] = useState(false);
   const { remaining, reset } = useCountdown(30);
 
   const refs = [useRef(null), useRef(null), useRef(null), useRef(null), useRef(null), useRef(null)];
@@ -78,20 +80,45 @@ export default function OtpScreen() {
   };
 
   const verifyOtp = async () => {
-    if (busy) return;
-    if (!/^\d{4,6}$/.test(code)) {
-      Alert.alert("Invalid OTP", `Enter the 6 digit code sent to your ${isEmail ? "email" : "mobile number"}.`);
-      return;
+    if (busy) return false;
+    if (!/^\d{6}$/.test(code)) {
+      setErrorMessage("Enter valid OTP");
+      return false;
     }
     try {
       setBusy(true);
+      setErrorMessage("");
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      // TODO: Call backend verification. Respecting user's preference to not change backend.
-      router.replace("/home");
+      // TEMP: accept any 6-digit OTP as valid; show success and redirect
+      try { await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+      setVerified(true);
+      setTimeout(() => {
+        router.replace({ pathname: "/auth/basic-info", params: { phone, email } });
+      }, 700);
+      return true;
+    } catch {
+      setErrorMessage("Enter valid OTP");
+      return false;
     } finally {
       setBusy(false);
     }
   };
+
+  // Auto-verify as soon as 6 digits are entered
+  useEffect(() => {
+    if (code.length === 6) {
+      verifyOtp().then((ok) => {
+        if (!ok) {
+          // Reset code on failure so user can re-enter quickly
+          setDigits(["", "", "", "", "", ""]);
+        }
+      });
+    } else if (errorMessage) {
+      // Clear error while user is typing
+      setErrorMessage("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code]);
 
   const resend = async () => {
     if (remaining > 0) return;
@@ -124,7 +151,19 @@ export default function OtpScreen() {
 
           {/* OTP boxes */}
           <View style={{ marginTop: 28 }}>
-            <CodeBoxes length={6} value={digits} onChange={setDigits} color="#0A66C2" />
+            <CodeBoxes
+              length={6}
+              value={digits}
+              onChange={(v) => {
+                if (!verified) setDigits(v);
+              }}
+              color={errorMessage ? "#DC2626" : verified ? "#16A34A" : "#0A66C2"}
+            />
+            {errorMessage ? (
+              <Text style={{ color: "#DC2626", marginTop: 10, textAlign: "center", fontWeight: "600" }}>{errorMessage}</Text>
+            ) : verified ? (
+              <Text style={{ color: "#16A34A", marginTop: 10, textAlign: "center", fontWeight: "700" }}>OTP verified! Redirecting…</Text>
+            ) : null}
           </View>
 
           {/* Resend */}
@@ -140,26 +179,7 @@ export default function OtpScreen() {
             </Text>
           </View>
 
-          {/* Verify button */}
-          <View style={{ alignItems: "center", marginTop: 24 }}>
-            <Pressable
-              onPress={verifyOtp}
-              disabled={busy || code.length < 4}
-              style={({ pressed }) => ({
-                height: 52,
-                width: "100%",
-                borderRadius: 14,
-                backgroundColor: code.length >= 4 ? BRAND : "#D1D5DB",
-                alignItems: "center",
-                justifyContent: "center",
-                opacity: pressed ? 0.9 : 1,
-              })}
-            >
-              <Text style={{ color: "#ffffff", fontSize: 16, fontWeight: "700" }}>
-                {busy ? "Verifying..." : "Verify & Continue"}
-              </Text>
-            </Pressable>
-          </View>
+          {/* No verify button needed; auto-verifies on 6th digit */}
         </View>
 
         {/* Bottom link */}

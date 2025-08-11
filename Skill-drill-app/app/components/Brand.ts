@@ -1,5 +1,11 @@
-// This file is intentionally left minimal.
-// Keeping it to avoid route warnings from expo-router about non-page files removal.
+// Non-route utility kept inside the `app/` tree.
+// Add a default export React component placeholder to satisfy expo-router route checks.
+import React from "react";
+
 export const BRAND = "#0A66C2";
+
+export default function BrandPlaceholder(): JSX.Element | null {
+  return null;
+}
 
 
