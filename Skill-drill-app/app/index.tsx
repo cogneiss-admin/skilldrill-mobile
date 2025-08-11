@@ -10,10 +10,10 @@ import Svg, { Defs, RadialGradient as SvgRadialGradient, Rect, Stop } from "reac
 import { Button } from "react-native-paper";
 import { MotiView } from "moti";
 import { StatusBar } from "expo-status-bar";
-// Animated logo asset
-const logoSrc = require("../assets/images/logo.png");
 import * as Haptics from "expo-haptics";
 import "./home"; // pre-load home route to avoid router spinner during navigation
+
+const logoSrc = require("../assets/images/logo.png");
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const BRAND = "#0A66C2"; // keep consistent with splash
@@ -23,40 +23,85 @@ export default function App() {
   const [navigating, setNavigating] = useState(false);
   const router = useRouter();
 
-
   const handleGetStarted = async () => {
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch {}
     setNavigating(true);
-    router.push("/auth/login");
-  };
-
-  const handleSkip = async () => {
-    try {
-      await Haptics.selectionAsync();
-    } catch {}
-    router.push("/home");
+    
+    // Add a small delay for smooth transition animation
+    setTimeout(() => {
+      router.push("/auth/login");
+    }, 300);
   };
 
   return (
     <View style={{ flex: 1, backgroundColor: BRAND }}>
-      <WelcomeScreen onGetStarted={handleGetStarted} onSkip={handleSkip} />
+      <MotiView
+        animate={{ opacity: isSplashDone ? 1 : 0 }}
+        transition={{ type: "timing", duration: 800 }}
+        style={{ flex: 1 }}
+      >
+        <WelcomeScreen onGetStarted={handleGetStarted} />
+      </MotiView>
+      
       {!isSplashDone && (
-        <View style={StyleSheet.absoluteFillObject}>
+        <MotiView
+          style={StyleSheet.absoluteFillObject}
+          exit={{ opacity: 0, scale: 1.1 }}
+          transition={{ type: "timing", duration: 800 }}
+        >
           <SplashOverlay onFinish={() => setSplashDone(true)} />
-        </View>
+        </MotiView>
       )}
+      
       {navigating && (
-        <View style={[StyleSheet.absoluteFillObject, { alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.25)" }]}>
-          <ActivityIndicator size="large" color="#ffffff" />
-        </View>
+        <MotiView
+          from={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ type: "timing", duration: 400 }}
+          style={[StyleSheet.absoluteFillObject, { alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.4)" }]}
+        >
+          <MotiView
+            from={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: "timing", duration: 300, delay: 100 }}
+            style={{ 
+              backgroundColor: "rgba(255,255,255,0.95)", 
+              borderRadius: 20, 
+              padding: 24,
+              alignItems: "center",
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              shadowRadius: 8,
+              elevation: 10,
+            }}
+          >
+            <ActivityIndicator size="large" color={BRAND} />
+            <MotiView
+              from={{ opacity: 0, translateY: 10 }}
+              animate={{ opacity: 1, translateY: 0 }}
+              transition={{ type: "timing", duration: 400, delay: 200 }}
+            >
+              <Text style={{ 
+                marginTop: 12, 
+                color: BRAND, 
+                fontSize: 16, 
+                fontWeight: "600",
+                textAlign: "center" 
+              }}>
+                Getting Started...
+              </Text>
+            </MotiView>
+          </MotiView>
+        </MotiView>
       )}
     </View>
   );
 }
 
-function WelcomeScreen({ onGetStarted, onSkip }: { onGetStarted: () => void; onSkip: () => void }) {
+function WelcomeScreen({ onGetStarted }: { onGetStarted: () => void }) {
   const slides = useMemo(
     () => [
       {
@@ -66,18 +111,23 @@ function WelcomeScreen({ onGetStarted, onSkip }: { onGetStarted: () => void; onS
       },
       {
         id: "s2",
-        headline: "Soft skills turn knowledge into impact.",
-        caption: "Practice > theory. Build habits that stick.",
+        headline: "93% of employers value soft skills over technical expertise.",
+        caption: "Source: LinkedIn Global Talent Trends Report",
       },
       {
         id: "s3",
-        headline: "Communicate clearly. Lead with empathy. Grow every day.",
-        caption: "Bite-sized drills. Real-world tasks.",
+        headline: "Soft skills boost productivity by 12% and job performance by 256%.",
+        caption: "Source: Harvard Business Review & MIT Studies",
       },
       {
         id: "s4",
-        headline: "Track growth with streaks, milestones, and insights.",
-        caption: "Stay consistent with science-backed methods.",
+        headline: "Top earners have 4x stronger communication and leadership skills.",
+        caption: "Source: Fortune 500 Executive Survey",
+      },
+      {
+        id: "s5",
+        headline: "Build skills that AI can't replace — emotional intelligence matters.",
+        caption: "Future-proof your career with SkillSeed",
       },
     ],
     []
@@ -89,37 +139,31 @@ function WelcomeScreen({ onGetStarted, onSkip }: { onGetStarted: () => void; onS
     <SafeAreaView className="flex-1">
       <StatusBar style="light" />
       <View className="flex-1">
-        {/* Skip button */}
-        <View style={{ position: "absolute", top: 6, right: 12, zIndex: 10 }}>
-          <Button mode="text" onPress={onSkip} compact>
-            Skip
-          </Button>
+        <StaticBackground />
+        
+        {/* Hidden carousel for banner content cycling */}
+        <View style={{ position: 'absolute', opacity: 0, pointerEvents: 'none' }}>
+          <Carousel
+            width={SCREEN_WIDTH}
+            height={SCREEN_HEIGHT}
+            autoPlay
+            autoPlayInterval={4000}
+            loop
+            pagingEnabled
+            data={slides}
+            onSnapToItem={(index) => setActiveIndex(index)}
+            renderItem={() => <View />}
+          />
         </View>
-
-        <Carousel
-          width={SCREEN_WIDTH}
-          height={SCREEN_HEIGHT}
-          autoPlay
-          autoPlayInterval={3500}
-          loop
-          pagingEnabled
-          data={slides}
-          onSnapToItem={(index) => setActiveIndex(index)}
-          renderItem={() => (
-            <PremiumSlide />
-          )}
-        />
 
         {/* Center animated logo + animated welcome headline */}
         <View style={{ position: "absolute", top: 0, bottom: 0, left: 0, right: 0 }} className="items-center justify-center">
-          <LogoPulse size={110} />
-          <MotiView
-            from={{ opacity: 0, translateY: 6 }}
-            animate={{ opacity: 1, translateY: 0 }}
-            transition={{ type: "timing", duration: 700, delay: 150 }}
-          >
-            <AnimatedWelcome />
-          </MotiView>
+          <View style={{ marginTop: -120 }} className="items-center">
+            <LogoPulse size={120} />
+            <View style={{ marginTop: 24 }}>
+              <AnimatedWelcome />
+            </View>
+          </View>
         </View>
 
         {/* Light top gradient for readability */}
@@ -128,50 +172,115 @@ function WelcomeScreen({ onGetStarted, onSkip }: { onGetStarted: () => void; onS
           style={{ position: "absolute", left: 0, right: 0, top: 0, height: 120 }}
         />
 
-        {/* Bottom overlay with copy + CTA */}
+        {/* Clean bottom section with content */}
         <LinearGradient
-          colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.25)"]}
+          colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.6)"]}
           style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}
         >
-          <View className="px-6 pt-10 pb-6">
+          <View className="px-8 pt-12 pb-10">
             <MotiView
               key={`txt-${activeIndex}`}
-              from={{ opacity: 0, translateY: 8 }}
-              animate={{ opacity: 1, translateY: 0 }}
-              transition={{ type: "timing", duration: 450 }}
+              from={{ opacity: 0, translateY: 15, scale: 0.98 }}
+              animate={{ opacity: 1, translateY: 0, scale: 1 }}
+              exit={{ opacity: 0, translateY: -10, scale: 0.98 }}
+              transition={{ 
+                type: "timing", 
+                duration: 600,
+                opacity: { duration: 400 },
+                translateY: { duration: 600 },
+                scale: { duration: 500 }
+              }}
             >
-              <Text style={{ fontSize: 26, lineHeight: 34 }} className="font-bold text-white">
+              <Text 
+                style={{ 
+                  fontSize: 26, 
+                  lineHeight: 34, 
+                  fontWeight: "800",
+                  textAlign: 'center',
+                  textShadowColor: 'rgba(0,0,0,0.8)', 
+                  textShadowOffset: {width: 0, height: 2}, 
+                  textShadowRadius: 6 
+                }} 
+                className="text-white"
+              >
                 {slides[activeIndex].headline}
               </Text>
-              {slides[activeIndex].caption ? (
-                <Text style={{ fontSize: 16 }} className="mt-2 text-gray-200">
+              {slides[activeIndex].caption && (
+                <Text 
+                  style={{ 
+                    fontSize: 15, 
+                    fontWeight: "500",
+                    textAlign: 'center',
+                    textShadowColor: 'rgba(0,0,0,0.6)', 
+                    textShadowOffset: {width: 0, height: 1}, 
+                    textShadowRadius: 3 
+                  }} 
+                  className="mt-3 text-gray-100"
+                >
                   {slides[activeIndex].caption}
                 </Text>
-              ) : null}
+              )}
             </MotiView>
 
-            {/* Pagination dots */}
-            <View className="flex-row items-center mt-4">
+            {/* Elegant pagination dots */}
+            <View className="flex-row items-center justify-center mt-6">
               {slides.map((s, idx) => (
-                <View
+                <MotiView
                   key={s.id}
-                  style={{
-                    width: idx === activeIndex ? 10 : 6,
-                    height: 6,
-                    borderRadius: 3,
-                    marginRight: 6,
-                    backgroundColor: idx === activeIndex ? "#ffffff" : "rgba(255,255,255,0.45)",
+                  animate={{
+                    scale: idx === activeIndex ? 1.3 : 1,
+                    opacity: idx === activeIndex ? 1 : 0.6,
                   }}
-                />
+                  transition={{ 
+                    type: "spring", 
+                    damping: 15,
+                    stiffness: 150,
+                  }}
+                >
+                  <MotiView
+                    animate={{
+                      width: idx === activeIndex ? 12 : 8,
+                      height: idx === activeIndex ? 12 : 8,
+                    }}
+                    transition={{ 
+                      type: "spring", 
+                      damping: 20,
+                      stiffness: 200,
+                    }}
+                    style={{
+                      borderRadius: 6,
+                      marginHorizontal: 4,
+                      backgroundColor: "#ffffff",
+                      shadowColor: "#ffffff",
+                      shadowOffset: { width: 0, height: 0 },
+                      shadowOpacity: idx === activeIndex ? 0.8 : 0,
+                      shadowRadius: idx === activeIndex ? 6 : 0,
+                    }}
+                  />
+                </MotiView>
               ))}
             </View>
 
-            <View className="mt-5" />
+            <View className="mt-8" />
             <Button
               mode="contained"
               onPress={onGetStarted}
-              contentStyle={{ height: 52 }}
-              style={{ borderRadius: 26 }}
+              contentStyle={{ height: 56 }}
+              style={{ 
+                borderRadius: 28,
+                backgroundColor: "#ffffff",
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.25,
+                shadowRadius: 12,
+                elevation: 8,
+              }}
+              labelStyle={{ 
+                fontSize: 18, 
+                fontWeight: "700",
+                color: "#0A66C2",
+                letterSpacing: 0.5,
+              }}
             >
               Get Started
             </Button>
@@ -185,90 +294,150 @@ function WelcomeScreen({ onGetStarted, onSkip }: { onGetStarted: () => void; onS
 function AnimatedWelcome() {
   return (
     <MotiView
-      from={{ opacity: 0.8 }}
+      from={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      transition={{ type: "timing", duration: 700 }}
+      transition={{ type: "timing", duration: 1500, delay: 800 }}
       className="items-center"
     >
       <Text
-        className="text-white"
-        style={{ fontSize: 24, fontWeight: "800", letterSpacing: 0.5 }}
+        className="text-white text-center"
+        style={{ 
+          fontSize: 32, 
+          fontWeight: "800", 
+          letterSpacing: 0.8, 
+          textShadowColor: 'rgba(0,0,0,0.5)', 
+          textShadowOffset: {width: 0, height: 2}, 
+          textShadowRadius: 6 
+        }}
       >
-        Welcome to <Text style={{ color: BRAND }}>Skill Drill</Text>
+        Welcome to
       </Text>
-      <MotiView
-        from={{ scale: 1 }}
-        animate={{ scale: 1.04 }}
-        transition={{ loop: true, type: "timing", duration: 1400 }}
+      <Text
+        className="text-white text-center"
+        style={{ 
+          fontSize: 40, 
+          fontWeight: "900", 
+          letterSpacing: 1.2, 
+          marginTop: 4,
+          textShadowColor: 'rgba(0,0,0,0.6)', 
+          textShadowOffset: {width: 0, height: 2}, 
+          textShadowRadius: 8 
+        }}
       >
-        <View style={{ height: 2, backgroundColor: "rgba(255,255,255,0.45)", width: 140, marginTop: 6, borderRadius: 1 }} />
-      </MotiView>
+        SkillSeed
+      </Text>
+      <View style={{ 
+        height: 3, 
+        backgroundColor: "rgba(255,255,255,0.8)", 
+        marginTop: 8, 
+        width: 180,
+        borderRadius: 2,
+      }} />
+      <Text
+        className="text-white text-center"
+        style={{ 
+          fontSize: 16, 
+          fontWeight: "500", 
+          letterSpacing: 0.3, 
+          marginTop: 12,
+          opacity: 0.9,
+          textShadowColor: 'rgba(0,0,0,0.4)', 
+          textShadowOffset: {width: 0, height: 1}, 
+          textShadowRadius: 3 
+        }}
+      >
+        Your personal platform for growing professional soft skills
+      </Text>
     </MotiView>
   );
 }
 
 function LogoPulse({ size = 200 }: { size?: number }) {
   const scale = useRef(new RNAnimated.Value(1)).current;
-  const opacity = useRef(new RNAnimated.Value(1)).current;
 
   useEffect(() => {
-    const loopAnim = RNAnimated.loop(
+    const pulseAnim = RNAnimated.loop(
       RNAnimated.sequence([
-        RNAnimated.parallel([
-          RNAnimated.timing(scale, { toValue: 1.06, duration: 900, useNativeDriver: true }),
-          RNAnimated.timing(opacity, { toValue: 0.95, duration: 900, useNativeDriver: true }),
-        ]),
-        RNAnimated.parallel([
-          RNAnimated.timing(scale, { toValue: 1.0, duration: 900, useNativeDriver: true }),
-          RNAnimated.timing(opacity, { toValue: 1, duration: 900, useNativeDriver: true }),
-        ]),
+        RNAnimated.timing(scale, { toValue: 1.05, duration: 2000, useNativeDriver: true }),
+        RNAnimated.timing(scale, { toValue: 1.0, duration: 2000, useNativeDriver: true }),
       ])
     );
-    loopAnim.start();
-    return () => loopAnim.stop();
-  }, [scale, opacity]);
+
+    pulseAnim.start();
+    
+    return () => {
+      pulseAnim.stop();
+    };
+  }, [scale]);
 
   return (
-    <RNAnimated.Image
-      source={logoSrc}
-      style={{ width: size, height: size, opacity, transform: [{ scale }] }}
-      resizeMode="contain"
-    />
+    <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+      {/* Logo with blending technique */}
+      <RNAnimated.View
+        style={{ 
+          width: size, 
+          height: size, 
+          transform: [{ scale }],
+          position: 'relative',
+        }}
+      >
+        {/* Background gradient that matches our main background */}
+        <LinearGradient
+          colors={["#0A66C2", "#0E75D1", "#1285E0"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{ 
+            position: 'absolute',
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+          }}
+        />
+        
+        {/* Logo on top with blend mode */}
+        <RNAnimated.Image
+          source={logoSrc}
+          style={{ 
+            width: size, 
+            height: size,
+            position: 'absolute',
+          }}
+          resizeMode="contain"
+        />
+      </RNAnimated.View>
+    </View>
   );
 }
 
-function PremiumSlide() {
+function StaticBackground() {
   return (
     <View className="flex-1">
-      {/* Base brand gradient */}
       <LinearGradient
-        colors={["#0A66C2", "#0A3E86"]}
+        colors={["#0A66C2", "#0E75D1", "#1285E0"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={{ flex: 1 }}
       />
-
-      {/* Soft radial accents (brand teal + violet) */}
-      <Svg width={SCREEN_WIDTH} height={SCREEN_HEIGHT} style={{ position: "absolute" }}>
-        <Defs>
-          <SvgRadialGradient id="accent1" cx="20%" cy="15%" r="35%">
-            <Stop offset="0%" stopColor="#22D3EE" stopOpacity="0.35" />
-            <Stop offset="100%" stopColor="#22D3EE" stopOpacity="0" />
-          </SvgRadialGradient>
-          <SvgRadialGradient id="accent2" cx="85%" cy="60%" r="45%">
-            <Stop offset="0%" stopColor="#8B5CF6" stopOpacity="0.25" />
-            <Stop offset="100%" stopColor="#8B5CF6" stopOpacity="0" />
-          </SvgRadialGradient>
-        </Defs>
-        <Rect x="0" y="0" width="100%" height="100%" fill="url(#accent1)" />
-        <Rect x="0" y="0" width="100%" height="100%" fill="url(#accent2)" />
-      </Svg>
-
-      {/* Gentle sheen to keep it clean */}
       <LinearGradient
-        colors={["rgba(255,255,255,0.0)", "rgba(255,255,255,0.04)"]}
+        colors={["rgba(10, 102, 194, 0.9)", "rgba(18, 133, 224, 0.6)", "rgba(10, 102, 194, 0.8)"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
         style={{ position: "absolute", inset: 0 }}
       />
+      <Svg width={SCREEN_WIDTH} height={SCREEN_HEIGHT} style={{ position: "absolute" }}>
+        <Defs>
+          <SvgRadialGradient id="brand-accent1" cx="30%" cy="30%" r="50%">
+            <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.12" />
+            <Stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+          </SvgRadialGradient>
+          <SvgRadialGradient id="brand-accent2" cx="70%" cy="80%" r="60%">
+            <Stop offset="0%" stopColor="#0A66C2" stopOpacity="0.4" />
+            <Stop offset="100%" stopColor="#0A66C2" stopOpacity="0" />
+          </SvgRadialGradient>
+        </Defs>
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#brand-accent1)" />
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#brand-accent2)" />
+      </Svg>
     </View>
   );
 }
