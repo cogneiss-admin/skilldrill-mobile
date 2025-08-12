@@ -66,11 +66,25 @@ export default function BasicInfoScreen() {
     try {
       setBusy(true);
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      
+      // Import auth service dynamically to avoid circular dependencies
+      const { authService } = await import("../../services/authService");
+      
+      // Update user profile with additional information
+      await authService.updateUserProfile({
+        name: fullName,
+        email: emailId || undefined,
+        phone_no: mobile || undefined,
+      });
+      
       try { await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
       setSuccess(true);
       setTimeout(() => {
         router.replace("/home");
       }, 900);
+    } catch (error: any) {
+      console.error('Profile update error:', error);
+      // Handle error - you might want to show an alert or error message
     } finally {
       setBusy(false);
     }

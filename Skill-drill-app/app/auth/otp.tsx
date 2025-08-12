@@ -89,15 +89,29 @@ export default function OtpScreen() {
       setBusy(true);
       setErrorMessage("");
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      // TEMP: accept any 6-digit OTP as valid; show success and redirect
-      try { await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
-      setVerified(true);
-      setTimeout(() => {
-        router.replace({ pathname: "/auth/basic-info", params: { phone, email } });
-      }, 700);
-      return true;
-    } catch {
-      setErrorMessage("Enter valid OTP");
+      
+      // Import auth service dynamically to avoid circular dependencies
+      const { authService } = await import("../../services/authService");
+      
+      const response = await authService.verifyOtp({
+        identifier: contactInfo,
+        otp: code
+      });
+      
+      if (response.success) {
+        try { await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+        setVerified(true);
+        setTimeout(() => {
+          router.replace({ pathname: "/auth/basic-info", params: { phone, email } });
+        }, 700);
+        return true;
+      } else {
+        setErrorMessage(response.message || "Invalid OTP");
+        return false;
+      }
+    } catch (error: any) {
+      console.error('OTP verification error:', error);
+      setErrorMessage(error.message || "Enter valid OTP");
       return false;
     } finally {
       setBusy(false);
@@ -122,9 +136,27 @@ export default function OtpScreen() {
 
   const resend = async () => {
     if (remaining > 0) return;
-    await Haptics.selectionAsync();
-    reset();
-    Alert.alert("OTP Sent", `We have re-sent the OTP to your ${isEmail ? "email" : "mobile number"}.`);
+    
+    try {
+      await Haptics.selectionAsync();
+      
+      // Import auth service dynamically to avoid circular dependencies
+      const { authService } = await import("../../services/authService");
+      
+      const response = await authService.resendOtp({
+        identifier: contactInfo
+      });
+      
+      if (response.success) {
+        reset();
+        Alert.alert("OTP Sent", `We have re-sent the OTP to your ${isEmail ? "email" : "mobile number"}.`);
+      } else {
+        Alert.alert("Error", response.message || "Failed to resend OTP");
+      }
+    } catch (error: any) {
+      console.error('Resend OTP error:', error);
+      Alert.alert("Error", error.message || "Failed to resend OTP");
+    }
   };
 
   return (
@@ -169,7 +201,7 @@ export default function OtpScreen() {
           {/* Resend */}
           <View style={{ alignItems: "center", marginTop: 24 }}>
             <Text style={{ fontSize: 15, color: "#6B7280" }}>
-              Didn't get the OTP?{" "}
+              Didn&apos;t get the OTP?{" "}
               <Text
                 onPress={resend}
                 style={{ color: remaining > 0 ? "#9CA3AF" : BRAND, fontWeight: "700" }}

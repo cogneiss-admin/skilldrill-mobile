@@ -6,6 +6,7 @@ import { TextInput } from "react-native-paper";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { detectInputType, isValidEmail, isValidPhone, validationMessageFor } from "../../components/validators";
+import { useSocialAuth } from "../../hooks/useSocialAuth";
 import { StatusBar } from "expo-status-bar";
 import Svg, { Path } from "react-native-svg";
 import { AntDesign } from "@expo/vector-icons";
@@ -19,6 +20,7 @@ export default function SignupScreen() {
   const [busy, setBusy] = useState(false);
   const inputType = useMemo(() => detectInputType(emailOrPhone), [emailOrPhone]);
   const [validationMessage, setValidationMessage] = useState("");
+  const { signInWithGoogle, signInWithLinkedIn, isLoading: socialLoading, isProviderAvailable } = useSocialAuth();
   const isValidInput = useMemo(() => {
     const msg = validationMessageFor(emailOrPhone);
     setValidationMessage(msg);
@@ -33,10 +35,35 @@ export default function SignupScreen() {
     try {
       setBusy(true);
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      const params = inputType === "email"
-        ? { email: emailOrPhone.trim() }
-        : { phone: emailOrPhone.replace(/[^0-9+]/g, "") };
-      router.push({ pathname: "/auth/otp", params });
+      
+      // Import auth service dynamically to avoid circular dependencies
+      const { authService } = await import("../../services/authService");
+      
+      let response;
+      if (inputType === "email") {
+        response = await authService.signupWithEmail({ 
+          email: emailOrPhone.trim(),
+          name: "User" // You might want to add a name input field
+        });
+      } else {
+        response = await authService.signupWithPhone({ 
+          phone_no: emailOrPhone.replace(/[^0-9+]/g, ""),
+          name: "User" // You might want to add a name input field
+        });
+      }
+      
+      if (response.success) {
+        const params = inputType === "email"
+          ? { email: emailOrPhone.trim() }
+          : { phone: emailOrPhone.replace(/[^0-9+]/g, "") };
+        router.push({ pathname: "/auth/otp", params });
+      } else {
+        // Handle error - you might want to show an alert or error message
+        console.error('Signup error:', response.message);
+      }
+    } catch (error: any) {
+      console.error('Signup error:', error);
+      // Handle error - you might want to show an alert or error message
     } finally {
       setBusy(false);
     }
@@ -183,58 +210,66 @@ export default function SignupScreen() {
 
           {/* OAuth buttons - Google and LinkedIn */}
           <View style={{ flexDirection: "row", justifyContent: "center", gap: 20, marginBottom: 20, width: "100%", alignItems: "center" }}>
-            <Pressable
-              style={({ pressed }) => [
-                {
-                  width: 60,
-                  height: 60,
-                  borderRadius: 16,
-                  backgroundColor: "#ffffff",
-                  borderWidth: 2,
-                  borderColor: "#d1d5db",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  transform: [{ scale: pressed ? 0.95 : 1 }],
-                  shadowColor: "#000",
-                  shadowOffset: { width: 0, height: 3 },
-                  shadowOpacity: 0.12,
-                  shadowRadius: 10,
-                  elevation: 5,
-                }
-              ]}
-              onPress={() => {}}
-            >
-              <Svg width={26} height={26} viewBox="0 0 18 18">
-                <Path fill="#EA4335" d="M9 3.48c1.69 0 3.22.58 4.42 1.71l3.3-3.3C14.86.5 12.11 0 9 0 5.48 0 2.44 1.64 .64 4.04l3.78 2.94C5.2 5.11 6.96 3.48 9 3.48z" />
-                <Path fill="#4285F4" d="M17.64 9.2c0-.74-.06-1.47-.18-2.16H9v4.09h4.84c-.21 1.1-.84 2.03-1.79 2.66l2.73 2.12c1.59-1.47 2.51-3.64 2.51-6.71z" />
-                <Path fill="#FBBC05" d="M3.42 10.96a5.5 5.5 0 010-3.92L-.36 4.1a9 9 0 000 9.8l3.78-2.94z" />
-                <Path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.73-2.12c-.76.51-1.74.82-3.23.82-2.47 0-4.57-1.67-5.32-3.92L-.64 13.9C1.16 16.36 4.03 18 9 18z" />
-              </Svg>
-            </Pressable>
+            {isProviderAvailable('GOOGLE') && (
+              <Pressable
+                style={({ pressed }) => [
+                  {
+                    width: 60,
+                    height: 60,
+                    borderRadius: 16,
+                    backgroundColor: "#ffffff",
+                    borderWidth: 2,
+                    borderColor: "#d1d5db",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transform: [{ scale: pressed ? 0.95 : 1 }],
+                    shadowColor: "#000",
+                    shadowOffset: { width: 0, height: 3 },
+                    shadowOpacity: 0.12,
+                    shadowRadius: 10,
+                    elevation: 5,
+                    opacity: socialLoading ? 0.6 : 1,
+                  }
+                ]}
+                onPress={signInWithGoogle}
+                disabled={socialLoading}
+              >
+                <Svg width={26} height={26} viewBox="0 0 18 18">
+                  <Path fill="#EA4335" d="M9 3.48c1.69 0 3.22.58 4.42 1.71l3.3-3.3C14.86.5 12.11 0 9 0 5.48 0 2.44 1.64 .64 4.04l3.78 2.94C5.2 5.11 6.96 3.48 9 3.48z" />
+                  <Path fill="#4285F4" d="M17.64 9.2c0-.74-.06-1.47-.18-2.16H9v4.09h4.84c-.21 1.1-.84 2.03-1.79 2.66l2.73 2.12c1.59-1.47 2.51-3.64 2.51-6.71z" />
+                  <Path fill="#FBBC05" d="M3.42 10.96a5.5 5.5 0 010-3.92L-.36 4.1a9 9 0 000 9.8l3.78-2.94z" />
+                  <Path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.73-2.12c-.76.51-1.74.82-3.23.82-2.47 0-4.57-1.67-5.32-3.92L-.64 13.9C1.16 16.36 4.03 18 9 18z" />
+                </Svg>
+              </Pressable>
+            )}
 
-            <Pressable
-              style={({ pressed }) => [
-                {
-                  width: 60,
-                  height: 60,
-                  borderRadius: 16,
-                  backgroundColor: "#ffffff",
-                  borderWidth: 2,
-                  borderColor: "#d1d5db",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  transform: [{ scale: pressed ? 0.95 : 1 }],
-                  shadowColor: "#000",
-                  shadowOffset: { width: 0, height: 3 },
-                  shadowOpacity: 0.12,
-                  shadowRadius: 10,
+            {isProviderAvailable('LINKEDIN') && (
+              <Pressable
+                style={({ pressed }) => [
+                  {
+                    width: 60,
+                    height: 60,
+                    borderRadius: 16,
+                    backgroundColor: "#ffffff",
+                    borderWidth: 2,
+                    borderColor: "#d1d5db",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transform: [{ scale: pressed ? 0.95 : 1 }],
+                    shadowColor: "#000",
+                    shadowOffset: { width: 0, height: 3 },
+                    shadowOpacity: 0.12,
+                    shadowRadius: 10,
                   elevation: 5,
-                }
-              ]}
-              onPress={() => {}}
-            >
-              <AntDesign name="linkedin-square" size={26} color="#0e76a8" />
-            </Pressable>
+                    opacity: socialLoading ? 0.6 : 1,
+                  }
+                ]}
+                onPress={signInWithLinkedIn}
+                disabled={socialLoading}
+              >
+                <AntDesign name="linkedin-square" size={26} color="#0e76a8" />
+              </Pressable>
+            )}
           </View>
         </ScrollView>
 
