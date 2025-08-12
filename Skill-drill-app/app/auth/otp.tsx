@@ -10,15 +10,16 @@ import CodeBoxes from "../../components/CodeBoxes";
 
 const BRAND = "#0A66C2";
 
-function useCountdown(seconds: number) {
-  const [remaining, setRemaining] = useState(seconds);
+function useCountdown(initialSeconds: number) {
+  const [remaining, setRemaining] = useState(initialSeconds);
   useEffect(() => {
     if (remaining <= 0) return;
     const t = setTimeout(() => setRemaining((s) => s - 1), 1000);
     return () => clearTimeout(t);
   }, [remaining]);
-  const reset = () => setRemaining(seconds);
-  return { remaining, reset } as const;
+  const reset = () => setRemaining(initialSeconds);
+  const setTo = (seconds: number) => setRemaining(seconds);
+  return { remaining, reset, setTo } as const;
 }
 
 export default function OtpScreen() {
@@ -29,7 +30,7 @@ export default function OtpScreen() {
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [verified, setVerified] = useState(false);
-  const { remaining, reset } = useCountdown(30);
+  const { remaining, reset, setTo } = useCountdown(30);
 
   const refs = [useRef(null), useRef(null), useRef(null), useRef(null), useRef(null), useRef(null)];
 
@@ -102,7 +103,7 @@ export default function OtpScreen() {
         try { await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
         setVerified(true);
         setTimeout(() => {
-          router.replace({ pathname: "/auth/basic-info", params: { phone, email } });
+          router.replace({ pathname: "/auth/career-role", params: { phone, email } });
         }, 700);
         return true;
       } else {
@@ -111,7 +112,15 @@ export default function OtpScreen() {
       }
     } catch (error: any) {
       console.error('OTP verification error:', error);
-      setErrorMessage(error.message || "Enter valid OTP");
+      // If server indicates OTP rate limit, enforce client-side lockout and show clear message
+      const isOtpRateLimited = error?.code === 'OTP_RATE_LIMIT_EXCEEDED' || /Too many OTP requests/i.test(error?.message || '');
+      if (isOtpRateLimited) {
+        const retryAfter = Number(error?.data?.retry_after || error?.data?.retryAfter || 300);
+        setTo(retryAfter);
+        setErrorMessage(`Too many OTP requests. Try again in ${Math.ceil(retryAfter / 60)} minute(s).`);
+      } else {
+        setErrorMessage(error.message || "Enter valid OTP");
+      }
       return false;
     } finally {
       setBusy(false);
@@ -151,11 +160,26 @@ export default function OtpScreen() {
         reset();
         Alert.alert("OTP Sent", `We have re-sent the OTP to your ${isEmail ? "email" : "mobile number"}.`);
       } else {
-        Alert.alert("Error", response.message || "Failed to resend OTP");
+        // If server blocks due to rate limit, respect it with a 5-minute lockout (or provided retry time)
+        const isOtpRateLimited = response?.code === 'OTP_RATE_LIMIT_EXCEEDED' || /Too many OTP requests/i.test(response?.message || '');
+        if (isOtpRateLimited) {
+          const retryAfter = Number(response?.data?.retry_after || response?.data?.retryAfter || 300);
+          setTo(retryAfter);
+          Alert.alert("Please wait", `Too many OTP requests. Try again in ${Math.ceil(retryAfter / 60)} minute(s).`);
+        } else {
+          Alert.alert("Error", response.message || "Failed to resend OTP");
+        }
       }
     } catch (error: any) {
       console.error('Resend OTP error:', error);
-      Alert.alert("Error", error.message || "Failed to resend OTP");
+      const isOtpRateLimited = error?.code === 'OTP_RATE_LIMIT_EXCEEDED' || /Too many OTP requests/i.test(error?.message || '');
+      if (isOtpRateLimited) {
+        const retryAfter = Number(error?.data?.retry_after || error?.data?.retryAfter || 300);
+        setTo(retryAfter);
+        Alert.alert("Please wait", `Too many OTP requests. Try again in ${Math.ceil(retryAfter / 60)} minute(s).`);
+      } else {
+        Alert.alert("Error", error.message || "Failed to resend OTP");
+      }
     }
   };
 
@@ -206,7 +230,13 @@ export default function OtpScreen() {
                 onPress={resend}
                 style={{ color: remaining > 0 ? "#9CA3AF" : BRAND, fontWeight: "700" }}
               >
-                {remaining > 0 ? `Resend SMS in ${remaining}s` : "Resend SMS"}
+                {remaining > 0
+                  ? `Resend ${isEmail ? 'email' : 'SMS'} in ${
+                      Math.floor(remaining / 60) > 0
+                        ? `${Math.floor(remaining / 60)}m ${String(remaining % 60).padStart(2, '0')}s`
+                        : `${remaining}s`
+                    }`
+                  : `Resend ${isEmail ? 'email' : 'SMS'}`}
               </Text>
             </Text>
           </View>

@@ -15,20 +15,7 @@ const BRAND = "#0A66C2";
 const APP_NAME = "Skill Drill";
 const logoSrc = require("../../assets/images/logo.png");
 
-type CareerStage = "entry" | "mid" | "senior";
-type RoleType = "ic" | "manager" | "exec";
-
-const careerOptions: Array<{ key: CareerStage; label: string }> = [
-  { key: "entry", label: "Entry-Level (0-3 Years)" },
-  { key: "mid", label: "Mid-Level (4-10 Years)" },
-  { key: "senior", label: "Experienced (11+ Years)" },
-];
-
-const roleOptions: Array<{ key: RoleType; label: string }> = [
-  { key: "ic", label: "Individual Contributor" },
-  { key: "manager", label: "Team Leader / Manager" },
-  { key: "exec", label: "Senior Leader / Executive" },
-];
+// Career details moved to separate screen
 
 export default function BasicInfoScreen() {
   const router = useRouter();
@@ -37,12 +24,8 @@ export default function BasicInfoScreen() {
   const [fullName, setFullName] = useState("");
   const [emailId, setEmailId] = useState(String(email || ""));
   const [mobile, setMobile] = useState(String(phone || ""));
-  const [careerStage, setCareerStage] = useState<CareerStage | null>(null);
-  const [roleType, setRoleType] = useState<RoleType | null>(null);
   const [busy, setBusy] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [careerMenuVisible, setCareerMenuVisible] = useState(false);
-  const [roleMenuVisible, setRoleMenuVisible] = useState(false);
 
   const emailError = useMemo(() => {
     if (!emailId) return "";
@@ -58,33 +41,27 @@ export default function BasicInfoScreen() {
     const hasName = fullName.trim().length >= 2;
     const emailOk = emailId ? isValidEmail(emailId) : true;
     const phoneOk = mobile ? isValidPhone(mobile) : true;
-    return hasName && emailOk && phoneOk && !!careerStage && !!roleType;
-  }, [fullName, emailId, mobile, careerStage, roleType]);
+    return hasName && emailOk && phoneOk;
+  }, [fullName, emailId, mobile]);
 
   const handleContinue = async () => {
     if (!canContinue || busy) return;
     try {
       setBusy(true);
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      
-      // Import auth service dynamically to avoid circular dependencies
+
+      // Save the basic info locally, then go to career-role screen
       const { authService } = await import("../../services/authService");
-      
-      // Update user profile with additional information
       await authService.updateUserProfile({
         name: fullName,
         email: emailId || undefined,
         phone_no: mobile || undefined,
       });
-      
-      try { await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
-      setSuccess(true);
-      setTimeout(() => {
-        router.replace("/home");
-      }, 900);
+
+      try { await Haptics.selectionAsync(); } catch {}
+      router.push("/auth/career-role");
     } catch (error: any) {
       console.error('Profile update error:', error);
-      // Handle error - you might want to show an alert or error message
     } finally {
       setBusy(false);
     }
@@ -174,45 +151,7 @@ export default function BasicInfoScreen() {
             {mobileError ? <Text style={{ color: "#DC2626", marginTop: 6 }}>{mobileError}</Text> : null}
           </MotiView>
 
-          {/* Career Stage (Field + Centered selector) */}
-          <MotiView from={{ opacity: 0, translateY: 12 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: "timing", duration: 500, delay: 240 }}>
-            <View style={{ position: "relative" }}>
-              <TextInput
-                mode="outlined"
-                label="Career Stage"
-                placeholder="Select your career stage"
-                value={careerStage ? careerOptions.find((o) => o.key === careerStage)?.label : ""}
-                editable={false}
-                showSoftInputOnFocus={false}
-                caretHidden
-                style={{ backgroundColor: "#ffffff", marginTop: 8 }}
-              />
-              <Pressable onPress={() => setCareerMenuVisible(true)} hitSlop={8} style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} />
-              <View style={{ position: "absolute", right: 12, top: 22 }}>
-                <AntDesign name="down" size={14} color="#6B7280" />
-              </View>
-            </View>
-          </MotiView>
-
-          {/* Role Type (Field + Centered selector) */}
-          <MotiView from={{ opacity: 0, translateY: 12 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: "timing", duration: 500, delay: 300 }}>
-            <View style={{ position: "relative" }}>
-              <TextInput
-                mode="outlined"
-                label="Current Role Type"
-                placeholder="Select your role type"
-                value={roleType ? roleOptions.find((o) => o.key === roleType)?.label : ""}
-                editable={false}
-                showSoftInputOnFocus={false}
-                caretHidden
-                style={{ backgroundColor: "#ffffff", marginTop: 8 }}
-              />
-              <Pressable onPress={() => setRoleMenuVisible(true)} hitSlop={8} style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} />
-              <View style={{ position: "absolute", right: 12, top: 22 }}>
-                <AntDesign name="down" size={14} color="#6B7280" />
-              </View>
-            </View>
-          </MotiView>
+          {/* Next step navigates to Career & Role */}
 
           {/* Continue Button */}
           <MotiView from={{ opacity: 0, translateY: 16 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: "timing", duration: 500, delay: 420 }}>
@@ -226,132 +165,11 @@ export default function BasicInfoScreen() {
               style={{ borderRadius: 26, backgroundColor: BRAND, opacity: canContinue ? 1 : 0.7 }}
               labelStyle={{ fontWeight: "700" }}
             >
-              Save & Continue
+              Next
             </Button>
           </MotiView>
         </ScrollView>
       </View>
-      {/* Success overlay */}
-      {success && (
-        <MotiView
-          style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.25)" }}
-          from={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ type: "timing", duration: 250 }}
-        >
-          <MotiView
-            from={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: "timing", duration: 300 }}
-            style={{ backgroundColor: "#ffffff", borderRadius: 20, padding: 24, alignItems: "center", minWidth: 220 }}
-          >
-            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "#16A34A", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
-              <AntDesign name="check" size={30} color="#ffffff" />
-            </View>
-            <Text style={{ fontSize: 16, fontWeight: "800", color: "#0f172a" }}>Saved!</Text>
-            <Text style={{ marginTop: 6, color: "#475569", textAlign: "center" }}>Personalizing your experience…</Text>
-          </MotiView>
-        </MotiView>
-      )}
-
-      {/* Dropdown bottom sheets */}
-      {careerMenuVisible && (
-        <MotiView
-          style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, alignItems: "center", justifyContent: "center" }}
-          from={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ type: "timing", duration: 200 }}
-        >
-          <Pressable
-            onPress={() => setCareerMenuVisible(false)}
-            style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.35)" }}
-          />
-          <MotiView
-            from={{ scale: 0.98, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: "timing", duration: 180 }}
-            style={{ position: "absolute", width: "88%", maxWidth: 520, backgroundColor: "#ffffff", paddingHorizontal: 12, paddingTop: 10, paddingBottom: 12, borderRadius: 12, shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 12, elevation: 8 }}
-          >
-            {careerOptions.map((o, idx) => {
-              const selected = careerStage === o.key;
-              return (
-                <Pressable
-                  key={o.key}
-                  onPress={async () => {
-                    setCareerStage(o.key);
-                    setCareerMenuVisible(false);
-                    try { await Haptics.selectionAsync(); } catch {}
-                  }}
-                  style={({ pressed }) => ({
-                    paddingVertical: 14,
-                    paddingHorizontal: 12,
-                    borderRadius: 10,
-                    backgroundColor: pressed ? "#F1F5F9" : "#ffffff",
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    borderWidth: selected ? 2 : 1,
-                    borderColor: selected ? BRAND : "#E5E7EB",
-                    marginTop: idx === 0 ? 4 : 10,
-                  })}
-                >
-                  <Text style={{ color: "#0f172a", fontSize: 15, fontWeight: "700" }}>{o.label}</Text>
-                  {selected ? <AntDesign name="checkcircle" size={20} color="#16A34A" /> : null}
-                </Pressable>
-              );
-            })}
-          </MotiView>
-        </MotiView>
-      )}
-
-      {roleMenuVisible && (
-        <MotiView
-          style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, alignItems: "center", justifyContent: "center" }}
-          from={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ type: "timing", duration: 200 }}
-        >
-          <Pressable
-            onPress={() => setRoleMenuVisible(false)}
-            style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.35)" }}
-          />
-          <MotiView
-            from={{ scale: 0.98, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: "timing", duration: 180 }}
-            style={{ position: "absolute", width: "88%", maxWidth: 520, backgroundColor: "#ffffff", paddingHorizontal: 12, paddingTop: 10, paddingBottom: 12, borderRadius: 12, shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 12, elevation: 8 }}
-          >
-            {roleOptions.map((o, idx) => {
-              const selected = roleType === o.key;
-              return (
-                <Pressable
-                  key={o.key}
-                  onPress={async () => {
-                    setRoleType(o.key);
-                    setRoleMenuVisible(false);
-                    try { await Haptics.selectionAsync(); } catch {}
-                  }}
-                  style={({ pressed }) => ({
-                    paddingVertical: 14,
-                    paddingHorizontal: 12,
-                    borderRadius: 10,
-                    backgroundColor: pressed ? "#F1F5F9" : "#ffffff",
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    borderWidth: selected ? 2 : 1,
-                    borderColor: selected ? BRAND : "#E5E7EB",
-                    marginTop: idx === 0 ? 4 : 10,
-                  })}
-                >
-                  <Text style={{ color: "#0f172a", fontSize: 15, fontWeight: "700" }}>{o.label}</Text>
-                  {selected ? <AntDesign name="checkcircle" size={20} color="#16A34A" /> : null}
-                </Pressable>
-              );
-            })}
-          </MotiView>
-        </MotiView>
-      )}
     </SafeAreaView>
   );
 }

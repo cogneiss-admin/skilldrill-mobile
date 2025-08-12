@@ -254,7 +254,7 @@ class ApiService {
   }
 
   private handleError(error: any): ApiError {
-    console.error('🔍 API Error Details:', {
+    if (__DEV__) console.debug('🔍 API Error Details:', {
       message: error.message,
       code: error.code,
       status: error.response?.status,
@@ -302,7 +302,7 @@ class ApiService {
       return new ApiError(message, status, data?.code, data);
     } else if (error.request) {
       // Network error - provide more specific information
-      console.error('🌐 Network Error:', {
+      if (__DEV__) console.debug('🌐 Network Error:', {
         url: error.config?.url,
         method: error.config?.method,
         timeout: error.code === 'ECONNABORTED' ? 'Request timeout' : 'No response received'

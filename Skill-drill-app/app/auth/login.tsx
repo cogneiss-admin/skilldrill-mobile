@@ -3,15 +3,17 @@ import React, { useMemo, useState } from "react";
 import { Pressable, View, Image, ScrollView, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TextInput } from "react-native-paper";
+import ErrorBanner from "../../components/ErrorBanner";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { AntDesign, MaterialIcons } from "@expo/vector-icons";
-import Svg, { Path } from "react-native-svg";
+import GoogleGIcon from "../../components/GoogleGIcon";
 import { StatusBar } from "expo-status-bar";
 
 const logoSrc = require("../../assets/images/logo.png");
 
 const BRAND = "#0A66C2";
+const COUNTRY_CODE = "+91";
 import { detectInputType, isValidEmail, isValidPhone, validationMessageFor } from "../../components/validators";
 import { useSocialAuth } from "../../hooks/useSocialAuth";
 
@@ -48,23 +50,30 @@ export default function LoginScreen() {
       if (inputType === "email") {
         response = await authService.loginWithEmail({ email: emailOrPhone.trim() });
       } else {
-        response = await authService.loginWithPhone({ phone_no: emailOrPhone.replace(/[^0-9+]/g, "") });
+        const raw = emailOrPhone;
+        const hasPlus = raw.includes("+");
+        const digits = raw.replace(/[^0-9]/g, "");
+        const phone_no = hasPlus ? `+${digits}` : `${COUNTRY_CODE}${digits}`;
+        response = await authService.loginWithPhone({ phone_no });
       }
       
       if (response.success) {
         // Pass both email and phone, backend will determine which to use
         const params = inputType === "email" 
           ? { email: emailOrPhone.trim() }
-          : { phone: emailOrPhone.replace(/[^0-9+]/g, "") };
+          : (() => { const raw = emailOrPhone; const hasPlus = raw.includes("+"); const digits = raw.replace(/[^0-9]/g, ""); return { phone: hasPlus ? `+${digits}` : `${COUNTRY_CODE}${digits}` }; })();
           
         router.push({ pathname: "/auth/otp", params });
       } else {
-        // Handle error - you might want to show an alert or error message
-        console.error('Login error:', response.message);
+        // If backend tells us user not found during login, show inline CTA to sign up
+        setValidationMessage(response.code === 'USER_NOT_FOUND' ? 'User does not exist. Please sign up.' : (response.message || 'Cannot send OTP'));
       }
     } catch (error: any) {
-      console.error('Login error:', error);
-      // Handle error - you might want to show an alert or error message
+      let message = error?.message || 'Cannot send OTP';
+      if (error?.code === 'USER_NOT_FOUND') message = 'User does not exist. Please sign up.';
+      if (error?.code === 'NETWORK_ERROR') message = 'Cannot connect to server. Please check your internet and try again.';
+      if (error?.code === 'TIMEOUT') message = 'Request timeout. Please try again.';
+      setValidationMessage(message);
     } finally {
       setBusy(false);
     }
@@ -76,7 +85,7 @@ export default function LoginScreen() {
       
       {/* Top half - Colorful section like Zomato */}
       <View style={{ 
-        height: "40%",
+        minHeight: 220,
         backgroundColor: "#E23744", // Zomato red color for reference, we'll use our brand
         paddingHorizontal: 20,
         justifyContent: "center",
@@ -188,22 +197,36 @@ export default function LoginScreen() {
               paddingHorizontal: 12,
               paddingVertical: 14,
               marginRight: 8,
-              minWidth: 60,
+              minWidth: 80,
               justifyContent: "center",
+              gap: 6,
             }}>
               <Text style={{ fontSize: 20 }}>🇮🇳</Text>
+              <Text style={{ fontSize: 16, color: "#111827", fontWeight: "700" }}>{COUNTRY_CODE}</Text>
             </View>
             
             <View style={{ flex: 1, maxWidth: 280 }}>
               <TextInput
                 mode="outlined"
-                placeholder="Enter Phone Number or Email"
-                keyboardType="default"
+                  placeholder="Mobile number or email"
+                keyboardType="number-pad"
                 autoCapitalize="none"
                 autoCorrect={false}
+                multiline={false}
                 textContentType={inputType === "phone" ? "telephoneNumber" : "emailAddress"}
                 value={emailOrPhone}
-                onChangeText={setEmailOrPhone}
+                maxLength={50}
+                onChangeText={(t) => {
+                  // If typing digits only, enforce 10-digit cap
+                  const onlyDigits = /^\+?\d*$/.test(t);
+                  if (onlyDigits) {
+                    const digits = t.replace(/\D/g, '').slice(0, 10);
+                    setEmailOrPhone(digits);
+                  } else {
+                    // Allow email input too (fallback)
+                    setEmailOrPhone(t);
+                  }
+                }}
                 style={{ 
                   backgroundColor: "#ffffff",
                   height: 50,
@@ -228,17 +251,22 @@ export default function LoginScreen() {
         </View>
 
 
-        {/* Validation message */}
+        {/* Validation / auth message with CTA */}
         {validationMessage ? (
-          <View style={{ width: 348, alignSelf: "center", marginTop: -8, marginBottom: 8 }}>
-            <Text style={{ color: "#E23744", fontSize: 12 }}>{validationMessage}</Text>
+          <View style={{ width: 348, alignSelf: "center", marginTop: -4, marginBottom: 10 }}>
+            <ErrorBanner
+              message={validationMessage}
+              tone="error"
+              ctaText={/sign up/i.test(validationMessage) ? 'Sign up' : undefined}
+              onCtaPress={/sign up/i.test(validationMessage) ? () => router.replace('/onboarding') : undefined}
+            />
           </View>
         ) : null}
 
 
 
         <View style={{ width: "100%", alignItems: "center" }}>
-          <View style={{ flexDirection: "row", justifyContent: "center" }}>
+          <View style={{ flexDirection: "row", justifyContent: "center", width: '100%' }}>
             <Pressable
               onPress={sendOtp}
               disabled={busy || !isValidInput}
@@ -250,7 +278,8 @@ export default function LoginScreen() {
                 justifyContent: "center",
                 marginTop: 20,
                 marginBottom: 16,
-                width: 348, // 60 (flag) + 8 (margin) + 280 (input) = 348
+                width: '100%',
+                maxWidth: 420,
                 opacity: isValidInput ? 1 : 0.5,
                 shadowColor: BRAND,
                 shadowOffset: {
@@ -309,10 +338,10 @@ export default function LoginScreen() {
               <Pressable
                 style={({ pressed }) => [
                   {
-                    width: 60,
-                    height: 60,
-                    borderRadius: 16,
-                    backgroundColor: "#ffffff",
+                    width: 56,
+                    height: 56,
+                    borderRadius: 9999,
+                    backgroundColor: "transparent",
                     borderWidth: 2,
                     borderColor: "#d1d5db",
                     alignItems: "center",
@@ -329,12 +358,7 @@ export default function LoginScreen() {
                 onPress={signInWithGoogle}
                 disabled={socialLoading}
               >
-                <Svg width={26} height={26} viewBox="0 0 18 18">
-                  <Path fill="#EA4335" d="M9 3.48c1.69 0 3.22.58 4.42 1.71l3.3-3.3C14.86.5 12.11 0 9 0 5.48 0 2.44 1.64 .64 4.04l3.78 2.94C5.2 5.11 6.96 3.48 9 3.48z" />
-                  <Path fill="#4285F4" d="M17.64 9.2c0-.74-.06-1.47-.18-2.16H9v4.09h4.84c-.21 1.1-.84 2.03-1.79 2.66l2.73 2.12c1.59-1.47 2.51-3.64 2.51-6.71z" />
-                  <Path fill="#FBBC05" d="M3.42 10.96a5.5 5.5 0 010-3.92L-.36 4.1a9 9 0 000 9.8l3.78-2.94z" />
-                  <Path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.73-2.12c-.76.51-1.74.82-3.23.82-2.47 0-4.57-1.67-5.32-3.92L-.64 13.9C1.16 16.36 4.03 18 9 18z" />
-                </Svg>
+                <GoogleGIcon size={26} />
               </Pressable>
             )}
 
@@ -342,10 +366,10 @@ export default function LoginScreen() {
               <Pressable
                 style={({ pressed }) => [
                   {
-                    width: 60,
-                    height: 60,
-                    borderRadius: 16,
-                    backgroundColor: "#ffffff",
+                    width: 56,
+                    height: 56,
+                    borderRadius: 9999,
+                    backgroundColor: "transparent",
                     borderWidth: 2,
                     borderColor: "#d1d5db",
                     alignItems: "center",
@@ -395,7 +419,7 @@ export default function LoginScreen() {
 
           {/* Bottom signup link */}
           <Pressable 
-            onPress={() => router.push("/auth/signup")}
+            onPress={() => router.push("/onboarding")}
             style={({ pressed }) => [
               { 
                 transform: [{ scale: pressed ? 0.98 : 1 }],

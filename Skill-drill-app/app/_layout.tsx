@@ -19,6 +19,9 @@ const theme = {
 };
 
 const logoSrc = require("../assets/images/logo.png");
+function GlobalOtpSheet() {
+  return null; // reserved for future global portal
+}
 
 function SmallLogo() {
   const scale = new RNAnimated.Value(1);
@@ -56,7 +59,8 @@ export default function RootLayout() {
             <Suspense fallback={<View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: BRAND }}><SmallLogo /></View>}>
               <Slot />
             </Suspense>
-            {/* Removed the blue navigation overlay */}
+            {/* Global OTP Bottom Sheet Portal */}
+            <GlobalOtpSheet />
           </>
         ) : (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: BRAND }}>

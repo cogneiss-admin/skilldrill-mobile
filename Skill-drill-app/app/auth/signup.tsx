@@ -1,81 +1,296 @@
 // @ts-nocheck
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, View, Image, ScrollView, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { TextInput } from "react-native-paper";
+import { Button, TextInput } from "react-native-paper";
+import ErrorBanner from "../../components/ErrorBanner";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
-import { detectInputType, isValidEmail, isValidPhone, validationMessageFor } from "../../components/validators";
+import { isValidEmail, isValidPhone } from "../../components/validators";
 import { useSocialAuth } from "../../hooks/useSocialAuth";
 import { StatusBar } from "expo-status-bar";
-import Svg, { Path } from "react-native-svg";
 import { AntDesign } from "@expo/vector-icons";
+import GoogleGIcon from "../../components/GoogleGIcon";
+import CodeBoxes from "../../components/CodeBoxes";
 
 const logoSrc = require("../../assets/images/logo.png");
 const BRAND = "#0A66C2";
+const COUNTRY_CODE = "+91";
 
 export default function SignupScreen() {
   const router = useRouter();
-  const [emailOrPhone, setEmailOrPhone] = useState("");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [busy, setBusy] = useState(false);
-  const inputType = useMemo(() => detectInputType(emailOrPhone), [emailOrPhone]);
-  const [validationMessage, setValidationMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [phoneVerified, setPhoneVerified] = useState(false);
+  const [otpSheetVisible, setOtpSheetVisible] = useState(false);
+  const [otpMode, setOtpMode] = useState<"email" | "phone">("email");
+  const [otpTarget, setOtpTarget] = useState<string>("");
+  const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
+  const [otpBusy, setOtpBusy] = useState(false);
+  const [otpError, setOtpError] = useState("");
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [bulkVerifyMode, setBulkVerifyMode] = useState<'both' | 'email' | 'phone'>('both');
+  const [otpSentEmail, setOtpSentEmail] = useState(false);
+  const [otpSentPhone, setOtpSentPhone] = useState(false);
+  const [resendRemaining, setResendRemaining] = useState(0);
   const { signInWithGoogle, signInWithLinkedIn, isLoading: socialLoading, isProviderAvailable } = useSocialAuth();
-  const isValidInput = useMemo(() => {
-    const msg = validationMessageFor(emailOrPhone);
-    setValidationMessage(msg);
-    if (!emailOrPhone.trim()) return false;
-    if (inputType === "email") return isValidEmail(emailOrPhone);
-    if (inputType === "phone") return isValidPhone(emailOrPhone);
-    return false;
-  }, [emailOrPhone, inputType]);
+  const nameOk = useMemo(() => name.trim().length >= 2, [name]);
+  const emailOk = useMemo(() => (email.trim() ? isValidEmail(email.trim()) : false), [email]);
+  const phoneOk = useMemo(() => (phone.trim() ? isValidPhone(phone.trim()) : false), [phone]);
+  const verifiedOk = emailVerified || phoneVerified; // verifying either is sufficient
+  const canContinue = useMemo(() => nameOk && (emailOk || phoneOk) && verifiedOk, [nameOk, emailOk, phoneOk, verifiedOk]);
 
-  const sendOtp = async () => {
-    if (busy || !isValidInput) return;
+  const handleContinue = async () => {
+    if (!canContinue || busy) return;
     try {
       setBusy(true);
+      setErrorMessage("");
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      
-      // Import auth service dynamically to avoid circular dependencies
+
       const { authService } = await import("../../services/authService");
-      
-      let response;
-      if (inputType === "email") {
-        response = await authService.signupWithEmail({ 
-          email: emailOrPhone.trim(),
-          name: "User" // You might want to add a name input field
-        });
-      } else {
-        response = await authService.signupWithPhone({ 
-          phone_no: emailOrPhone.replace(/[^0-9+]/g, ""),
-          name: "User" // You might want to add a name input field
-        });
-      }
-      
-      if (response.success) {
-        const params = inputType === "email"
-          ? { email: emailOrPhone.trim() }
-          : { phone: emailOrPhone.replace(/[^0-9+]/g, "") };
-        router.push({ pathname: "/auth/otp", params });
-      } else {
-        // Handle error - you might want to show an alert or error message
-        console.error('Signup error:', response.message);
-      }
+
+      const digits = phone.replace(/\D/g, "");
+      const fullPhone = phoneOk && digits ? `${COUNTRY_CODE}${digits}` : undefined;
+
+      // Save locally and proceed without OTP for now
+      await authService.updateUserProfile({
+        name: name.trim(),
+        email: emailOk ? email.trim() : undefined,
+        phone_no: fullPhone,
+      });
+
+      try { await Haptics.selectionAsync(); } catch {}
+      router.push("/auth/career-role");
     } catch (error: any) {
-      console.error('Signup error:', error);
-      // Handle error - you might want to show an alert or error message
+      setErrorMessage(error?.message || 'Something went wrong. Please try again.');
     } finally {
       setBusy(false);
     }
   };
 
+  // Helpers to show masked contact info
+  const maskEmail = (value: string) => {
+    const [user, domain] = String(value).split('@');
+    if (!domain || user.length <= 2) return value;
+    return `${user[0]}•••${user.slice(-1)}@${domain}`;
+  };
+  const maskPhone = (value: string) => {
+    const clean = String(value).replace(/\D/g, '');
+    if (clean.length < 4) return value;
+    return `+${clean.slice(0, -4).replace(/\d/g, '•')} ${clean.slice(-4)}`;
+  };
+  const buildOtpSentMessage = () => {
+    const parts: string[] = [];
+    if (phoneOk) parts.push(`phone number ${maskPhone(phone)}`);
+    if (emailOk) parts.push(`email ${maskEmail(email.trim())}`);
+    if (parts.length === 0) return '';
+    return `We have sent OTP to your ${parts.join(' and ')}.`;
+  };
+
+  // Resend cooldown ticker
+  useEffect(() => {
+    if (resendRemaining <= 0) return;
+    const t = setTimeout(() => setResendRemaining((s) => Math.max(0, s - 1)), 1000);
+    return () => clearTimeout(t);
+  }, [resendRemaining]);
+
+  const openOtpSheet = async (mode: "email" | "phone") => {
+    if (mode === "email" && !emailOk) return;
+    if (mode === "phone" && !phoneOk) return;
+    setOtpMode(mode);
+    setOtpDigits(["", "", "", "", "", ""]);
+    setOtpError("");
+    setOtpVerified(false);
+    const digits = phone.replace(/\D/g, "");
+    const fullPhone = phoneOk && digits ? `${COUNTRY_CODE}${digits}` : undefined;
+    const target = mode === "email" ? email.trim() : String(fullPhone || "");
+    setOtpTarget(target);
+    setOtpSheetVisible(true);
+    try {
+      const { authService } = await import("../../services/authService");
+      setOtpSentEmail(false);
+      setOtpSentPhone(false);
+      if (mode === "email") {
+        try {
+          const resLogin = await authService.loginWithEmail({ email: target });
+          if (resLogin?.success) { setOtpSentEmail(true); setResendRemaining(30); }
+        } catch (e: any) {
+          if (e?.code === 'USER_NOT_FOUND') {
+            const resSignup = await authService.signupWithEmail({ email: target, name: name.trim(), phone_no: fullPhone });
+            if (resSignup?.success) { setOtpSentEmail(true); setResendRemaining(30); }
+          } else {
+            const friendly = authService.handleAuthError?.(e) || e?.message;
+            setOtpError(friendly || 'Failed to send OTP');
+          }
+        }
+      } else {
+        try {
+          const resLogin = await authService.loginWithPhone({ phone_no: target });
+          if (resLogin?.success) { setOtpSentPhone(true); setResendRemaining(30); }
+        } catch (e: any) {
+          if (e?.code === 'USER_NOT_FOUND') {
+            const resSignup = await authService.signupWithPhone({ phone_no: target, name: name.trim(), email: emailOk ? email.trim() : undefined });
+            if (resSignup?.success) { setOtpSentPhone(true); setResendRemaining(30); }
+          } else {
+            const friendly = authService.handleAuthError?.(e) || e?.message;
+            setOtpError(friendly || 'Failed to send OTP');
+          }
+        }
+      }
+    } catch (err: any) {
+      setOtpError(err?.message || 'Failed to send OTP');
+    }
+  };
+
+  // Bulk verify: send OTP to both email and phone if available; open sheet prioritizing phone
+  const handleVerifyAll = async () => {
+    if (!(emailOk || phoneOk)) return;
+    try {
+      setBulkVerifyMode('both');
+      setErrorMessage("");
+      const { authService } = await import("../../services/authService");
+      const digits = phone.replace(/\D/g, "");
+      const fullPhone = phoneOk && digits ? `${COUNTRY_CODE}${digits}` : undefined;
+      // Open sheet immediately
+      const preferPhone = !!fullPhone;
+      setOtpMode(preferPhone ? 'phone' : 'email');
+      setOtpTarget(preferPhone ? String(fullPhone) : email.trim());
+      setOtpDigits(["", "", "", "", "", ""]);
+      setOtpError("");
+      setOtpVerified(false);
+      setOtpSheetVisible(true);
+
+      setOtpSentEmail(false);
+      setOtpSentPhone(false);
+      if (emailOk) {
+        try {
+          const resLoginE = await authService.loginWithEmail({ email: email.trim() });
+          if (resLoginE?.success) { setOtpSentEmail(true); setResendRemaining(30); }
+        } catch (e: any) {
+          if (e?.code === 'USER_EXISTS') {
+            // If account exists during Sign Up, prompt Login CTA in OTP sheet
+            setOtpError('Account already exists. Please log in.');
+          } else if (e?.code === 'USER_NOT_FOUND') {
+            const resSignupE = await authService.signupWithEmail({ email: email.trim(), name: name.trim(), phone_no: fullPhone });
+            if (resSignupE?.success) { setOtpSentEmail(true); setResendRemaining(30); }
+          } else {
+            const friendly = authService.handleAuthError?.(e) || e?.message;
+            setOtpError(friendly || 'Failed to send OTP');
+          }
+        }
+      }
+      if (fullPhone) {
+        try {
+          const resLoginP = await authService.loginWithPhone({ phone_no: fullPhone });
+          if (resLoginP?.success) { setOtpSentPhone(true); setResendRemaining(30); }
+        } catch (e: any) {
+          if (e?.code === 'USER_EXISTS') {
+            setOtpError('Account already exists. Please log in.');
+          } else if (e?.code === 'USER_NOT_FOUND') {
+            const resSignupP = await authService.signupWithPhone({ phone_no: fullPhone, name: name.trim(), email: emailOk ? email.trim() : undefined });
+            if (resSignupP?.success) { setOtpSentPhone(true); setResendRemaining(30); }
+          } else {
+            const friendly = authService.handleAuthError?.(e) || e?.message;
+            setOtpError(friendly || 'Failed to send OTP');
+          }
+        }
+      }
+    } catch (err: any) {
+      setOtpError(err?.message || 'Failed to send OTP');
+    }
+  };
+
+  // Resend handler
+  const handleResend = async () => {
+    if (otpBusy || resendRemaining > 0 || !otpTarget) return;
+    try {
+      const { authService } = await import("../../services/authService");
+      const res = await authService.resendOtp({ identifier: otpTarget });
+      if (res?.success) {
+        setResendRemaining(30);
+        setOtpError("");
+      } else {
+        const retry = Number(res?.data?.retry_after || res?.data?.retryAfter || 30);
+        setResendRemaining(retry);
+        setOtpError(res?.message || 'Please wait before requesting a new code.');
+      }
+    } catch (err: any) {
+      const retry = Number(err?.data?.retry_after || err?.data?.retryAfter || 30);
+      if (err?.code === 'OTP_RATE_LIMIT_EXCEEDED' || err?.status === 429) {
+        setResendRemaining(retry);
+        setOtpError('Too many requests. Please wait a bit and try again.');
+      } else {
+        setOtpError(err?.message || 'Failed to resend code');
+      }
+    }
+  };
+
+  const verifyOtpCode = async () => {
+    if (otpBusy) return;
+    const code = otpDigits.join("");
+    if (!/^\d{6}$/.test(code)) return;
+    try {
+      setOtpBusy(true);
+      setOtpError("");
+      const { authService } = await import("../../services/authService");
+      const res = await authService.verifyOtp({ identifier: otpTarget, otp: code });
+      if (res.success) {
+        try { await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+        setOtpVerified(true);
+        if (otpMode === "email") setEmailVerified(true);
+        if (otpMode === "phone") setPhoneVerified(true);
+        setTimeout(() => {
+          setOtpSheetVisible(false);
+          // Redirect to onboarding (career-role)
+          router.replace("/auth/career-role");
+        }, 800);
+      } else {
+        setOtpError(res.message || "Incorrect OTP");
+      }
+    } catch (err: any) {
+      try {
+        const { authService } = await import("../../services/authService");
+        const friendly = authService.handleAuthError?.(err);
+        if (friendly) {
+          setOtpError(friendly);
+        } else if (err?.code === 'INVALID_OTP') {
+          setOtpError('Incorrect OTP');
+        } else if (err?.code === 'OTP_EXPIRED') {
+          setOtpError('OTP expired. Please request a new one.');
+        } else if (err?.code === 'OTP_RATE_LIMIT_EXCEEDED' || err?.status === 429) {
+          setOtpError('Too many attempts. Please wait a few minutes and try again.');
+        } else {
+          setOtpError(err?.message || 'Incorrect OTP');
+        }
+      } catch {
+        setOtpError(err?.message || 'Incorrect OTP');
+      }
+    } finally {
+      setOtpBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    const code = otpDigits.join("");
+    if (code.length === 6) {
+      verifyOtpCode();
+    } else if (otpError) {
+      setOtpError("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [otpDigits.join("")]);
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: BRAND }}>
       <StatusBar style="light" />
 
-      {/* Top half - Brand section like login */}
+      {/* Top half - Brand section like login (reduced height) */}
       <View style={{ 
-        height: "40%",
+        minHeight: 200,
         backgroundColor: BRAND,
         paddingHorizontal: 20,
         justifyContent: "center",
@@ -96,29 +311,67 @@ export default function SignupScreen() {
           <View style={{ position: "absolute", bottom: 100, right: 60, width: 30, height: 30, backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 15 }} />
         </View>
 
-        {/* Logo */}
+        {/* Logo (slightly smaller) */}
         <Image
           source={logoSrc}
-          style={{ width: 180, height: 180, marginBottom: 10, alignSelf: "center" }}
+          style={{ width: 150, height: 150, marginBottom: 6, alignSelf: "center" }}
           resizeMode="contain"
         />
       </View>
 
-      {/* Bottom half - White form section matching login */}
+      {/* Bottom half - White form section matching login (more space) */}
       <View style={{ flex: 1, backgroundColor: "#ffffff", borderTopLeftRadius: 24, borderTopRightRadius: 24, marginTop: -20 }}>
         <ScrollView
-          contentContainerStyle={{ paddingTop: 24, paddingHorizontal: 24, paddingBottom: 20, alignItems: "center" }}
+          contentContainerStyle={{ paddingTop: 16, paddingHorizontal: 24, paddingBottom: 20, alignItems: "center", maxWidth: 560, width: '100%', alignSelf: 'center' }}
           showsVerticalScrollIndicator={false}
         >
           {/* Heading */}
           <View style={{ width: "100%", alignItems: "center", marginBottom: 8 }}>
             <Text style={{ fontSize: 28, fontWeight: "700", color: "#1a1a1a", marginBottom: 8 }}>Create your account</Text>
-            <Text style={{ fontSize: 16, color: "#666666", marginBottom: 24, textAlign: "center" }}>Verify your mobile number or email to continue</Text>
+            <Text style={{ fontSize: 16, color: "#666666", marginBottom: 24, textAlign: "center" }}>Enter your name, email and phone</Text>
           </View>
 
-          {/* Phone or Email input - same layout as login */}
-          <View style={{ width: "100%", marginBottom: 16 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
+          {/* Name */}
+          <View style={{ width: "100%", marginBottom: 12 }}>
+            <TextInput
+              mode="outlined"
+              label="Full Name"
+              placeholder="Enter your name"
+              value={name}
+              onChangeText={setName}
+              autoCapitalize="words"
+              style={{ backgroundColor: "#ffffff" }}
+              textColor="#333333"
+              outlineColor="#e9ecef"
+              activeOutlineColor={BRAND}
+              contentStyle={{ fontSize: 16 }}
+            />
+          </View>
+
+          {/* Email */}
+          <View style={{ width: "100%", marginBottom: 12 }}>
+            <TextInput
+              mode="outlined"
+              label="Email"
+              placeholder="name@example.com"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              textContentType="emailAddress"
+              value={email}
+              onChangeText={setEmail}
+              style={{ backgroundColor: "#ffffff" }}
+              textColor="#333333"
+              outlineColor="#e9ecef"
+              activeOutlineColor={BRAND}
+              contentStyle={{ fontSize: 16 }}
+              right={undefined}
+            />
+          </View>
+
+          {/* Phone */}
+          <View style={{ width: "100%", marginBottom: 6 }}>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
               <View style={{
                 flexDirection: "row",
                 alignItems: "center",
@@ -129,95 +382,100 @@ export default function SignupScreen() {
                 paddingHorizontal: 12,
                 paddingVertical: 14,
                 marginRight: 8,
-                minWidth: 60,
+                minWidth: 80,
                 justifyContent: "center",
+                gap: 6,
               }}>
                 <Text style={{ fontSize: 20 }}>🇮🇳</Text>
+                <Text style={{ fontSize: 16, color: "#111827", fontWeight: "700" }}>{COUNTRY_CODE}</Text>
               </View>
-
-              <View style={{ flex: 1, maxWidth: 280 }}>
+              <View style={{ flex: 1 }}>
                 <TextInput
                   mode="outlined"
-                  placeholder="Enter Phone Number or Email"
-                  keyboardType="default"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  textContentType={inputType === "phone" ? "telephoneNumber" : "emailAddress"}
-                  value={emailOrPhone}
-                  onChangeText={setEmailOrPhone}
+                  label="Mobile number"
+                  placeholder="Enter mobile number"
+                  keyboardType="number-pad"
+                  textContentType="telephoneNumber"
+                  value={phone}
+                  maxLength={10}
+                  onChangeText={(t) => {
+                    const digits = String(t || '').replace(/\D/g, '').slice(0, 10);
+                    setPhone(digits);
+                  }}
                   style={{ backgroundColor: "#ffffff", height: 50 }}
                   textColor="#333333"
                   placeholderTextColor="#999999"
                   outlineColor="#e9ecef"
                   activeOutlineColor={BRAND}
-                  contentStyle={{ paddingVertical: 0, fontSize: 16, textAlign: "left" }}
+                  contentStyle={{ paddingVertical: 0, fontSize: 16 }}
+                  right={undefined}
                   theme={{ colors: { onSurfaceVariant: "#666666" } }}
                 />
               </View>
             </View>
           </View>
 
-          {/* Validation message */}
-          {validationMessage ? (
-            <View style={{ width: 348, alignSelf: "center", marginTop: -8, marginBottom: 8 }}>
-              <Text style={{ color: "#E23744", fontSize: 12 }}>{validationMessage}</Text>
-            </View>
-          ) : null}
-
-          {/* Continue button */}
-          <View style={{ width: "100%", alignItems: "center" }}>
-            <View style={{ flexDirection: "row", justifyContent: "center" }}>
-              <Pressable
-                onPress={sendOtp}
-                disabled={busy || !isValidInput}
-                style={{
-                  height: 54,
-                  borderRadius: 12,
-                  backgroundColor: BRAND,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  marginTop: 20,
-                  marginBottom: 16,
-                  width: 348,
-                  opacity: isValidInput ? 1 : 0.5,
-                  shadowColor: BRAND,
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: isValidInput ? 0.3 : 0,
-                  shadowRadius: 12,
-                  elevation: isValidInput ? 8 : 0,
-                }}
-              >
-                <Text style={{ fontSize: 17, fontWeight: "700", color: "#ffffff", letterSpacing: 0.5 }}>
-                  {busy ? "Please wait..." : "Send OTP"}
+          {/* Single-line verify link (visible only when both email and phone are valid) */}
+          {emailOk && phoneOk ? (
+            <View style={{ width: '100%', marginTop: 4, alignItems: 'flex-end' }}>
+              <Pressable onPress={() => handleVerifyAll()} style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}>
+                <Text style={{
+                  color: BRAND,
+                  textDecorationLine: 'underline',
+                  fontWeight: '700',
+                  fontSize: 14
+                }}>
+                  Verify Now
                 </Text>
               </Pressable>
             </View>
+          ) : null}
+
+          {/* Continue */}
+          <View style={{ width: "100%", marginTop: 8 }}>
+            {errorMessage ? (
+              <ErrorBanner message={errorMessage} tone="error" />
+            ) : null}
+
+            <Button
+              mode="contained"
+              onPress={handleContinue}
+              loading={busy}
+              disabled={!canContinue || busy}
+              contentStyle={{ height: 50 }}
+              style={{ borderRadius: 26, backgroundColor: BRAND, opacity: canContinue ? 1 : 0.7 }}
+              labelStyle={{ fontWeight: "700" }}
+            >
+              Continue
+            </Button>
           </View>
 
-          {/* Divider */}
+          {/* Inline verify links handle OTP; no extra buttons needed */}
+
+          {/* Divider (reduced vertical spacing) */}
           <View style={{ 
             alignItems: "center", 
             flexDirection: "row", 
-            marginTop: 20,
-            marginBottom: 20, 
+            marginTop: 14,
+            marginBottom: 14, 
             width: "100%",
-            maxWidth: 350,
+            maxWidth: 360,
           }}>
             <View style={{ flex: 1, height: 1, backgroundColor: "#e9ecef" }} />
             <Text style={{ marginHorizontal: 20, color: "#666666", fontSize: 14, fontWeight: "500" }}>or</Text>
             <View style={{ flex: 1, height: 1, backgroundColor: "#e9ecef" }} />
           </View>
 
-          {/* OAuth buttons - Google and LinkedIn */}
-          <View style={{ flexDirection: "row", justifyContent: "center", gap: 20, marginBottom: 20, width: "100%", alignItems: "center" }}>
+          {/* OAuth buttons - placed earlier and with tighter spacing */}
+          <View style={{ flexDirection: "row", justifyContent: "center", gap: 20, marginBottom: 12, width: "100%", alignItems: "center" }}>
             {isProviderAvailable('GOOGLE') && (
               <Pressable
                 style={({ pressed }) => [
                   {
-                    width: 60,
-                    height: 60,
-                    borderRadius: 16,
-                    backgroundColor: "#ffffff",
+                    width: 56,
+                    height: 56,
+                    borderRadius: 9999,
+                    backgroundColor: "transparent",
                     borderWidth: 2,
                     borderColor: "#d1d5db",
                     alignItems: "center",
@@ -232,14 +490,9 @@ export default function SignupScreen() {
                   }
                 ]}
                 onPress={signInWithGoogle}
-                disabled={socialLoading}
+                disabled={socialLoading || busy}
               >
-                <Svg width={26} height={26} viewBox="0 0 18 18">
-                  <Path fill="#EA4335" d="M9 3.48c1.69 0 3.22.58 4.42 1.71l3.3-3.3C14.86.5 12.11 0 9 0 5.48 0 2.44 1.64 .64 4.04l3.78 2.94C5.2 5.11 6.96 3.48 9 3.48z" />
-                  <Path fill="#4285F4" d="M17.64 9.2c0-.74-.06-1.47-.18-2.16H9v4.09h4.84c-.21 1.1-.84 2.03-1.79 2.66l2.73 2.12c1.59-1.47 2.51-3.64 2.51-6.71z" />
-                  <Path fill="#FBBC05" d="M3.42 10.96a5.5 5.5 0 010-3.92L-.36 4.1a9 9 0 000 9.8l3.78-2.94z" />
-                  <Path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.73-2.12c-.76.51-1.74.82-3.23.82-2.47 0-4.57-1.67-5.32-3.92L-.64 13.9C1.16 16.36 4.03 18 9 18z" />
-                </Svg>
+                <GoogleGIcon size={26} />
               </Pressable>
             )}
 
@@ -247,10 +500,10 @@ export default function SignupScreen() {
               <Pressable
                 style={({ pressed }) => [
                   {
-                    width: 60,
-                    height: 60,
-                    borderRadius: 16,
-                    backgroundColor: "#ffffff",
+                    width: 56,
+                    height: 56,
+                    borderRadius: 9999,
+                    backgroundColor: "transparent",
                     borderWidth: 2,
                     borderColor: "#d1d5db",
                     alignItems: "center",
@@ -265,13 +518,15 @@ export default function SignupScreen() {
                   }
                 ]}
                 onPress={signInWithLinkedIn}
-                disabled={socialLoading}
+                disabled={socialLoading || busy}
               >
                 <AntDesign name="linkedin-square" size={26} color="#0e76a8" />
               </Pressable>
             )}
           </View>
         </ScrollView>
+
+        {/* OTP Bottom Sheet moved outside white card */}
 
         {/* Footer - Terms and login link */}
         <View style={{ paddingHorizontal: 24, paddingBottom: 20, paddingTop: 10, backgroundColor: "#ffffff" }}>
@@ -293,7 +548,57 @@ export default function SignupScreen() {
           </Pressable>
         </View>
       </View>
+
+      {/* OTP Bottom Sheet overlay (renders over entire screen) */}
+      {otpSheetVisible && (
+        <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'flex-end' }}>
+          <Pressable
+            onPress={() => { if (!otpBusy) setOtpSheetVisible(false); }}
+            style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)' }}
+          />
+          <View style={{ backgroundColor: '#ffffff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 12 }}>
+            <View style={{ alignItems: 'center' }}>
+              <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: '#E5E7EB', marginBottom: 12 }} />
+            </View>
+            <Text style={{ fontSize: 18, fontWeight: '900', color: '#0f172a' }}>Verify your contact</Text>
+            <Text style={{ marginTop: 6, color: '#64748b' }}>{buildOtpSentMessage()}</Text>
+
+            <View style={{ marginTop: 16, paddingBottom: 28 }}>
+              <CodeBoxes
+                length={6}
+                value={otpDigits}
+                onChange={(v) => { if (!otpVerified) setOtpDigits(v); }}
+                color={otpError ? '#DC2626' : otpVerified ? '#16A34A' : BRAND}
+              />
+              <View style={{ minHeight: 24, justifyContent: 'center' }}>
+                {otpError ? (
+                  <Text style={{ color: '#DC2626', marginTop: 10, textAlign: 'center', fontWeight: '700' }}>{otpError}</Text>
+                ) : otpVerified ? (
+                  <Text style={{ color: '#16A34A', marginTop: 10, textAlign: 'center', fontWeight: '800' }}>Verified! Redirecting…</Text>
+                ) : null}
+              </View>
+              {/* Resend */}
+              <View style={{ alignItems: 'center', marginTop: 6 }}>
+                <Text style={{ color: '#6B7280' }}>
+                  Code not received?{' '}
+                  <Text onPress={handleResend} style={{ color: resendRemaining > 0 ? '#9CA3AF' : BRAND, fontWeight: '800', textDecorationLine: 'underline' }}>
+                    {resendRemaining > 0 ? `Resend in ${resendRemaining}s` : 'Resend'}
+                  </Text>
+                </Text>
+              </View>
+            </View>
+
+            {/* No submit button; auto-verifies on 6th digit */}
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
+}
+
+// OTP Bottom Sheet portal rendered after SafeAreaView to avoid overlap with card footer
+// Keeping it here for clarity – if needed we can lift this to a global portal later.
+export function OtpSheetPortal() {
+  return null;
 }
 

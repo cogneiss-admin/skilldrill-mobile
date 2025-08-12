@@ -20,81 +20,20 @@ const BRAND = "#0A66C2"; // keep consistent with splash
 
 export default function App() {
   const [isSplashDone, setSplashDone] = useState(false);
-  const [navigating, setNavigating] = useState(false);
   const router = useRouter();
-
-  const handleGetStarted = async () => {
-    try {
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } catch {}
-    setNavigating(true);
-    
-    // Add a small delay for smooth transition animation
-    setTimeout(() => {
-      router.push("/auth/login");
-    }, 300);
-  };
 
   return (
     <View style={{ flex: 1, backgroundColor: BRAND }}>
-      <MotiView
-        animate={{ opacity: isSplashDone ? 1 : 0 }}
-        transition={{ type: "timing", duration: 800 }}
-        style={{ flex: 1 }}
-      >
-        <WelcomeScreen onGetStarted={handleGetStarted} />
-      </MotiView>
-      
       {!isSplashDone && (
         <MotiView
           style={StyleSheet.absoluteFillObject}
-          exit={{ opacity: 0, scale: 1.1 }}
-          transition={{ type: "timing", duration: 800 }}
+          exit={{ opacity: 0, scale: 1.05 }}
+          transition={{ type: "timing", duration: 600 }}
         >
-          <SplashOverlay onFinish={() => setSplashDone(true)} />
-        </MotiView>
-      )}
-      
-      {navigating && (
-        <MotiView
-          from={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ type: "timing", duration: 400 }}
-          style={[StyleSheet.absoluteFillObject, { alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.4)" }]}
-        >
-          <MotiView
-            from={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: "timing", duration: 300, delay: 100 }}
-            style={{ 
-              backgroundColor: "rgba(255,255,255,0.95)", 
-              borderRadius: 20, 
-              padding: 24,
-              alignItems: "center",
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.3,
-              shadowRadius: 8,
-              elevation: 10,
-            }}
-          >
-            <ActivityIndicator size="large" color={BRAND} />
-            <MotiView
-              from={{ opacity: 0, translateY: 10 }}
-              animate={{ opacity: 1, translateY: 0 }}
-              transition={{ type: "timing", duration: 400, delay: 200 }}
-            >
-              <Text style={{ 
-                marginTop: 12, 
-                color: BRAND, 
-                fontSize: 16, 
-                fontWeight: "600",
-                textAlign: "center" 
-              }}>
-                Getting Started...
-              </Text>
-            </MotiView>
-          </MotiView>
+          <SplashOverlay onFinish={() => {
+            setSplashDone(true);
+            router.replace("/auth/login");
+          }} />
         </MotiView>
       )}
     </View>
