@@ -206,18 +206,32 @@ export default function SignupScreen() {
 
   // Resend handler
   const handleResend = async () => {
-    if (otpBusy || resendRemaining > 0 || !otpTarget) return;
+    if (otpBusy || resendRemaining > 0) return;
     try {
       const { authService } = await import("../../services/authService");
-      const res = await authService.resendOtp({ identifier: otpTarget });
-      if (res?.success) {
-        setResendRemaining(30);
-        setOtpError("");
-      } else {
-        const retry = Number(res?.data?.retry_after || res?.data?.retryAfter || 30);
-        setResendRemaining(retry);
-        setOtpError(res?.message || 'Please wait before requesting a new code.');
+      const digits = phone.replace(/\D/g, "");
+      const fullPhone = phoneOk && digits ? `${COUNTRY_CODE}${digits}` : undefined;
+      const tasks: Promise<any>[] = [];
+
+      // If both are available, resend to both; else fallback to current otpTarget
+      if (emailOk) tasks.push(authService.resendOtp({ identifier: email.trim() }));
+      if (fullPhone) tasks.push(authService.resendOtp({ identifier: fullPhone }));
+      if (tasks.length === 0 && otpTarget) tasks.push(authService.resendOtp({ identifier: otpTarget }));
+
+      const results = await Promise.allSettled(tasks);
+      let anySuccess = false;
+      let retryAfter = 30;
+      for (const r of results) {
+        if (r.status === 'fulfilled' && r.value?.success) anySuccess = true;
+        if (r.status === 'fulfilled' && (r.value?.data?.retry_after || r.value?.data?.retryAfter)) {
+          retryAfter = Number(r.value?.data?.retry_after || r.value?.data?.retryAfter || retryAfter);
+        }
+        if (r.status === 'rejected' && (r.reason?.data?.retry_after || r.reason?.data?.retryAfter)) {
+          retryAfter = Number(r.reason?.data?.retry_after || r.reason?.data?.retryAfter || retryAfter);
+        }
       }
+      setResendRemaining(retryAfter);
+      setOtpError(anySuccess ? '' : 'Please wait before requesting a new code.');
     } catch (err: any) {
       const retry = Number(err?.data?.retry_after || err?.data?.retryAfter || 30);
       if (err?.code === 'OTP_RATE_LIMIT_EXCEEDED' || err?.status === 429) {
