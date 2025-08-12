@@ -1,12 +1,36 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
-// Environment variables
-const API_BASE_URL = Constants.expoConfig?.extra?.API_BASE_URL || 'http://localhost:3000/api';
+// Environment variables with platform detection
+const getApiBaseUrl = () => {
+  // If environment variable is set, use it
+  if (Constants.expoConfig?.extra?.API_BASE_URL) {
+    return Constants.expoConfig.extra.API_BASE_URL;
+  }
+  
+  // Otherwise, use platform-specific defaults
+  if (Platform.OS === 'android') {
+    return 'http://10.0.2.2:3000/api'; // Android emulator
+  } else if (Platform.OS === 'ios') {
+    return 'http://localhost:3000/api'; // iOS simulator
+  } else {
+    return 'http://localhost:3000/api'; // Web or other platforms
+  }
+};
+
+const API_BASE_URL = getApiBaseUrl();
 const API_TIMEOUT = Constants.expoConfig?.extra?.API_TIMEOUT || 10000;
 const ACCESS_TOKEN_KEY = Constants.expoConfig?.extra?.ACCESS_TOKEN_KEY || 'skilldrill_access_token';
 const REFRESH_TOKEN_KEY = Constants.expoConfig?.extra?.REFRESH_TOKEN_KEY || 'skilldrill_refresh_token';
+
+// Debug environment variables
+console.log('🔧 API Configuration:');
+console.log('Platform:', Platform.OS);
+console.log('API_BASE_URL:', API_BASE_URL);
+console.log('API_TIMEOUT:', API_TIMEOUT);
+console.log('Constants.expoConfig?.extra:', Constants.expoConfig?.extra);
 
 // API Response types
 export interface ApiResponse<T = any> {
@@ -55,6 +79,8 @@ class ApiService {
   }> = [];
 
   constructor() {
+    console.log('🚀 Initializing API Service with baseURL:', API_BASE_URL);
+    
     this.api = axios.create({
       baseURL: API_BASE_URL,
       timeout: API_TIMEOUT,
@@ -63,6 +89,7 @@ class ApiService {
       },
     });
 
+    console.log('✅ API Service initialized successfully');
     this.setupInterceptors();
   }
 
@@ -70,6 +97,10 @@ class ApiService {
     // Request interceptor to add auth token
     this.api.interceptors.request.use(
       async (config) => {
+        console.log('📡 Making request to:', config.baseURL + config.url);
+        console.log('📡 Method:', config.method?.toUpperCase());
+        console.log('📡 Full URL:', config.baseURL + config.url);
+        
         const token = await this.getAccessToken();
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
@@ -223,6 +254,15 @@ class ApiService {
   }
 
   private handleError(error: any): ApiError {
+    console.error('🔍 API Error Details:', {
+      message: error.message,
+      code: error.code,
+      status: error.response?.status,
+      url: error.config?.url,
+      method: error.config?.method,
+      data: error.response?.data
+    });
+
     if (error.response) {
       const { status, data } = error.response;
       
@@ -261,7 +301,20 @@ class ApiService {
       
       return new ApiError(message, status, data?.code, data);
     } else if (error.request) {
-      return new ApiError('Network error - no response received', 0);
+      // Network error - provide more specific information
+      console.error('🌐 Network Error:', {
+        url: error.config?.url,
+        method: error.config?.method,
+        timeout: error.code === 'ECONNABORTED' ? 'Request timeout' : 'No response received'
+      });
+      
+      if (error.code === 'ECONNABORTED') {
+        return new ApiError('Request timeout - server is not responding', 0, 'TIMEOUT');
+      } else if (error.code === 'ERR_NETWORK') {
+        return new ApiError('Cannot connect to server. Please check your internet connection and try again.', 0, 'NETWORK_ERROR');
+      } else {
+        return new ApiError('Network error - no response received from server', 0, 'NETWORK_ERROR');
+      }
     } else {
       return new ApiError(error.message || 'An unexpected error occurred', 0);
     }

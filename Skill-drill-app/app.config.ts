@@ -44,8 +44,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   extra: {
     // Backend API Configuration
-    API_BASE_URL: process.env.API_BASE_URL || 'http://localhost:3000/api',
-    API_TIMEOUT: parseInt(process.env.API_TIMEOUT || '10000'),
+    // Use environment variable or default based on platform
+    API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'http://10.0.2.2:3000/api', // Default to Android
+    API_TIMEOUT: parseInt(process.env.EXPO_PUBLIC_API_TIMEOUT || process.env.API_TIMEOUT || '10000'),
     
     // Authentication
     ACCESS_TOKEN_KEY: process.env.ACCESS_TOKEN_KEY || 'skilldrill_access_token',
