@@ -2,7 +2,8 @@ import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import * as Crypto from 'expo-crypto';
 import authService from './authService';
-import { ApiResponse, AuthSuccessResponse } from './api';
+import { ApiResponse } from './api';
+import { AuthSuccessResponse } from './authService';
 
 // Complete the auth session
 WebBrowser.maybeCompleteAuthSession();
@@ -87,7 +88,7 @@ class SocialAuthService {
         authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
       });
 
-      console.log('📱 OAuth Result:', result.type, result.params);
+      console.log('📱 OAuth Result:', result.type, (result as any).params);
 
       if (result.type === 'success' && result.params.code) {
         console.log('✅ Authorization code received, exchanging for tokens...');
@@ -286,7 +287,7 @@ class SocialAuthService {
         id: profileData.id,
         email,
         name: `${profileData.localizedFirstName} ${profileData.localizedLastName}`,
-        avatar_url: null, // LinkedIn doesn't provide avatar in basic profile
+        avatar_url: undefined, // LinkedIn doesn't provide avatar in basic profile
         provider: 'LINKEDIN',
       };
 

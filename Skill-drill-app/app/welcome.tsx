@@ -1,9 +1,7 @@
-// @ts-nocheck
-import React, { useMemo, useRef, useState, useEffect } from "react";
-import { Dimensions, Text, View, StyleSheet, Animated as RNAnimated, ActivityIndicator } from "react-native";
+import React, { useMemo, useRef, useState } from "react";
+import { Dimensions, Text, View, StyleSheet, Animated as RNAnimated } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import SplashOverlay from "./components/SplashOverlay";
 import Carousel from "react-native-reanimated-carousel";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Defs, RadialGradient as SvgRadialGradient, Rect, Stop } from "react-native-svg";
@@ -11,102 +9,14 @@ import { Button } from "react-native-paper";
 import { MotiView } from "moti";
 import { StatusBar } from "expo-status-bar";
 import * as Haptics from "expo-haptics";
-import { useAuth } from "../hooks/useAuth";
-import "./home"; // pre-load home route to avoid router spinner during navigation
 
 const logoSrc = require("../assets/images/logo.png");
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-const BRAND = "#0A66C2"; // keep consistent with splash
+const BRAND = "#0A66C2";
 
-export default function App() {
-  const [isSplashDone, setSplashDone] = useState(false);
-  const [showWelcome, setShowWelcome] = useState(false);
+export default function WelcomeScreen() {
   const router = useRouter();
-  const { isAuthenticated, user, isLoading, isOnboardingComplete } = useAuth();
-
-  const handleSplashFinish = () => {
-    console.log('🎬 Index: Splash finished');
-    console.log('🔐 Index: Auth state:', { isAuthenticated, isLoading, user: user ? { id: user.id, name: user.name } : null });
-    
-    setSplashDone(true);
-    
-    // Only show welcome screen if user is not authenticated
-    if (!isAuthenticated) {
-      console.log('👋 Index: User not authenticated, showing welcome screen');
-      setShowWelcome(true);
-    } else {
-      console.log('🚀 Index: User authenticated, handling routing directly');
-      // If authenticated, handle routing directly
-      handleRouting();
-    }
-  };
-
-  const handleGetStarted = () => {
-    setShowWelcome(false);
-    
-    // Since welcome screen only shows for unauthenticated users,
-    // we can directly navigate to login
-    router.replace('/auth/login');
-  };
-
-  const handleRouting = () => {
-    console.log('🧭 Index: Handling routing...');
-    console.log('📊 Index: Routing state:', { isAuthenticated, isLoading, onboardingComplete: isOnboardingComplete() });
-    
-    if (isAuthenticated) {
-      const onboardingComplete = isOnboardingComplete();
-      if (onboardingComplete) {
-        console.log('🎯 Index: Navigating to dashboard');
-        router.replace('/dashboard');
-      } else {
-        console.log('📋 Index: Navigating to career-role');
-        router.replace('/auth/career-role');
-      }
-    } else {
-      console.log('🔐 Index: Navigating to login');
-      router.replace('/auth/login');
-    }
-  };
-
-  // Handle authentication state changes after splash
-  useEffect(() => {
-    if (isSplashDone && !isLoading) {
-      if (isAuthenticated && showWelcome) {
-        // User became authenticated while welcome screen was showing
-        setShowWelcome(false);
-        handleRouting();
-      }
-    }
-  }, [isAuthenticated, isLoading, isSplashDone, showWelcome]);
-
-  return (
-    <View style={{ flex: 1, backgroundColor: BRAND }}>
-      {!isSplashDone && (
-        <MotiView
-          style={StyleSheet.absoluteFillObject}
-          exit={{ opacity: 0, scale: 1.05 }}
-          transition={{ type: "timing", duration: 600 }}
-        >
-          <SplashOverlay onFinish={handleSplashFinish} />
-        </MotiView>
-      )}
-      
-      {showWelcome && (
-        <MotiView
-          style={StyleSheet.absoluteFillObject}
-          from={{ opacity: 0, scale: 1.05 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ type: "timing", duration: 600 }}
-        >
-          <WelcomeScreen onGetStarted={handleGetStarted} />
-        </MotiView>
-      )}
-    </View>
-  );
-}
-
-function WelcomeScreen({ onGetStarted }: { onGetStarted: () => void }) {
   const slides = useMemo(
     () => [
       {
@@ -139,6 +49,11 @@ function WelcomeScreen({ onGetStarted }: { onGetStarted: () => void }) {
   );
 
   const [activeIndex, setActiveIndex] = useState(0);
+
+  const handleGetStarted = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push('/auth/login');
+  };
 
   return (
     <SafeAreaView className="flex-1">
@@ -269,7 +184,7 @@ function WelcomeScreen({ onGetStarted }: { onGetStarted: () => void }) {
             <View className="mt-8" />
             <Button
               mode="contained"
-              onPress={onGetStarted}
+              onPress={handleGetStarted}
               contentStyle={{ height: 56 }}
               style={{ 
                 borderRadius: 28,
@@ -360,7 +275,7 @@ function AnimatedWelcome() {
 function LogoPulse({ size = 200 }: { size?: number }) {
   const scale = useRef(new RNAnimated.Value(1)).current;
 
-  useEffect(() => {
+  React.useEffect(() => {
     const pulseAnim = RNAnimated.loop(
       RNAnimated.sequence([
         RNAnimated.timing(scale, { toValue: 1.05, duration: 2000, useNativeDriver: true }),

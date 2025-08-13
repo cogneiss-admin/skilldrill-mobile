@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { View, Pressable, ScrollView, Text, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "react-native-paper";
@@ -9,52 +9,121 @@ import { MotiView } from "moti";
 import { StatusBar } from "expo-status-bar";
 import { AntDesign } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { useAuth } from "../../hooks/useAuth";
 
 const BRAND = "#0A66C2";
 const APP_NAME = "Skill Drill";
 const logoSrc = require("../../assets/images/logo.png");
 
-type CareerStage = "entry" | "mid" | "senior";
-type RoleType = "ic" | "manager" | "exec";
+type CareerStage = "ENTRY_LEVEL" | "MID_LEVEL" | "EXPERIENCED";
+type RoleType = "INDIVIDUAL_CONTRIBUTOR" | "TEAM_LEADER_MANAGER" | "SENIOR_LEADER_EXECUTIVE";
 
 const careerOptions: Array<{ key: CareerStage; label: string; sub?: string; emoji: string }> = [
-  { key: "entry", label: "Entry-Level (0-3 Years)", sub: "Starting out, learning and growing", emoji: "🌱" },
-  { key: "mid", label: "Mid-Level (4-10 Years)", sub: "Building expertise and impact", emoji: "🚀" },
-  { key: "senior", label: "Experienced (11+ Years)", sub: "Leading with depth and vision", emoji: "🏆" },
+  { key: "ENTRY_LEVEL", label: "Entry-Level (0-3 Years)", sub: "Starting out, learning and growing", emoji: "🌱" },
+  { key: "MID_LEVEL", label: "Mid-Level (4-10 Years)", sub: "Building expertise and impact", emoji: "🚀" },
+  { key: "EXPERIENCED", label: "Experienced (11+ Years)", sub: "Leading with depth and vision", emoji: "🏆" },
 ];
 
 const roleOptions: Array<{ key: RoleType; label: string; sub?: string; emoji: string }> = [
-  { key: "ic", label: "Individual Contributor", sub: "Hands-on, craft-focused", emoji: "🎯" },
-  { key: "manager", label: "Team Leader / Manager", sub: "Leads people and delivery", emoji: "🧑‍🤝‍🧑" },
-  { key: "exec", label: "Senior Leader / Executive", sub: "Owns strategy and outcomes", emoji: "👑" },
+  { key: "INDIVIDUAL_CONTRIBUTOR", label: "Individual Contributor", sub: "Hands-on, craft-focused", emoji: "🎯" },
+  { key: "TEAM_LEADER_MANAGER", label: "Team Leader / Manager", sub: "Leads people and delivery", emoji: "🧑‍🤝‍🧑" },
+  { key: "SENIOR_LEADER_EXECUTIVE", label: "Senior Leader / Executive", sub: "Owns strategy and outcomes", emoji: "👑" },
 ];
 
 export default function CareerRoleScreen() {
   const router = useRouter();
+  const { updateProfile, checkAuthStatus } = useAuth();
   const [careerStage, setCareerStage] = useState<CareerStage | null>(null);
   const [roleType, setRoleType] = useState<RoleType | null>(null);
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const canContinue = useMemo(() => !!careerStage && !!roleType, [careerStage, roleType]);
+
+  // Check if user already has career info set
+  useEffect(() => {
+    const checkCareerInfo = async () => {
+      try {
+        const { authService } = await import("../../services/authService");
+        const userData = await authService.getUserData();
+        
+        if (userData?.career_stage && userData?.role_type) {
+          // User already has career info, redirect to dashboard
+          router.replace("/dashboard");
+          return;
+        }
+        
+        // Pre-populate if partial data exists
+        if (userData?.career_stage) {
+          setCareerStage(userData.career_stage as CareerStage);
+        }
+        if (userData?.role_type) {
+          setRoleType(userData.role_type as RoleType);
+        }
+      } catch (error) {
+        console.error('Error checking career info:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkCareerInfo();
+  }, [router]);
 
   const handleSave = async () => {
     if (!canContinue || busy) return;
     try {
+      console.log('🎯 Career-role: Starting profile update...');
+      console.log('📊 Career-role: Selected values:', { careerStage, roleType });
+      
       setBusy(true);
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-      const { authService } = await import("../../services/authService");
-      await authService.updateUserProfile({
-        career_stage: careerStage as any,
-        role_type: roleType as any,
+      // Update profile using AuthContext
+      console.log('🔄 Career-role: Calling updateProfile...');
+      await updateProfile({
+        career_stage: careerStage,
+        role_type: roleType,
       });
+      console.log('✅ Career-role: Profile update successful');
 
       try { await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
-      router.replace("/home");
+      
+      // Add a small delay to ensure state updates complete
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Force a refresh of the auth state to ensure onboarding completion is detected
+      console.log('🔄 Career-role: Refreshing auth state...');
+      await checkAuthStatus();
+      
+      console.log('🚀 Career-role: Navigating to dashboard...');
+      try {
+        router.replace("/dashboard");
+        console.log('✅ Career-role: Navigation to dashboard initiated');
+      } catch (navigationError) {
+        console.error('❌ Career-role: Navigation error:', navigationError);
+        // Fallback navigation
+        console.log('🔄 Career-role: Trying fallback navigation...');
+        router.push("/dashboard");
+      }
+    } catch (error) {
+      console.error('❌ Career-role: Profile update error:', error);
+      // You might want to show an error message to the user here
     } finally {
       setBusy(false);
     }
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: BRAND }}>
+        <StatusBar style="light" />
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <Text style={{ color: "#ffffff", fontSize: 16 }}>Loading...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: BRAND }}>
@@ -179,6 +248,8 @@ export default function CareerRoleScreen() {
             >
               Continue
             </Button>
+            
+
           </View>
         </View>
       </View>

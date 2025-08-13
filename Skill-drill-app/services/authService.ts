@@ -277,13 +277,84 @@ class AuthService {
     }
   }
 
+  // Update user profile via API
+  public async updateProfileViaAPI(profileData: { career_stage?: string; role_type?: string }): Promise<ApiResponse<User>> {
+    try {
+      const response = await apiService.put<User>('/multi-auth/profile', profileData);
+      
+      if (response.success && response.data) {
+        // Update local user data
+        await this.setUserData(response.data);
+      }
+      
+      return response;
+    } catch (error) {
+      console.error('Profile update API error:', error);
+      throw error;
+    }
+  }
+
+  // Get user profile from API
+  public async getProfileFromAPI(): Promise<ApiResponse<User>> {
+    try {
+      const response = await apiService.get<{ user: User }>('/multi-auth/profile');
+      
+      if (response.success && response.data?.user) {
+        // Update local user data
+        await this.setUserData(response.data.user);
+        // Return the user data directly
+        return {
+          success: response.success,
+          data: response.data.user,
+          message: response.message
+        };
+      }
+      
+      return response as any;
+    } catch (error) {
+      console.error('Get profile API error:', error);
+      throw error;
+    }
+  }
+
+  // Validate token and get fresh user data
+  public async validateTokenAndGetUser(): Promise<{ isValid: boolean; user: User | null }> {
+    try {
+      const token = await this.getAccessToken();
+      
+      if (!token) {
+        return { isValid: false, user: null };
+      }
+
+      // Try to get fresh user data from API
+      const response = await this.getProfileFromAPI();
+      
+      if (response.success && response.data) {
+        return { isValid: true, user: response.data };
+      } else {
+        return { isValid: false, user: null };
+      }
+    } catch (error) {
+      console.error('Token validation error:', error);
+      return { isValid: false, user: null };
+    }
+  }
+
   // Error handling
   public handleAuthError(error: ApiError): string {
     switch (error.code) {
       case 'USER_EXISTS':
-        return 'An account with this email/phone already exists';
+        return 'An account with this email/phone already exists. Please log in instead.';
       case 'USER_NOT_FOUND':
-        return 'No account found with this email/phone';
+        return 'No account found with this email/phone. Please sign up to create a new account.';
+      case 'USER_PENDING_VERIFICATION':
+        return 'An account with this email/phone is pending verification. Please complete your verification or contact support.';
+      case 'ACCOUNT_PENDING_VERIFICATION':
+        return 'Your account is pending verification. Please complete the signup process.';
+      case 'ACCOUNT_SUSPENDED':
+        return 'Your account has been suspended. Please contact support.';
+      case 'ACCOUNT_INACTIVE':
+        return 'Your account is not active. Please contact support.';
       case 'INVALID_CREDENTIALS':
         return 'Invalid email or password';
       case 'INVALID_OTP':
@@ -294,6 +365,10 @@ class AuthService {
         return 'This account requires social login';
       case 'INVALID_REFRESH_TOKEN':
         return 'Session expired. Please login again';
+      case 'RATE_LIMIT_EXCEEDED':
+        return 'Too many attempts. Please try again later.';
+      case 'OTP_RATE_LIMIT_EXCEEDED':
+        return 'Too many OTP requests. Please wait before requesting another.';
       default:
         return error.message || 'An authentication error occurred';
     }

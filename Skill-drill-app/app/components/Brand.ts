@@ -4,7 +4,7 @@ import React from "react";
 
 export const BRAND = "#0A66C2";
 
-export default function BrandPlaceholder(): JSX.Element | null {
+export default function BrandPlaceholder(): React.JSX.Element | null {
   return null;
 }
 

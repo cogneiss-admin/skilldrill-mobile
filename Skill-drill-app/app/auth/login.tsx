@@ -22,6 +22,7 @@ export default function LoginScreen() {
   const [emailOrPhone, setEmailOrPhone] = useState("");
   const [busy, setBusy] = useState(false);
   const [validationMessage, setValidationMessage] = useState("");
+  const [showSignupSuggestion, setShowSignupSuggestion] = useState(false);
   const { signInWithGoogle, signInWithLinkedIn, isLoading: socialLoading, isProviderAvailable } = useSocialAuth();
 
   // Detect if input is email or phone number (simple, user-friendly heuristic)
@@ -43,36 +44,89 @@ export default function LoginScreen() {
       setBusy(true);
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       
+      console.log('🔍 Send OTP - Input:', emailOrPhone, 'Type:', inputType);
+      
       // Import auth service dynamically to avoid circular dependencies
       const { authService } = await import("../../services/authService");
       
       let response;
       if (inputType === "email") {
+        console.log('📧 Sending email login request...');
         response = await authService.loginWithEmail({ email: emailOrPhone.trim() });
+        console.log('📧 Email login response:', response);
       } else {
         const raw = emailOrPhone;
         const hasPlus = raw.includes("+");
         const digits = raw.replace(/[^0-9]/g, "");
         const phone_no = hasPlus ? `+${digits}` : `${COUNTRY_CODE}${digits}`;
+        console.log('📱 Sending phone login request with:', phone_no);
         response = await authService.loginWithPhone({ phone_no });
+        console.log('📱 Phone login response:', response);
       }
       
       if (response.success) {
-        // Pass both email and phone, backend will determine which to use
+        console.log('✅ OTP sent successfully, navigating to OTP screen...');
+        // Pass the identifier to the OTP screen
         const params = inputType === "email" 
           ? { email: emailOrPhone.trim() }
-          : (() => { const raw = emailOrPhone; const hasPlus = raw.includes("+"); const digits = raw.replace(/[^0-9]/g, ""); return { phone: hasPlus ? `+${digits}` : `${COUNTRY_CODE}${digits}` }; })();
+          : { phone: (() => { const raw = emailOrPhone; const hasPlus = raw.includes("+"); const digits = raw.replace(/[^0-9]/g, ""); return hasPlus ? `+${digits}` : `${COUNTRY_CODE}${digits}`; })() };
           
-        router.push({ pathname: "/auth/otp", params });
+        console.log('🚀 Navigating to OTP with params:', params);
+        try {
+          await router.replace({ pathname: "/auth/otp", params });
+          console.log('✅ Navigation to OTP completed');
+        } catch (navError) {
+          console.error('❌ Navigation error:', navError);
+          // Fallback: try simple navigation
+          try {
+            console.log('🔄 Trying fallback navigation...');
+            await router.replace("/auth/otp");
+            console.log('✅ Fallback navigation completed');
+          } catch (fallbackError) {
+            console.error('❌ Fallback navigation also failed:', fallbackError);
+          }
+        }
       } else {
-        // If backend tells us user not found during login, show inline CTA to sign up
-        setValidationMessage(response.code === 'USER_NOT_FOUND' ? 'User does not exist. Please sign up.' : (response.message || 'Cannot send OTP'));
+        // Handle different error cases
+        if (response.code === 'USER_NOT_FOUND') {
+          setValidationMessage('No account found with this email. Please sign up to create a new account.');
+          setShowSignupSuggestion(true);
+        } else if (response.code === 'ACCOUNT_PENDING_VERIFICATION') {
+          setValidationMessage('Your account is pending verification. Please complete the signup process.');
+          setShowSignupSuggestion(false);
+        } else if (response.code === 'ACCOUNT_SUSPENDED') {
+          setValidationMessage('Your account has been suspended. Please contact support.');
+          setShowSignupSuggestion(false);
+        } else if (response.code === 'ACCOUNT_INACTIVE') {
+          setValidationMessage('Your account is not active. Please contact support.');
+          setShowSignupSuggestion(false);
+        } else {
+          setValidationMessage(response.message || 'Cannot send OTP');
+          setShowSignupSuggestion(false);
+        }
       }
     } catch (error: any) {
+      console.error('❌ Send OTP error:', error);
       let message = error?.message || 'Cannot send OTP';
-      if (error?.code === 'USER_NOT_FOUND') message = 'User does not exist. Please sign up.';
-      if (error?.code === 'NETWORK_ERROR') message = 'Cannot connect to server. Please check your internet and try again.';
-      if (error?.code === 'TIMEOUT') message = 'Request timeout. Please try again.';
+      if (error?.code === 'USER_NOT_FOUND') {
+        message = 'No account found with this email. Please sign up to create a new account.';
+        setShowSignupSuggestion(true);
+      } else if (error?.code === 'ACCOUNT_PENDING_VERIFICATION') {
+        message = 'Your account is pending verification. Please complete the signup process.';
+        setShowSignupSuggestion(false);
+      } else if (error?.code === 'ACCOUNT_SUSPENDED') {
+        message = 'Your account has been suspended. Please contact support.';
+        setShowSignupSuggestion(false);
+      } else if (error?.code === 'ACCOUNT_INACTIVE') {
+        message = 'Your account is not active. Please contact support.';
+        setShowSignupSuggestion(false);
+      } else if (error?.code === 'NETWORK_ERROR') {
+        message = 'Cannot connect to server. Please check your internet and try again.';
+        setShowSignupSuggestion(false);
+      } else if (error?.code === 'TIMEOUT') {
+        message = 'Request timeout. Please try again.';
+        setShowSignupSuggestion(false);
+      }
       setValidationMessage(message);
     } finally {
       setBusy(false);
@@ -419,7 +473,10 @@ export default function LoginScreen() {
 
           {/* Bottom signup link */}
           <Pressable 
-            onPress={() => router.push("/onboarding")}
+            onPress={() => {
+              console.log('📝 Navigating to signup screen...');
+              router.push("/auth/signup");
+            }}
             style={({ pressed }) => [
               { 
                 transform: [{ scale: pressed ? 0.98 : 1 }],

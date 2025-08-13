@@ -23,8 +23,11 @@ function useCountdown(initialSeconds: number) {
 }
 
 export default function OtpScreen() {
+  console.log('🎯 OTP Screen loaded!');
   const router = useRouter();
   const { phone, email } = useLocalSearchParams<{ phone?: string; email?: string }>();
+  
+  console.log('📱 OTP Screen params:', { phone, email });
 
   const [digits, setDigits] = useState<string[]>(["", "", "", "", "", ""]);
   const [busy, setBusy] = useState(false);
@@ -36,6 +39,8 @@ export default function OtpScreen() {
 
   const contactInfo = phone || email || "";
   const isEmail = !!email;
+  
+  console.log('📧 Contact info:', contactInfo, 'Is email:', isEmail);
 
   const masked = useMemo(() => {
     if (!contactInfo) return "";
@@ -102,9 +107,50 @@ export default function OtpScreen() {
       if (response.success) {
         try { await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
         setVerified(true);
-        setTimeout(() => {
-          router.replace({ pathname: "/auth/career-role", params: { phone, email } });
-        }, 700);
+        
+        // Check if user already has career info
+        const userData = response.data.user;
+        console.log('🎯 OTP verification successful, user data:', userData);
+        
+        if (userData?.career_stage && userData?.role_type) {
+          // User already has career info, go directly to dashboard
+          console.log('✅ User has career info, navigating to dashboard');
+          console.log('🎯 User data for navigation:', {
+            career_stage: userData.career_stage,
+            role_type: userData.role_type,
+            is_verified: userData.is_verified,
+            account_status: userData.account_status
+          });
+          
+          setTimeout(async () => {
+            try {
+              console.log('🚀 Attempting navigation to dashboard...');
+              await router.replace("/dashboard");
+              console.log('✅ Navigation to dashboard completed');
+            } catch (navError) {
+              console.error('❌ Navigation to dashboard failed:', navError);
+              // Fallback: try navigating to root first
+              try {
+                console.log('🔄 Trying fallback navigation to root...');
+                await router.replace("/");
+                console.log('✅ Fallback navigation completed');
+              } catch (fallbackError) {
+                console.error('❌ Fallback navigation also failed:', fallbackError);
+              }
+            }
+          }, 700);
+        } else {
+          // User needs to complete career info
+          console.log('📝 User needs career info, navigating to career-role');
+          setTimeout(async () => {
+            try {
+              await router.replace({ pathname: "/auth/career-role", params: { phone, email } });
+              console.log('✅ Navigation to career-role completed');
+            } catch (navError) {
+              console.error('❌ Navigation to career-role failed:', navError);
+            }
+          }, 700);
+        }
         return true;
       } else {
         setErrorMessage(response.message || "Invalid OTP");
@@ -189,7 +235,29 @@ export default function OtpScreen() {
 
       {/* Header */}
       <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12 }}>
-        <Pressable onPress={() => router.back()} hitSlop={12} style={{ padding: 8, marginRight: 4 }}>
+        <Pressable 
+          onPress={() => {
+            console.log('🔙 Back button pressed, attempting to go back...');
+            try {
+              // Try to go back first
+              router.back();
+              console.log('✅ Back navigation initiated');
+            } catch (error) {
+              console.error('❌ Back navigation failed:', error);
+              // Fallback: go to login screen
+              console.log('🔄 Falling back to login screen...');
+              router.replace('/auth/login');
+            }
+          }} 
+          hitSlop={12} 
+          style={({ pressed }) => ({
+            padding: 8, 
+            marginRight: 4,
+            backgroundColor: pressed ? '#e5e7eb' : '#f3f4f6',
+            borderRadius: 8,
+            opacity: pressed ? 0.7 : 1
+          })}
+        >
           <AntDesign name="arrowleft" size={22} color="#111827" />
         </Pressable>
         <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827" }}>OTP Verification</Text>

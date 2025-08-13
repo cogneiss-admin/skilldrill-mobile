@@ -53,6 +53,9 @@ export interface User {
   phone_no?: string;
   is_verified: boolean;
   auth_provider?: string;
+  avatar_url?: string;
+  career_stage?: 'ENTRY_LEVEL' | 'MID_LEVEL' | 'EXPERIENCED';
+  role_type?: 'INDIVIDUAL_CONTRIBUTOR' | 'TEAM_LEADER_MANAGER' | 'SENIOR_LEADER_EXECUTIVE';
 }
 
 // API Error class
@@ -97,9 +100,9 @@ class ApiService {
     // Request interceptor to add auth token
     this.api.interceptors.request.use(
       async (config) => {
-        console.log('📡 Making request to:', config.baseURL + config.url);
+        console.log('📡 Making request to:', (config.baseURL || '') + (config.url || ''));
         console.log('📡 Method:', config.method?.toUpperCase());
-        console.log('📡 Full URL:', config.baseURL + config.url);
+        console.log('📡 Full URL:', (config.baseURL || '') + (config.url || ''));
         
         const token = await this.getAccessToken();
         if (token) {
@@ -137,7 +140,9 @@ class ApiService {
               throw new Error('No refresh token available');
             }
 
-            const response = await this.refreshToken(refreshToken);
+            // Import authService to handle token refresh
+            const { default: authService } = await import('./authService');
+            const response = await authService.refreshToken(refreshToken);
             const { access_token } = response.data;
 
             await this.setAccessToken(access_token);

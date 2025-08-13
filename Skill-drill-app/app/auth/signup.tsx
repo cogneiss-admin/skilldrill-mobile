@@ -42,7 +42,7 @@ export default function SignupScreen() {
   const emailOk = useMemo(() => (email.trim() ? isValidEmail(email.trim()) : false), [email]);
   const phoneOk = useMemo(() => (phone.trim() ? isValidPhone(phone.trim()) : false), [phone]);
   const verifiedOk = emailVerified || phoneVerified; // verifying either is sufficient
-  const canContinue = useMemo(() => nameOk && (emailOk || phoneOk) && verifiedOk, [nameOk, emailOk, phoneOk, verifiedOk]);
+  const canContinue = useMemo(() => nameOk && (emailOk || phoneOk), [nameOk, emailOk, phoneOk]);
 
   const handleContinue = async () => {
     if (!canContinue || busy) return;
@@ -51,20 +51,35 @@ export default function SignupScreen() {
       setErrorMessage("");
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
+      // If not verified yet, trigger verification flow
+      if (!verifiedOk) {
+        await handleVerifyAll();
+        return;
+      }
+
       const { authService } = await import("../../services/authService");
 
       const digits = phone.replace(/\D/g, "");
       const fullPhone = phoneOk && digits ? `${COUNTRY_CODE}${digits}` : undefined;
 
-      // Save locally and proceed without OTP for now
+      // Save locally and check if career info is needed
       await authService.updateUserProfile({
         name: name.trim(),
         email: emailOk ? email.trim() : undefined,
         phone_no: fullPhone,
       });
 
-      try { await Haptics.selectionAsync(); } catch {}
-      router.push("/auth/career-role");
+      // Check if user already has career info
+      const userData = await authService.getUserData();
+      if (userData?.career_stage && userData?.role_type) {
+        // User already has career info, go directly to dashboard
+        try { await Haptics.selectionAsync(); } catch {}
+        router.replace("/dashboard");
+      } else {
+        // User needs to complete career info
+        try { await Haptics.selectionAsync(); } catch {}
+        router.push("/auth/career-role");
+      }
     } catch (error: any) {
       setErrorMessage(error?.message || 'Something went wrong. Please try again.');
     } finally {
@@ -101,48 +116,82 @@ export default function SignupScreen() {
   const openOtpSheet = async (mode: "email" | "phone") => {
     if (mode === "email" && !emailOk) return;
     if (mode === "phone" && !phoneOk) return;
-    setOtpMode(mode);
-    setOtpDigits(["", "", "", "", "", ""]);
-    setOtpError("");
-    setOtpVerified(false);
+    
     const digits = phone.replace(/\D/g, "");
     const fullPhone = phoneOk && digits ? `${COUNTRY_CODE}${digits}` : undefined;
     const target = mode === "email" ? email.trim() : String(fullPhone || "");
-    setOtpTarget(target);
-    setOtpSheetVisible(true);
+    
     try {
       const { authService } = await import("../../services/authService");
-      setOtpSentEmail(false);
-      setOtpSentPhone(false);
+      
       if (mode === "email") {
         try {
-          const resLogin = await authService.loginWithEmail({ email: target });
-          if (resLogin?.success) { setOtpSentEmail(true); setResendRemaining(30); }
-        } catch (e: any) {
-          if (e?.code === 'USER_NOT_FOUND') {
-            const resSignup = await authService.signupWithEmail({ email: target, name: name.trim(), phone_no: fullPhone });
-            if (resSignup?.success) { setOtpSentEmail(true); setResendRemaining(30); }
+          // Call signup endpoint directly for email
+          const resSignup = await authService.signupWithEmail({ 
+            email: target, 
+            name: name.trim(), 
+            phone_no: fullPhone 
+          });
+          if (resSignup?.success) { 
+            // Success - open OTP sheet
+            setOtpMode(mode);
+            setOtpDigits(["", "", "", "", "", ""]);
+            setOtpError("");
+            setOtpVerified(false);
+            setOtpTarget(target);
+            setOtpSheetVisible(true);
+            setOtpSentEmail(true); 
+            setResendRemaining(30); 
+          }
+        } catch (signupError: any) {
+          if (signupError?.code === 'USER_EXISTS' || signupError?.code === 'USER_PENDING_VERIFICATION') {
+            // User already exists - show error and redirect to login
+            setErrorMessage(authService.handleAuthError(signupError));
+            // Redirect to login after a short delay
+            setTimeout(() => {
+              router.push("/auth/login");
+            }, 2000);
           } else {
-            const friendly = authService.handleAuthError?.(e) || e?.message;
-            setOtpError(friendly || 'Failed to send OTP');
+            const friendly = authService.handleAuthError?.(signupError) || signupError?.message;
+            setErrorMessage(friendly || 'Failed to send OTP');
           }
         }
       } else {
         try {
-          const resLogin = await authService.loginWithPhone({ phone_no: target });
-          if (resLogin?.success) { setOtpSentPhone(true); setResendRemaining(30); }
-        } catch (e: any) {
-          if (e?.code === 'USER_NOT_FOUND') {
-            const resSignup = await authService.signupWithPhone({ phone_no: target, name: name.trim(), email: emailOk ? email.trim() : undefined });
-            if (resSignup?.success) { setOtpSentPhone(true); setResendRemaining(30); }
+          // Call signup endpoint directly for phone
+          const resSignup = await authService.signupWithPhone({ 
+            phone_no: target, 
+            name: name.trim(), 
+            email: emailOk ? email.trim() : undefined 
+          });
+          if (resSignup?.success) { 
+            // Success - open OTP sheet
+            setOtpMode(mode);
+            setOtpDigits(["", "", "", "", "", ""]);
+            setOtpError("");
+            setOtpVerified(false);
+            setOtpTarget(target);
+            setOtpSheetVisible(true);
+            setOtpSentPhone(true); 
+            setResendRemaining(30); 
+          }
+        } catch (signupError: any) {
+          if (signupError?.code === 'USER_EXISTS' || signupError?.code === 'USER_PENDING_VERIFICATION') {
+            // User already exists - show error and redirect to login
+            setErrorMessage(authService.handleAuthError(signupError));
+            // Redirect to login after a short delay
+            setTimeout(() => {
+              router.push("/auth/login");
+            }, 2000);
           } else {
-            const friendly = authService.handleAuthError?.(e) || e?.message;
-            setOtpError(friendly || 'Failed to send OTP');
+            const friendly = authService.handleAuthError?.(signupError) || signupError?.message;
+            setErrorMessage(friendly || 'Failed to send OTP');
           }
         }
       }
-    } catch (err: any) {
-      setOtpError(err?.message || 'Failed to send OTP');
+    } catch (error: any) {
+      const friendly = authService.handleAuthError?.(error) || error?.message;
+      setErrorMessage(friendly || 'Failed to send OTP');
     }
   };
 
@@ -155,50 +204,82 @@ export default function SignupScreen() {
       const { authService } = await import("../../services/authService");
       const digits = phone.replace(/\D/g, "");
       const fullPhone = phoneOk && digits ? `${COUNTRY_CODE}${digits}` : undefined;
-      // Open sheet immediately
-      const preferPhone = !!fullPhone;
-      setOtpMode(preferPhone ? 'phone' : 'email');
-      setOtpTarget(preferPhone ? String(fullPhone) : email.trim());
-      setOtpDigits(["", "", "", "", "", ""]);
-      setOtpError("");
-      setOtpVerified(false);
-      setOtpSheetVisible(true);
+      
+      // Try signup first for both email and phone
+      let signupSuccess = false;
+      let signupError = null;
 
-      setOtpSentEmail(false);
-      setOtpSentPhone(false);
+      // Try email signup first
       if (emailOk) {
         try {
-          const resLoginE = await authService.loginWithEmail({ email: email.trim() });
-          if (resLoginE?.success) { setOtpSentEmail(true); setResendRemaining(30); }
-        } catch (e: any) {
-          if (e?.code === 'USER_EXISTS') {
-            // If account exists during Sign Up, prompt Login CTA in OTP sheet
-            setOtpError('Account already exists. Please log in.');
-          } else if (e?.code === 'USER_NOT_FOUND') {
-            const resSignupE = await authService.signupWithEmail({ email: email.trim(), name: name.trim(), phone_no: fullPhone });
-            if (resSignupE?.success) { setOtpSentEmail(true); setResendRemaining(30); }
+          const resSignupE = await authService.signupWithEmail({ email: email.trim(), name: name.trim(), phone_no: fullPhone });
+          if (resSignupE?.success) { 
+            signupSuccess = true;
+            // Open sheet for email OTP
+            setOtpMode('email');
+            setOtpTarget(email.trim());
+            setOtpDigits(["", "", "", "", "", ""]);
+            setOtpError("");
+            setOtpVerified(false);
+            setOtpSheetVisible(true);
+            setOtpSentEmail(true);
+            setResendRemaining(30);
+          }
+        } catch (signupError: any) {
+          if (signupError?.code === 'USER_EXISTS' || signupError?.code === 'USER_PENDING_VERIFICATION') {
+            // User already exists - show error and redirect to login
+            setErrorMessage(authService.handleAuthError(signupError));
+            setOtpSheetVisible(false);
+            // Redirect to login after a short delay
+            setTimeout(() => {
+              router.push("/auth/login");
+            }, 2000);
+            return;
           } else {
-            const friendly = authService.handleAuthError?.(e) || e?.message;
-            setOtpError(friendly || 'Failed to send OTP');
+            // Other signup error - try phone signup if available
+            signupError = signupError;
           }
         }
       }
-      if (fullPhone) {
+
+      // If email signup failed, try phone signup
+      if (!signupSuccess && fullPhone) {
         try {
-          const resLoginP = await authService.loginWithPhone({ phone_no: fullPhone });
-          if (resLoginP?.success) { setOtpSentPhone(true); setResendRemaining(30); }
-        } catch (e: any) {
-          if (e?.code === 'USER_EXISTS') {
-            setOtpError('Account already exists. Please log in.');
-          } else if (e?.code === 'USER_NOT_FOUND') {
-            const resSignupP = await authService.signupWithPhone({ phone_no: fullPhone, name: name.trim(), email: emailOk ? email.trim() : undefined });
-            if (resSignupP?.success) { setOtpSentPhone(true); setResendRemaining(30); }
+          const resSignupP = await authService.signupWithPhone({ phone_no: fullPhone, name: name.trim(), email: emailOk ? email.trim() : undefined });
+          if (resSignupP?.success) { 
+            signupSuccess = true;
+            // Open sheet for phone OTP
+            setOtpMode('phone');
+            setOtpTarget(String(fullPhone));
+            setOtpDigits(["", "", "", "", "", ""]);
+            setOtpError("");
+            setOtpVerified(false);
+            setOtpSheetVisible(true);
+            setOtpSentPhone(true);
+            setResendRemaining(30);
+          }
+        } catch (phoneSignupError: any) {
+          if (phoneSignupError?.code === 'USER_EXISTS' || phoneSignupError?.code === 'USER_PENDING_VERIFICATION') {
+            // User already exists - show error and redirect to login
+            setErrorMessage(authService.handleAuthError(phoneSignupError));
+            setOtpSheetVisible(false);
+            // Redirect to login after a short delay
+            setTimeout(() => {
+              router.push("/auth/login");
+            }, 2000);
+            return;
           } else {
-            const friendly = authService.handleAuthError?.(e) || e?.message;
-            setOtpError(friendly || 'Failed to send OTP');
+            // Other error - show the error
+            setOtpError(authService.handleAuthError(phoneSignupError) || phoneSignupError?.message || 'Failed to send OTP');
           }
         }
       }
+
+      // If both signup attempts failed and it's not due to existing user, show error
+      if (!signupSuccess && signupError) {
+        setOtpError(authService.handleAuthError(signupError) || signupError?.message || 'Failed to send OTP');
+      }
+
     } catch (err: any) {
       setOtpError(err?.message || 'Failed to send OTP');
     }
@@ -257,11 +338,22 @@ export default function SignupScreen() {
         setOtpVerified(true);
         if (otpMode === "email") setEmailVerified(true);
         if (otpMode === "phone") setPhoneVerified(true);
-        setTimeout(() => {
-          setOtpSheetVisible(false);
-          // Redirect to onboarding (career-role)
-          router.replace("/auth/career-role");
-        }, 800);
+        
+        // Check if user already has career info
+        const userData = res.data.user;
+        if (userData?.career_stage && userData?.role_type) {
+          // User already has career info, go directly to dashboard
+          setTimeout(() => {
+            setOtpSheetVisible(false);
+            router.replace("/dashboard");
+          }, 800);
+        } else {
+          // User needs to complete career info
+          setTimeout(() => {
+            setOtpSheetVisible(false);
+            router.replace("/auth/career-role");
+          }, 800);
+        }
       } else {
         setOtpError(res.message || "Incorrect OTP");
       }
@@ -301,6 +393,36 @@ export default function SignupScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: BRAND }}>
       <StatusBar style="light" />
+
+      {/* Header with back button */}
+      <View style={{ 
+        flexDirection: "row", 
+        alignItems: "center", 
+        paddingHorizontal: 16, 
+        paddingVertical: 12,
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 10
+      }}>
+        <Pressable 
+          onPress={() => {
+            console.log('🔙 Back button pressed from signup, going to login...');
+            router.replace("/auth/login");
+          }} 
+          hitSlop={12} 
+          style={({ pressed }) => ({
+            padding: 8, 
+            marginRight: 4,
+            backgroundColor: pressed ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)',
+            borderRadius: 8,
+            opacity: pressed ? 0.7 : 1
+          })}
+        >
+          <AntDesign name="arrowleft" size={22} color="#ffffff" />
+        </Pressable>
+      </View>
 
       {/* Top half - Brand section like login (reduced height) */}
       <View style={{ 
@@ -342,7 +464,7 @@ export default function SignupScreen() {
           {/* Heading */}
           <View style={{ width: "100%", alignItems: "center", marginBottom: 8 }}>
             <Text style={{ fontSize: 28, fontWeight: "700", color: "#1a1a1a", marginBottom: 8 }}>Create your account</Text>
-            <Text style={{ fontSize: 16, color: "#666666", marginBottom: 24, textAlign: "center" }}>Enter your name, email and phone</Text>
+            <Text style={{ fontSize: 16, color: "#666666", marginBottom: 24, textAlign: "center" }}>Enter your name and email or phone number</Text>
           </View>
 
           {/* Name */}
@@ -429,21 +551,16 @@ export default function SignupScreen() {
             </View>
           </View>
 
-          {/* Single-line verify link (visible only when both email and phone are valid) */}
-          {emailOk && phoneOk ? (
-            <View style={{ width: '100%', marginTop: 4, alignItems: 'flex-end' }}>
-              <Pressable onPress={() => handleVerifyAll()} style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}>
-                <Text style={{
-                  color: BRAND,
-                  textDecorationLine: 'underline',
-                  fontWeight: '700',
-                  fontSize: 14
-                }}>
-                  Verify Now
-                </Text>
-              </Pressable>
+          {/* Contact method validation message */}
+          {!emailOk && !phoneOk && (email.trim() || phone.trim()) && (
+            <View style={{ width: "100%", marginBottom: 8 }}>
+              <Text style={{ color: "#DC2626", fontSize: 12, marginTop: 4 }}>
+                Please provide a valid email address or phone number
+              </Text>
             </View>
-          ) : null}
+          )}
+
+
 
           {/* Continue */}
           <View style={{ width: "100%", marginTop: 8 }}>
@@ -460,7 +577,7 @@ export default function SignupScreen() {
               style={{ borderRadius: 26, backgroundColor: BRAND, opacity: canContinue ? 1 : 0.7 }}
               labelStyle={{ fontWeight: "700" }}
             >
-              Continue
+              {verifiedOk ? 'Continue' : 'Verify & Continue'}
             </Button>
           </View>
 

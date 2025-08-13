@@ -25,16 +25,43 @@ export const useAuth = () => {
     try {
       setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
       
+      // First check if we have a token
       const isAuthenticated = await authService.isAuthenticated();
-      const user = await authService.getUserData();
       
+      if (isAuthenticated) {
+        // Validate token and get fresh user data
+        const { isValid, user } = await authService.validateTokenAndGetUser();
+        
+        if (isValid && user) {
+          setAuthState({
+            isAuthenticated: true,
+            user,
+            isLoading: false,
+            error: null,
+          });
+          return;
+        } else {
+          // Token is invalid, clear auth data
+          await authService.clearAuthData();
+          setAuthState({
+            isAuthenticated: false,
+            user: null,
+            isLoading: false,
+            error: null,
+          });
+          return;
+        }
+      }
+      
+      // No token or invalid token
       setAuthState({
-        isAuthenticated,
-        user,
+        isAuthenticated: false,
+        user: null,
         isLoading: false,
         error: null,
       });
     } catch (error: any) {
+      console.error('🔐 useAuth: Error during auth check:', error);
       setAuthState({
         isAuthenticated: false,
         user: null,
@@ -42,6 +69,10 @@ export const useAuth = () => {
         error: error.message,
       });
     }
+  };
+
+  const isOnboardingComplete = (user: User | null): boolean => {
+    return !!(user?.career_stage && user?.role_type);
   };
 
   const login = async (emailOrPhone: string, password?: string) => {
@@ -148,6 +179,7 @@ export const useAuth = () => {
 
   const verifyOtp = async (identifier: string, otp: string) => {
     try {
+      console.log('🔐 useAuth: Starting OTP verification...');
       setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
       
       const response = await authService.verifyOtp({
@@ -155,14 +187,28 @@ export const useAuth = () => {
         otp,
       });
       
+      console.log('🔐 useAuth: OTP verification response:', {
+        success: response.success,
+        hasUser: 'user' in response.data && !!response.data.user,
+        userData: response.data.user ? {
+          id: response.data.user.id,
+          name: response.data.user.name,
+          career_stage: response.data.user.career_stage,
+          role_type: response.data.user.role_type
+        } : null
+      });
+      
       if (response.success && 'user' in response.data && response.data.user) {
+        console.log('✅ useAuth: OTP verification successful, setting authenticated state');
         setAuthState({
           isAuthenticated: true,
           user: response.data.user,
           isLoading: false,
           error: null,
         });
+        console.log('✅ useAuth: Authentication state updated successfully');
       } else {
+        console.log('❌ useAuth: OTP verification failed, setting error state');
         setAuthState(prev => ({
           ...prev,
           isLoading: false,
@@ -172,6 +218,7 @@ export const useAuth = () => {
       
       return response;
     } catch (error: any) {
+      console.error('❌ useAuth: OTP verification error:', error);
       setAuthState(prev => ({
         ...prev,
         isLoading: false,
@@ -205,13 +252,32 @@ export const useAuth = () => {
 
   const updateProfile = async (userData: Partial<User>) => {
     try {
-      await authService.updateUserProfile(userData);
+      console.log('🔄 useAuth: Starting profile update...');
+      console.log('📊 useAuth: Profile data to update:', userData);
       
-      setAuthState(prev => ({
-        ...prev,
-        user: prev.user ? { ...prev.user, ...userData } : null,
-      }));
+      // Use the API method to update profile on backend
+      const response = await authService.updateProfileViaAPI(userData as { career_stage?: string; role_type?: string });
+      
+      console.log('✅ useAuth: Profile update API response:', response);
+      
+      if (response.success && response.data) {
+        // Update local state with the response from backend
+        setAuthState(prev => ({
+          ...prev,
+          user: response.data,
+        }));
+        console.log('✅ useAuth: Local state updated with new user data');
+        console.log('📊 useAuth: Updated user data:', {
+          career_stage: response.data.career_stage,
+          role_type: response.data.role_type,
+          onboardingComplete: !!(response.data.career_stage && response.data.role_type)
+        });
+      } else {
+        console.error('❌ useAuth: Profile update failed:', response.message);
+        throw new Error(response.message || 'Profile update failed');
+      }
     } catch (error: any) {
+      console.error('❌ useAuth: Profile update error:', error);
       setAuthState(prev => ({
         ...prev,
         error: error.message,
@@ -226,6 +292,7 @@ export const useAuth = () => {
 
   return {
     ...authState,
+    isOnboardingComplete: () => isOnboardingComplete(authState.user),
     login,
     signup,
     verifyOtp,

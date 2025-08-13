@@ -10,6 +10,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { MotiView } from "moti";
 import { StatusBar } from "expo-status-bar";
 import { AntDesign } from "@expo/vector-icons";
+import { useAuth } from "../../hooks/useAuth";
 
 const BRAND = "#0A66C2";
 const APP_NAME = "Skill Drill";
@@ -19,6 +20,7 @@ const logoSrc = require("../../assets/images/logo.png");
 
 export default function BasicInfoScreen() {
   const router = useRouter();
+  const { updateProfile } = useAuth();
   const { phone, email } = useLocalSearchParams<{ phone?: string; email?: string }>();
 
   const [fullName, setFullName] = useState("");
@@ -50,16 +52,25 @@ export default function BasicInfoScreen() {
       setBusy(true);
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-      // Save the basic info locally, then go to career-role screen
-      const { authService } = await import("../../services/authService");
-      await authService.updateUserProfile({
+      // Save the basic info using AuthContext
+      await updateProfile({
         name: fullName,
         email: emailId || undefined,
         phone_no: mobile || undefined,
       });
 
-      try { await Haptics.selectionAsync(); } catch {}
-      router.push("/auth/career-role");
+      // Check if user already has career info
+      const { authService } = await import("../../services/authService");
+      const userData = await authService.getUserData();
+      if (userData?.career_stage && userData?.role_type) {
+        // User already has career info, go directly to dashboard
+        try { await Haptics.selectionAsync(); } catch {}
+        router.replace("/dashboard");
+      } else {
+        // User needs to complete career info
+        try { await Haptics.selectionAsync(); } catch {}
+        router.push("/auth/career-role");
+      }
     } catch (error: any) {
       console.error('Profile update error:', error);
     } finally {
