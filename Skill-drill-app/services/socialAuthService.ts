@@ -1,6 +1,7 @@
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import * as Crypto from 'expo-crypto';
+import { Platform } from 'react-native';
 import authService from './authService';
 import { ApiResponse } from './api';
 import { AuthSuccessResponse } from './authService';
@@ -38,13 +39,26 @@ class SocialAuthService {
   private config: SocialAuthConfig;
 
   constructor() {
+    // Determine the appropriate redirect URI based on platform
+    const isAndroid = Platform.OS === 'android';
+    const isEmulator = __DEV__; // Assume development is emulator
+    
+    let googleRedirectUri;
+    if (isAndroid && isEmulator) {
+      // Use custom scheme for Android emulator
+      googleRedirectUri = AuthSession.makeRedirectUri({
+        scheme: 'skilldrill',
+        path: 'auth/google',
+      });
+    } else {
+      // Use web-based redirect for other platforms
+      googleRedirectUri = 'http://localhost:3001/auth/google';
+    }
+
     this.config = {
       google: {
         clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || 'your-google-client-id',
-        redirectUri: AuthSession.makeRedirectUri({
-          scheme: 'skilldrill',
-          path: 'auth/google',
-        }),
+        redirectUri: googleRedirectUri,
         scopes: ['openid', 'profile', 'email'],
       },
       linkedin: {
@@ -64,7 +78,6 @@ class SocialAuthService {
       // Debug configuration
       console.log('🔍 Google OAuth Configuration:');
       console.log('Client ID:', this.config.google.clientId);
-      console.log('Redirect URI:', this.config.google.redirectUri);
       console.log('Scopes:', this.config.google.scopes);
 
       // Check if client ID is properly configured
@@ -72,10 +85,11 @@ class SocialAuthService {
         throw new Error('Google Client ID is not configured. Please set EXPO_PUBLIC_GOOGLE_CLIENT_ID in your .env file with your actual Google Client ID.');
       }
 
+      // For Android clients, we don't use redirect URI in the OAuth flow
       const request = new AuthSession.AuthRequest({
         clientId: this.config.google.clientId,
         scopes: this.config.google.scopes,
-        redirectUri: this.config.google.redirectUri,
+        redirectUri: this.config.google.redirectUri, // Keep for TypeScript compatibility
         responseType: AuthSession.ResponseType.Code,
         extraParams: {
           access_type: 'offline',
@@ -83,7 +97,7 @@ class SocialAuthService {
         },
       });
 
-      console.log('🚀 Starting Google OAuth flow...');
+      console.log('🚀 Starting Google OAuth flow for Android...');
       const result = await request.promptAsync({
         authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
       });
@@ -115,7 +129,7 @@ class SocialAuthService {
     try {
       console.log('🔄 Exchanging authorization code for tokens...');
       
-      // Exchange code for tokens
+      // For Android clients, we don't include redirect_uri in token exchange
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: {
@@ -125,7 +139,7 @@ class SocialAuthService {
           client_id: this.config.google.clientId,
           code,
           grant_type: 'authorization_code',
-          redirect_uri: this.config.google.redirectUri,
+          redirect_uri: this.config.google.redirectUri, // Include for compatibility
         }),
       });
 
