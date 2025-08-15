@@ -114,6 +114,13 @@ function AuthMiddleware({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    // Don't redirect if we're on the assessment skill selection screen
+    const isAssessmentSkillSelectionScreen = segments[0] === 'assessment-skill-selection';
+    if (isAssessmentSkillSelectionScreen) {
+      console.log('🎯 AuthMiddleware: On assessment skill selection screen, not redirecting');
+      return;
+    }
+
     if (isAuthenticated) {
       const onboardingComplete = isOnboardingComplete();
       const nextStep = getOnboardingNextStep();

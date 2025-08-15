@@ -72,7 +72,21 @@ export const useAuth = () => {
   };
 
   const isOnboardingComplete = (user: User | null): boolean => {
-    return user?.onboarding_step === 'COMPLETED';
+    if (!user) return false;
+    
+    // Check if user has completed onboarding
+    if (user.onboarding_step === 'COMPLETED' || user.onboarding_step === 'SKILLS_SELECTED') {
+      return true;
+    }
+    
+    // For legacy users without onboarding_step, check if they have all required info
+    if (!user.onboarding_step) {
+      // Legacy users need career info and skills to be considered complete
+      // Since we can't check skills here, we'll assume they need to go through the flow
+      return false;
+    }
+    
+    return false;
   };
 
   const getOnboardingNextStep = (user: User | null): string | null => {
@@ -98,11 +112,11 @@ export const useAuth = () => {
           return '/auth/career-role';
         }
         
-        // They have career/role info, but we need to check if they have skills
-        // Since we can't check user skills from this context, we'll assume they need skills
-        // This will be handled by the skills screen itself to check and redirect if needed
-        console.log('🔄 getOnboardingNextStep: Legacy user with career/role, directing to skills');
-        return '/auth/skills';
+        // They have career/role info, assume they might be complete
+        // Send them to dashboard instead of skills to avoid unnecessary skills screen loading
+        // The dashboard can handle any further routing if needed
+        console.log('🔄 getOnboardingNextStep: Legacy user with career/role, assuming complete, directing to dashboard');
+        return '/dashboard';
     }
   };
 

@@ -1,6 +1,6 @@
 // @ts-nocheck
-import React, { useMemo, useState, useEffect } from "react";
-import { View, Text, Pressable, ScrollView, Image } from "react-native";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
+import { View, Text, Pressable, ScrollView, Image, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "react-native-paper";
 import { LinearGradient } from "expo-linear-gradient";
@@ -8,6 +8,7 @@ import { StatusBar } from "expo-status-bar";
 import { MotiView } from "moti";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
+import Constants from "expo-constants";
 import { useResponsive } from "../../utils/responsive";
 import { useAuth } from "../../hooks/useAuth";
 import { apiService } from "../../services/api";
@@ -44,13 +45,32 @@ export default function SkillsScreen() {
   const canContinue = useMemo(() => selected.length > 0, [selected]);
 
   // Load skills from backend and check if user already has skills
-  useEffect(() => {
-    const loadSkillsAndCheckProgress = async () => {
+  const loadSkillsAndCheckProgress = useCallback(async () => {
       try {
+        // Debug: Log API configuration
+        console.log('🔍 Skills: API Configuration:', {
+          platform: Platform.OS,
+          apiBaseUrl: Constants.expoConfig?.extra?.API_BASE_URL || 'http://10.0.2.2:3000/api',
+          isDev: __DEV__,
+          constants: Constants.expoConfig?.extra
+        });
+
+        // First, test connection to backend
+        try {
+          console.log('🔍 Skills: Testing backend connection...');
+          const healthResponse = await apiService.healthCheck();
+          console.log('✅ Skills: Backend connection successful:', healthResponse);
+        } catch (healthError: any) {
+          console.error('❌ Skills: Backend connection failed:', healthError);
+          setError('Cannot connect to server. Please check your internet connection and try again.');
+          setLoading(false);
+          return;
+        }
+
         // First, check if user already has skills selected
         try {
           const userSkillsResponse = await apiService.get('/user/skills');
-          if (userSkillsResponse.data.success && userSkillsResponse.data.data.length > 0) {
+          if (userSkillsResponse.success && userSkillsResponse.data.length > 0) {
             console.log('✅ Skills: User already has skills selected, redirecting to dashboard');
             
             // Update onboarding step if needed
@@ -64,28 +84,79 @@ export default function SkillsScreen() {
             router.replace("/dashboard");
             return;
           }
-        } catch (userSkillsError) {
-          console.log('ℹ️ Skills: User has no skills selected yet, proceeding with skill selection');
+        } catch (userSkillsError: any) {
+          // Check if this is an authentication error (401) or a network error
+          if (userSkillsError.status === 401) {
+            console.log('ℹ️ Skills: User not authenticated, proceeding with skill selection');
+          } else if (userSkillsError.status === 404) {
+            console.log('ℹ️ Skills: User has no skills selected yet, proceeding with skill selection');
+          } else {
+            console.log('ℹ️ Skills: Error checking user skills, proceeding with skill selection:', userSkillsError.message);
+          }
         }
         
         // Load available skills for selection
+        console.log('🔍 Skills: Loading skills from categories endpoint...');
         const response = await apiService.get('/skills/categories');
         
-        if (response.data.success) {
-          setSkillGroups(response.data.data);
+        console.log('🔍 Skills: Raw API response:', response);
+        
+        if (response.success) {
+          console.log('✅ Skills: Successfully loaded', response.data.length, 'skill groups');
+          
+          // Validate that the data is in the expected format
+          if (Array.isArray(response.data)) {
+            setSkillGroups(response.data);
+          } else {
+            console.error('❌ Skills: Invalid data format received:', response.data);
+            setError('Invalid data format received from server');
+          }
         } else {
-          setError(response.data.message || 'Failed to load skills');
+          console.error('❌ Skills: API returned error:', response.message);
+          setError(response.message || 'Failed to load skills');
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Load skills error:', error);
-        setError('Failed to load skills. Please try again.');
+        
+        // Provide more specific error messages based on the error type
+        if (error.status === 0) {
+          // Network error
+          setError('Cannot connect to server. Please check your internet connection and try again.');
+        } else if (error.status === 500) {
+          // Server error
+          setError('Server error. Please try again later.');
+        } else if (error.status === 404) {
+          // Not found
+          setError('Skills not found. Please try again later.');
+        } else if (error.status === 401) {
+          // Unauthorized
+          setError('Authentication required. Please login again.');
+        } else if (error.status === 403) {
+          // Forbidden
+          setError('Access denied. Please check your permissions.');
+        } else if (error.code === 'TIMEOUT') {
+          // Timeout
+          setError('Request timeout. Please check your connection and try again.');
+        } else {
+          // Other errors
+          setError(error.message || 'Failed to load skills. Please try again.');
+        }
       } finally {
         setLoading(false);
       }
-    };
+    }, [updateOnboardingStep, router]);
 
+  // Handle retry action
+  const handleRetry = useCallback(() => {
+    setError("");
+    setLoading(true);
     loadSkillsAndCheckProgress();
-  }, [updateOnboardingStep, router]);
+  }, [loadSkillsAndCheckProgress]);
+
+  // Load skills on component mount
+  useEffect(() => {
+    loadSkillsAndCheckProgress();
+  }, [loadSkillsAndCheckProgress]);
 
   const toggleSkill = async (skillId: string) => {
     try { await Haptics.selectionAsync(); } catch {}
@@ -107,7 +178,7 @@ export default function SkillsScreen() {
         skill_ids: selected
       });
       
-      if (response.data.success) {
+      if (response.success) {
         console.log('✅ Skills saved successfully');
         
         // Update onboarding step to indicate skills have been selected
@@ -119,11 +190,10 @@ export default function SkillsScreen() {
           // Continue anyway, skills were saved successfully
         }
         
-        // For now, redirect to dashboard
-        // In the future, this could redirect to the first assessment
+        // Redirect to dashboard (assessment is now optional)
         router.replace("/dashboard");
       } else {
-        setError(response.data.message || 'Failed to save skills');
+        setError(response.message || 'Failed to save skills');
       }
     } catch (error) {
       console.error('Save skills error:', error);
@@ -181,7 +251,7 @@ export default function SkillsScreen() {
               marginTop: responsive.spacing(8), 
               color: "#E6F2FF", 
               fontSize: responsive.typography.body2 
-            }}>Pick one or more to start your assessment journey</Text>
+            }}>Pick one or more skills to continue</Text>
           </MotiView>
         </View>
       </View>
@@ -215,9 +285,24 @@ export default function SkillsScreen() {
                 padding: responsive.padding.md, 
                 marginBottom: responsive.spacing(16) 
               }}>
-                <Text style={{ color: "#dc2626", fontSize: responsive.typography.body2, fontWeight: "600" }}>
+                <Text style={{ color: "#dc2626", fontSize: responsive.typography.body2, fontWeight: "600", marginBottom: responsive.spacing(8) }}>
                   {error}
                 </Text>
+                <Pressable
+                  onPress={handleRetry}
+                  style={({ pressed }) => ({
+                    backgroundColor: "#dc2626",
+                    paddingVertical: responsive.padding.sm,
+                    paddingHorizontal: responsive.padding.md,
+                    borderRadius: responsive.size(8),
+                    alignSelf: "flex-start",
+                    opacity: pressed ? 0.8 : 1,
+                  })}
+                >
+                  <Text style={{ color: "#ffffff", fontSize: responsive.typography.body2, fontWeight: "600" }}>
+                    Retry
+                  </Text>
+                </Pressable>
               </View>
             ) : null}
 
@@ -333,7 +418,7 @@ export default function SkillsScreen() {
                 fontSize: responsive.button.fontSize
               }}
             >
-              {busy ? "Saving..." : "Start Assessment"}
+              {busy ? "Saving..." : "Continue to Dashboard"}
             </Button>
           </View>
         </View>

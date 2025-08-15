@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { View, Pressable, ScrollView, Text, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "react-native-paper";
@@ -38,11 +38,21 @@ export default function CareerRoleScreen() {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Add refs to prevent multiple calls
+  const hasCheckedCareerInfo = useRef(false);
+  const hasUpdatedProfile = useRef(false);
+
   const canContinue = useMemo(() => !!careerStage && !!roleType, [careerStage, roleType]);
 
   // Check if user already has career info set
   useEffect(() => {
     const checkCareerInfo = async () => {
+      // Prevent multiple calls
+      if (hasCheckedCareerInfo.current) {
+        return;
+      }
+      hasCheckedCareerInfo.current = true;
+
       try {
         const { authService } = await import("../../services/authService");
         const userData = await authService.getUserData();
@@ -58,14 +68,17 @@ export default function CareerRoleScreen() {
           } else {
             console.log('🔧 Career-role: Updating onboarding step for legacy user');
             // Legacy user - update their onboarding step
-            try {
-              await updateProfile({
-                onboarding_step: 'CAREER_ROLE_COMPLETED'
-              });
-              router.replace("/auth/skills");
-            } catch (error) {
-              console.error('❌ Failed to update onboarding step:', error);
-              router.replace("/auth/skills");
+            if (!hasUpdatedProfile.current) {
+              hasUpdatedProfile.current = true;
+              try {
+                await updateProfile({
+                  onboarding_step: 'CAREER_ROLE_COMPLETED'
+                });
+                router.replace("/auth/skills");
+              } catch (error) {
+                console.error('❌ Failed to update onboarding step:', error);
+                router.replace("/auth/skills");
+              }
             }
           }
           return;
@@ -86,10 +99,17 @@ export default function CareerRoleScreen() {
     };
 
     checkCareerInfo();
-  }, [router, updateProfile]);
+  }, []); // Remove dependencies to prevent infinite loops
 
   const handleSave = async () => {
     if (!canContinue || busy) return;
+    
+    // Prevent multiple calls
+    if (hasUpdatedProfile.current) {
+      return;
+    }
+    hasUpdatedProfile.current = true;
+    
     try {
       console.log('🎯 Career-role: Starting profile update...');
       console.log('📊 Career-role: Selected values:', { careerStage, roleType });
@@ -127,6 +147,8 @@ export default function CareerRoleScreen() {
       }
     } catch (error) {
       console.error('❌ Career-role: Profile update error:', error);
+      // Reset the flag on error to allow retry
+      hasUpdatedProfile.current = false;
       // You might want to show an error message to the user here
     } finally {
       setBusy(false);

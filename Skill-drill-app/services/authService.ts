@@ -97,6 +97,7 @@ export interface TokenRefreshResponse {
 
 class AuthService {
   private readonly USER_DATA_KEY = 'skilldrill_user_data';
+  private isUpdatingProfile = false;
 
   // Token management
   public async getAccessToken(): Promise<string | null> {
@@ -283,6 +284,14 @@ class AuthService {
     role_type?: string; 
     onboarding_step?: string 
   }): Promise<ApiResponse<User>> {
+    // Prevent multiple simultaneous profile updates
+    if (this.isUpdatingProfile) {
+      console.log('🔄 AuthService: Profile update already in progress, skipping');
+      return { success: true, data: {} as User, message: 'Update already in progress' };
+    }
+    
+    this.isUpdatingProfile = true;
+    
     try {
       const response = await apiService.put<User>('/multi-auth/profile', profileData);
       
@@ -295,6 +304,8 @@ class AuthService {
     } catch (error) {
       console.error('Profile update API error:', error);
       throw error;
+    } finally {
+      this.isUpdatingProfile = false;
     }
   }
 

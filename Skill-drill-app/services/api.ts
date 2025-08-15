@@ -10,6 +10,11 @@ const getApiBaseUrl = () => {
     return Constants.expoConfig.extra.API_BASE_URL;
   }
   
+  // For development, always use localhost to ensure connectivity
+  if (__DEV__) {
+    return 'http://localhost:3000/api';
+  }
+  
   // Otherwise, use platform-specific defaults
   if (Platform.OS === 'android') {
     return 'http://10.0.2.2:3000/api'; // Android emulator
@@ -85,6 +90,12 @@ class ApiService {
 
   constructor() {
     console.log('🚀 Initializing API Service with baseURL:', API_BASE_URL);
+    console.log('🔧 API Configuration:', {
+      platform: Platform.OS,
+      isDev: __DEV__,
+      timeout: API_TIMEOUT,
+      constants: Constants.expoConfig?.extra
+    });
     
     this.api = axios.create({
       baseURL: API_BASE_URL,
@@ -102,23 +113,43 @@ class ApiService {
     // Request interceptor to add auth token
     this.api.interceptors.request.use(
       async (config) => {
-        console.log('📡 Making request to:', (config.baseURL || '') + (config.url || ''));
+        const fullUrl = (config.baseURL || '') + (config.url || '');
+        console.log('📡 Making request to:', fullUrl);
         console.log('📡 Method:', config.method?.toUpperCase());
-        console.log('📡 Full URL:', (config.baseURL || '') + (config.url || ''));
+        console.log('📡 Headers:', config.headers);
         
         const token = await this.getAccessToken();
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
+          console.log('🔐 Added auth token to request');
+        } else {
+          console.log('ℹ️ No auth token available');
         }
         return config;
       },
-      (error) => Promise.reject(error)
+      (error) => {
+        console.error('❌ Request interceptor error:', error);
+        return Promise.reject(error);
+      }
     );
 
     // Response interceptor to handle token refresh
     this.api.interceptors.response.use(
-      (response) => response,
+      (response) => {
+        console.log('✅ Response received:', {
+          status: response.status,
+          url: response.config.url,
+          data: response.data
+        });
+        return response;
+      },
       async (error) => {
+        console.error('❌ Response error:', {
+          status: error.response?.status,
+          url: error.config?.url,
+          message: error.message,
+          data: error.response?.data
+        });
         const originalRequest = error.config;
 
         if (error.response?.status === 401 && !originalRequest._retry) {

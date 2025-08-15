@@ -23,7 +23,7 @@ export default function App() {
   const [isSplashDone, setSplashDone] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
   const router = useRouter();
-  const { isAuthenticated, user, isLoading, isOnboardingComplete } = useAuth();
+  const { isAuthenticated, user, isLoading, isOnboardingComplete, getOnboardingNextStep } = useAuth();
 
   const handleSplashFinish = () => {
     console.log('🎬 Index: Splash finished');
@@ -60,8 +60,10 @@ export default function App() {
         console.log('🎯 Index: Navigating to dashboard');
         router.replace('/dashboard');
       } else {
-        console.log('📋 Index: Navigating to career-role');
-        router.replace('/auth/career-role');
+        // Use getOnboardingNextStep to determine the exact next step
+        const nextStep = getOnboardingNextStep();
+        console.log('📋 Index: Navigating to next step:', nextStep);
+        router.replace(nextStep || '/auth/career-role');
       }
     } else {
       console.log('🔐 Index: Navigating to login');

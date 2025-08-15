@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React from "react";
+import React, { useState } from "react";
 import { View, Text, Image, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -16,6 +16,7 @@ export default function DashboardWelcome() {
   const { logout, user } = useAuth();
   const router = useRouter();
   const responsive = useResponsive();
+  const [assessmentLoading, setAssessmentLoading] = useState(false);
 
   console.log('🎯 Dashboard: Component loaded');
   console.log('📊 Dashboard: User data:', user ? {
@@ -34,6 +35,22 @@ export default function DashboardWelcome() {
       router.replace('/auth/login');
     } catch (error) {
       console.error('❌ Logout error:', error);
+    }
+  };
+
+  const handleStartAssessment = async () => {
+    try {
+      setAssessmentLoading(true);
+      console.log('🎯 Starting assessment skill selection...');
+      
+      // Navigate to assessment skill selection screen
+      router.push('/assessment-skill-selection');
+      
+    } catch (error) {
+      console.error('❌ Assessment error:', error);
+      alert('Failed to start assessment. Please try again.');
+    } finally {
+      setAssessmentLoading(false);
     }
   };
 
@@ -103,12 +120,78 @@ export default function DashboardWelcome() {
           fontSize: responsive.typography.subtitle, 
           color: "#64748b", 
           textAlign: "center" 
-        }}>We'll build this next.</Text>
+        }}>Your skills are ready! Take an assessment when you are ready.</Text>
         
+        {/* Assessment Status */}
+        <View style={{ 
+          marginTop: responsive.spacing(16), 
+          padding: responsive.padding.md, 
+          backgroundColor: "#f0f9ff", 
+          borderRadius: responsive.size(12), 
+          borderWidth: 1,
+          borderColor: "#bae6fd",
+          width: "100%", 
+          maxWidth: responsive.size(300) 
+        }}>
+          <Text style={{ 
+            fontSize: responsive.typography.body2, 
+            color: "#0369a1", 
+            textAlign: "center",
+            fontWeight: "600"
+          }}>
+            📊 Assessment Status: Not Started
+          </Text>
+          <Text style={{ 
+            fontSize: responsive.typography.body2, 
+            color: "#64748b", 
+            textAlign: "center",
+            marginTop: responsive.spacing(4)
+          }}>
+            Complete the assessment to get personalized skill insights
+          </Text>
+        </View>
+        
+        {/* Assessment Button */}
+        <View style={{ 
+          marginTop: responsive.spacing(20), 
+          width: "100%", 
+          maxWidth: responsive.size(300) 
+        }}>
+          <Button
+            mode="contained"
+            onPress={handleStartAssessment}
+            loading={assessmentLoading}
+            disabled={assessmentLoading}
+            contentStyle={{ height: responsive.button.height }}
+            style={{ 
+              borderRadius: responsive.button.borderRadius, 
+              backgroundColor: BRAND, 
+              marginBottom: responsive.spacing(16),
+              width: '100%'
+            }}
+            labelStyle={{ 
+              fontWeight: "800", 
+              letterSpacing: 0.3,
+              fontSize: responsive.button.fontSize
+            }}
+                      >
+              {assessmentLoading ? "Loading..." : "Start Assessment"}
+            </Button>
+          
+          <Text style={{ 
+            fontSize: responsive.typography.body2, 
+            color: "#64748b", 
+            textAlign: "center",
+            fontStyle: "italic"
+          }}>
+            Assess your skills and get personalized recommendations
+          </Text>
+        </View>
+
         {/* User info */}
         {user && (
           <View style={{ 
-            marginTop: responsive.spacing(30), 
+            marginTop: responsive.spacing(20), 
             padding: responsive.padding.lg, 
             backgroundColor: "#f8fafc", 
             borderRadius: responsive.card.borderRadius, 
