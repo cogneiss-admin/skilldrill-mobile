@@ -1,6 +1,7 @@
 // @ts-nocheck
 import React, { useEffect, useRef } from "react";
 import { TextInput, View, useWindowDimensions } from "react-native";
+import { useResponsive } from "../utils/responsive";
 
 type Props = {
   length?: number;
@@ -14,13 +15,14 @@ const DEFAULT_BRAND = "#0A66C2";
 export default function CodeBoxes({ length = 6, value, onChange, color = DEFAULT_BRAND }: Props) {
   const refs = useRef(Array.from({ length }, () => React.createRef<any>())).current;
   const { width } = useWindowDimensions();
+  const responsive = useResponsive();
 
   // Responsive sizing: try to fit within screen padding
-  const horizontalPadding = 40; // approx container paddings
-  const gap = 12;
-  const maxPerBox = Math.min(56, Math.floor((width - horizontalPadding - (length - 1) * gap) / length));
-  const boxSize = Math.max(44, maxPerBox);
-  const fontSize = Math.max(18, Math.min(22, Math.floor(boxSize * 0.38)));
+  const horizontalPadding = responsive.padding.lg * 2; // container paddings
+  const gap = responsive.spacing(12);
+  const maxPerBox = Math.min(responsive.size(56), Math.floor((width - horizontalPadding - (length - 1) * gap) / length));
+  const boxSize = Math.max(responsive.size(44), maxPerBox);
+  const fontSize = responsive.fontSize(Math.max(18, Math.min(22, Math.floor(boxSize * 0.38))));
 
   useEffect(() => {
     // Auto focus the first empty box when component mounts
@@ -76,7 +78,14 @@ export default function CodeBoxes({ length = 6, value, onChange, color = DEFAULT
   };
 
   return (
-    <View style={{ flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 12 }}>
+    <View style={{ 
+      flexDirection: "row", 
+      justifyContent: "space-between", 
+      paddingHorizontal: responsive.padding.sm,
+      maxWidth: responsive.maxWidth.form,
+      alignSelf: 'center',
+      width: '100%'
+    }}>
       {Array.from({ length }).map((_, i) => (
         <TextInput
           key={i}
@@ -98,8 +107,8 @@ export default function CodeBoxes({ length = 6, value, onChange, color = DEFAULT
           }}
           style={{
             width: boxSize,
-            height: Math.max(52, Math.floor(boxSize * 1.2)),
-            borderRadius: 12,
+            height: Math.max(responsive.size(52), Math.floor(boxSize * 1.2)),
+            borderRadius: responsive.size(12),
             borderWidth: 1.5,
             borderColor: value[i] ? color : "#E5E7EB",
             backgroundColor: "#ffffff",

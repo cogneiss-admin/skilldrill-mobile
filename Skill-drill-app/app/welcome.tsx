@@ -9,6 +9,7 @@ import { Button } from "react-native-paper";
 import { MotiView } from "moti";
 import { StatusBar } from "expo-status-bar";
 import * as Haptics from "expo-haptics";
+import { useResponsive } from "../utils/responsive";
 
 const logoSrc = require("../assets/images/logo.png");
 
@@ -17,32 +18,38 @@ const BRAND = "#0A66C2";
 
 export default function WelcomeScreen() {
   const router = useRouter();
+  const responsive = useResponsive();
   const slides = useMemo(
     () => [
       {
         id: "s1",
-        headline: "85% of career success depends on soft skills — not hard skills.",
-        caption: "Source: Stanford & Harvard Research",
+        headline: "Master the skills that matter most in today's workplace",
+        caption: "85% of career success depends on soft skills — Stanford & Harvard Research",
+        icon: "🎯",
       },
       {
         id: "s2",
-        headline: "93% of employers value soft skills over technical expertise.",
-        caption: "Source: LinkedIn Global Talent Trends Report",
+        headline: "Stand out in a competitive job market",
+        caption: "93% of employers value soft skills over technical expertise — LinkedIn Report",
+        icon: "🚀",
       },
       {
         id: "s3",
-        headline: "Soft skills boost productivity by 12% and job performance by 256%.",
-        caption: "Source: Harvard Business Review & MIT Studies",
+        headline: "Boost your performance and productivity",
+        caption: "Soft skills increase job performance by 256% — Harvard Business Review",
+        icon: "📈",
       },
       {
         id: "s4",
-        headline: "Top earners have 4x stronger communication and leadership skills.",
-        caption: "Source: Fortune 500 Executive Survey",
+        headline: "Unlock higher earning potential",
+        caption: "Top earners have 4x stronger communication skills — Fortune 500 Survey",
+        icon: "💎",
       },
       {
         id: "s5",
-        headline: "Build skills that AI can't replace — emotional intelligence matters.",
-        caption: "Future-proof your career with SkillSeed",
+        headline: "Future-proof your career with SkillDrill",
+        caption: "Build skills that AI can't replace — emotional intelligence matters",
+        icon: "🛡️",
       },
     ],
     []
@@ -64,8 +71,8 @@ export default function WelcomeScreen() {
         {/* Hidden carousel for banner content cycling */}
         <View style={{ position: 'absolute', opacity: 0, pointerEvents: 'none' }}>
           <Carousel
-            width={SCREEN_WIDTH}
-            height={SCREEN_HEIGHT}
+            width={responsive.screenWidth}
+            height={responsive.screenHeight}
             autoPlay
             autoPlayInterval={4000}
             loop
@@ -78,9 +85,9 @@ export default function WelcomeScreen() {
 
         {/* Center animated logo + animated welcome headline */}
         <View style={{ position: "absolute", top: 0, bottom: 0, left: 0, right: 0 }} className="items-center justify-center">
-          <View style={{ marginTop: -120 }} className="items-center">
-            <LogoPulse size={120} />
-            <View style={{ marginTop: 24 }}>
+          <View style={{ marginTop: responsive.spacing(-120) }} className="items-center">
+            <LogoPulse size={responsive.size(120)} />
+            <View style={{ marginTop: responsive.spacing(24) }}>
               <AnimatedWelcome />
             </View>
           </View>
@@ -97,7 +104,14 @@ export default function WelcomeScreen() {
           colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.6)"]}
           style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}
         >
-          <View className="px-8 pt-12 pb-10">
+          <View style={{ 
+            paddingHorizontal: responsive.padding.lg,
+            paddingTop: responsive.padding.xl,
+            paddingBottom: responsive.padding.lg,
+            maxWidth: responsive.maxWidth.form,
+            alignSelf: 'center',
+            width: '100%'
+          }}>
             <MotiView
               key={`txt-${activeIndex}`}
               from={{ opacity: 0, translateY: 15, scale: 0.98 }}
@@ -110,32 +124,67 @@ export default function WelcomeScreen() {
                 translateY: { duration: 600 },
                 scale: { duration: 500 }
               }}
+              className="items-center"
             >
+              {/* Icon */}
+              <MotiView
+                from={{ scale: 0, rotate: "180deg" }}
+                animate={{ scale: 1, rotate: "0deg" }}
+                transition={{ 
+                  type: "spring", 
+                  damping: 15,
+                  stiffness: 200,
+                  delay: 200
+                }}
+                style={{
+                  width: responsive.size(56),
+                  height: responsive.size(56),
+                  borderRadius: responsive.size(28),
+                  backgroundColor: "rgba(255,255,255,0.15)",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginBottom: responsive.spacing(14),
+                  shadowColor: "#ffffff",
+                  shadowOffset: { width: 0, height: 0 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 6,
+                }}
+              >
+                <Text style={{ fontSize: responsive.fontSize(24) }}>
+                  {slides[activeIndex].icon}
+                </Text>
+              </MotiView>
+
+              {/* Headline */}
               <Text 
                 style={{ 
-                  fontSize: 26, 
-                  lineHeight: 34, 
-                  fontWeight: "800",
+                  fontSize: responsive.typography.h3, 
+                  lineHeight: responsive.fontSize(28), 
+                  fontWeight: "700",
                   textAlign: 'center',
                   textShadowColor: 'rgba(0,0,0,0.8)', 
                   textShadowOffset: {width: 0, height: 2}, 
-                  textShadowRadius: 6 
+                  textShadowRadius: 6,
+                  marginBottom: responsive.spacing(10)
                 }} 
                 className="text-white"
               >
                 {slides[activeIndex].headline}
               </Text>
+
+              {/* Caption */}
               {slides[activeIndex].caption && (
                 <Text 
                   style={{ 
-                    fontSize: 15, 
+                    fontSize: responsive.typography.body2, 
                     fontWeight: "500",
                     textAlign: 'center',
                     textShadowColor: 'rgba(0,0,0,0.6)', 
                     textShadowOffset: {width: 0, height: 1}, 
-                    textShadowRadius: 3 
+                    textShadowRadius: 3,
+                    lineHeight: responsive.fontSize(20)
                   }} 
-                  className="mt-3 text-gray-100"
+                  className="text-gray-100"
                 >
                   {slides[activeIndex].caption}
                 </Text>
@@ -143,7 +192,13 @@ export default function WelcomeScreen() {
             </MotiView>
 
             {/* Elegant pagination dots */}
-            <View className="flex-row items-center justify-center mt-6">
+            <View style={{ 
+              flexDirection: 'row', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              marginTop: responsive.spacing(24),
+              paddingHorizontal: responsive.padding.md
+            }}>
               {slides.map((s, idx) => (
                 <MotiView
                   key={s.id}
@@ -159,8 +214,8 @@ export default function WelcomeScreen() {
                 >
                   <MotiView
                     animate={{
-                      width: idx === activeIndex ? 12 : 8,
-                      height: idx === activeIndex ? 12 : 8,
+                      width: idx === activeIndex ? responsive.size(12) : responsive.size(8),
+                      height: idx === activeIndex ? responsive.size(12) : responsive.size(8),
                     }}
                     transition={{ 
                       type: "spring", 
@@ -168,8 +223,8 @@ export default function WelcomeScreen() {
                       stiffness: 200,
                     }}
                     style={{
-                      borderRadius: 6,
-                      marginHorizontal: 4,
+                      borderRadius: responsive.size(6),
+                      marginHorizontal: responsive.spacing(4),
                       backgroundColor: "#ffffff",
                       shadowColor: "#ffffff",
                       shadowOffset: { width: 0, height: 0 },
@@ -181,29 +236,41 @@ export default function WelcomeScreen() {
               ))}
             </View>
 
-            <View className="mt-8" />
-            <Button
-              mode="contained"
-              onPress={handleGetStarted}
-              contentStyle={{ height: 56 }}
-              style={{ 
-                borderRadius: 28,
-                backgroundColor: "#ffffff",
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.25,
-                shadowRadius: 12,
-                elevation: 8,
-              }}
-              labelStyle={{ 
-                fontSize: 18, 
-                fontWeight: "700",
-                color: "#0A66C2",
-                letterSpacing: 0.5,
+            <View style={{ marginTop: responsive.margin.lg }} />
+            <MotiView
+              from={{ opacity: 0, scale: 0.9, translateY: 20 }}
+              animate={{ opacity: 1, scale: 1, translateY: 0 }}
+              transition={{ 
+                type: "spring", 
+                damping: 15,
+                stiffness: 100,
+                delay: 800
               }}
             >
-              Get Started
-            </Button>
+              <Button
+                mode="contained"
+                onPress={handleGetStarted}
+                contentStyle={{ height: responsive.button.height }}
+                style={{ 
+                  borderRadius: responsive.button.borderRadius,
+                  backgroundColor: "#ffffff",
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 6 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 16,
+                  elevation: 12,
+                  paddingHorizontal: responsive.button.paddingHorizontal,
+                }}
+                labelStyle={{ 
+                  fontSize: responsive.button.fontSize, 
+                  fontWeight: "700",
+                  color: "#0A66C2",
+                  letterSpacing: 0.5,
+                }}
+              >
+                🚀 Start Your Journey
+              </Button>
+            </MotiView>
           </View>
         </LinearGradient>
       </View>
@@ -222,9 +289,9 @@ function AnimatedWelcome() {
       <Text
         className="text-white text-center"
         style={{ 
-          fontSize: 32, 
-          fontWeight: "800", 
-          letterSpacing: 0.8, 
+          fontSize: responsive.typography.h2, 
+          fontWeight: "700", 
+          letterSpacing: 0.6, 
           textShadowColor: 'rgba(0,0,0,0.5)', 
           textShadowOffset: {width: 0, height: 2}, 
           textShadowRadius: 6 
@@ -235,16 +302,16 @@ function AnimatedWelcome() {
       <Text
         className="text-white text-center"
         style={{ 
-          fontSize: 40, 
-          fontWeight: "900", 
-          letterSpacing: 1.2, 
-          marginTop: 4,
+          fontSize: responsive.typography.h1, 
+          fontWeight: "800", 
+          letterSpacing: 1.0, 
+          marginTop: responsive.spacing(4),
           textShadowColor: 'rgba(0,0,0,0.6)', 
           textShadowOffset: {width: 0, height: 2}, 
           textShadowRadius: 8 
         }}
       >
-        SkillSeed
+        SkillDrill
       </Text>
       <View style={{ 
         height: 3, 
@@ -256,17 +323,32 @@ function AnimatedWelcome() {
       <Text
         className="text-white text-center"
         style={{ 
-          fontSize: 16, 
-          fontWeight: "500", 
+          fontSize: responsive.typography.subtitle, 
+          fontWeight: "600", 
           letterSpacing: 0.3, 
-          marginTop: 12,
-          opacity: 0.9,
+          marginTop: responsive.spacing(12),
+          opacity: 0.95,
           textShadowColor: 'rgba(0,0,0,0.4)', 
           textShadowOffset: {width: 0, height: 1}, 
           textShadowRadius: 3 
         }}
       >
-        Your personal platform for growing professional soft skills
+        Practice • Learn • Excel
+      </Text>
+      <Text
+        className="text-white text-center"
+        style={{ 
+          fontSize: responsive.typography.caption, 
+          fontWeight: "500", 
+          letterSpacing: 0.1, 
+          marginTop: responsive.spacing(6),
+          opacity: 0.85,
+          textShadowColor: 'rgba(0,0,0,0.4)', 
+          textShadowOffset: {width: 0, height: 1}, 
+          textShadowRadius: 3 
+        }}
+      >
+        Master the soft skills that drive career success
       </Text>
     </MotiView>
   );
@@ -330,6 +412,8 @@ function LogoPulse({ size = 200 }: { size?: number }) {
 }
 
 function StaticBackground() {
+  const responsive = useResponsive();
+  
   return (
     <View className="flex-1">
       <LinearGradient
@@ -344,7 +428,7 @@ function StaticBackground() {
         end={{ x: 1, y: 1 }}
         style={{ position: "absolute", inset: 0 }}
       />
-      <Svg width={SCREEN_WIDTH} height={SCREEN_HEIGHT} style={{ position: "absolute" }}>
+      <Svg width={responsive.screenWidth} height={responsive.screenHeight} style={{ position: "absolute" }}>
         <Defs>
           <SvgRadialGradient id="brand-accent1" cx="30%" cy="30%" r="50%">
             <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.12" />

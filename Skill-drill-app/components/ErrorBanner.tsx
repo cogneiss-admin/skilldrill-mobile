@@ -2,6 +2,7 @@
 import React from 'react';
 import { View, Text, Pressable, ViewStyle } from 'react-native';
 import { AntDesign } from '@expo/vector-icons';
+import { useResponsive } from '../utils/responsive';
 
 type Props = {
   message?: string | null;
@@ -36,25 +37,46 @@ const COLORS = {
 export default function ErrorBanner({ message, tone = 'error', compact = false, ctaText, onCtaPress, style }: Props) {
   if (!message) return null;
   const palette = COLORS[tone];
+  const responsive = useResponsive();
+  
   return (
     <View
       style={{
         backgroundColor: palette.bg,
         borderColor: palette.border,
         borderWidth: 1,
-        borderRadius: 12,
-        paddingVertical: compact ? 8 : 10,
-        paddingHorizontal: compact ? 10 : 12,
+        borderRadius: responsive.card.borderRadius,
+        paddingVertical: compact ? responsive.padding.xs : responsive.padding.sm,
+        paddingHorizontal: compact ? responsive.padding.sm : responsive.padding.md,
         flexDirection: 'row',
         alignItems: 'center',
+        maxWidth: responsive.maxWidth.form,
+        alignSelf: 'center',
+        width: '100%',
         ...(style || {}),
       }}
     >
-      <AntDesign name={tone === 'success' ? 'checkcircle' : tone === 'info' ? 'infocirlceo' : 'exclamationcircleo'} size={18} color={palette.icon} />
-      <Text style={{ color: palette.text, marginLeft: 8, flex: 1, fontWeight: '700', fontSize: compact ? 12 : 13 }}>
+      <AntDesign 
+        name={tone === 'success' ? 'checkcircle' : tone === 'info' ? 'infocirlceo' : 'exclamationcircleo'} 
+        size={responsive.size(18)} 
+        color={palette.icon} 
+      />
+      <Text style={{ 
+        color: palette.text, 
+        marginLeft: responsive.spacing(8), 
+        flex: 1, 
+        fontWeight: '700', 
+        fontSize: compact ? responsive.typography.caption : responsive.typography.body2 
+      }}>
         {message}{' '}
         {ctaText && onCtaPress ? (
-          <Text onPress={onCtaPress} style={{ color: '#0A66C2', textDecorationLine: 'underline' }}>{ctaText}</Text>
+          <Text onPress={onCtaPress} style={{ 
+            color: '#0A66C2', 
+            textDecorationLine: 'underline',
+            fontSize: compact ? responsive.typography.caption : responsive.typography.body2 
+          }}>
+            {ctaText}
+          </Text>
         ) : null}
       </Text>
     </View>

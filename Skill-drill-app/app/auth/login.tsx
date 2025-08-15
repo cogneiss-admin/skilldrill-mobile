@@ -16,9 +16,11 @@ const BRAND = "#0A66C2";
 const COUNTRY_CODE = "+91";
 import { detectInputType, isValidEmail, isValidPhone, validationMessageFor } from "../../components/validators";
 import { useSocialAuth } from "../../hooks/useSocialAuth";
+import { useResponsive } from "../../utils/responsive";
 
 export default function LoginScreen() {
   const router = useRouter();
+  const responsive = useResponsive();
   const [emailOrPhone, setEmailOrPhone] = useState("");
   const [busy, setBusy] = useState(false);
   const [validationMessage, setValidationMessage] = useState("");
@@ -139,9 +141,9 @@ export default function LoginScreen() {
       
       {/* Top half - Colorful section like Zomato */}
       <View style={{ 
-        minHeight: 220,
+        minHeight: responsive.height(25), // 25% of screen height
         backgroundColor: "#E23744", // Zomato red color for reference, we'll use our brand
-        paddingHorizontal: 20,
+        paddingHorizontal: responsive.padding.lg,
         justifyContent: "center",
         alignItems: "center",
         position: "relative",
@@ -189,9 +191,9 @@ export default function LoginScreen() {
         <Image
           source={logoSrc}
           style={{
-            width: 180,
-            height: 180,
-            marginBottom: 10,
+            width: responsive.size(180),
+            height: responsive.size(180),
+            marginBottom: responsive.spacing(10),
             alignSelf: "center",
           }}
           resizeMode="contain"
@@ -202,16 +204,19 @@ export default function LoginScreen() {
       <View style={{ 
         flex: 1,
         backgroundColor: "#ffffff",
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        marginTop: -20,
+        borderTopLeftRadius: responsive.size(24),
+        borderTopRightRadius: responsive.size(24),
+        marginTop: responsive.spacing(-20),
       }}>
         <ScrollView
           contentContainerStyle={{
-            paddingTop: 24,
-            paddingHorizontal: 24,
-            paddingBottom: 20,
+            paddingTop: responsive.padding.lg,
+            paddingHorizontal: responsive.padding.lg,
+            paddingBottom: responsive.padding.lg,
             alignItems: "center",
+            maxWidth: responsive.maxWidth.form,
+            alignSelf: 'center',
+            width: '100%'
           }}
           showsVerticalScrollIndicator={false}
         >
@@ -219,71 +224,90 @@ export default function LoginScreen() {
 
 
         {/* Login heading */}
-        <View style={{ width: "100%", alignItems: "center", marginBottom: 8 }}>
+        <View style={{ width: "100%", alignItems: "center", marginBottom: responsive.spacing(8) }}>
           <Text style={{
-            fontSize: 28,
+            fontSize: responsive.typography.h2,
             fontWeight: "700",
             color: "#1a1a1a",
-            marginBottom: 8,
+            marginBottom: responsive.spacing(8),
           }}>
             Welcome Back!
           </Text>
           <Text style={{
-            fontSize: 16,
+            fontSize: responsive.typography.body1,
             color: "#666666",
-            marginBottom: 24,
+            marginBottom: responsive.spacing(24),
             textAlign: "center",
           }}>
             Log in or sign up to continue
           </Text>
         </View>
 
-        {/* Phone number input - Centered like Mindvalley */}
-        <View style={{ width: "100%", marginBottom: 16 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
-            <View style={{
-              flexDirection: "row",
-              alignItems: "center",
-              backgroundColor: "#f8f9fa",
-              borderWidth: 1,
-              borderColor: "#e9ecef",
-              borderRadius: 8,
-              paddingHorizontal: 12,
-              paddingVertical: 14,
-              marginRight: 8,
-              minWidth: 80,
-              justifyContent: "center",
-              gap: 6,
-            }}>
-              <Text style={{ fontSize: 20 }}>🇮🇳</Text>
-              <Text style={{ fontSize: 16, color: "#111827", fontWeight: "700" }}>{COUNTRY_CODE}</Text>
-            </View>
+        {/* Clean input field for email or phone */}
+        <View style={{ width: "100%", marginBottom: responsive.spacing(16) }}>
+          <View style={{ 
+            flexDirection: inputType === "phone" ? "row" : "column",
+            alignItems: inputType === "phone" ? "center" : "stretch",
+            justifyContent: "center",
+            maxWidth: responsive.maxWidth.form,
+            alignSelf: 'center',
+            width: '100%'
+          }}>
+            {/* Country code (only visible for phone input) */}
+            {inputType === "phone" && (
+              <View style={{
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: "#f8f9fa",
+                borderWidth: 1,
+                borderColor: "#e9ecef",
+                borderRadius: responsive.size(8),
+                paddingHorizontal: responsive.padding.sm,
+                paddingVertical: responsive.padding.sm,
+                marginRight: responsive.spacing(8),
+                minWidth: responsive.size(80),
+                justifyContent: "center",
+                gap: responsive.spacing(4),
+              }}>
+                <Text style={{ fontSize: responsive.fontSize(18) }}>🇮🇳</Text>
+                <Text style={{ 
+                  fontSize: responsive.typography.body2, 
+                  color: "#111827", 
+                  fontWeight: "700" 
+                }}>
+                  {COUNTRY_CODE}
+                </Text>
+              </View>
+            )}
             
-            <View style={{ flex: 1, maxWidth: 280 }}>
+            {/* Input field */}
+            <View style={{ flex: inputType === "phone" ? 1 : 0, width: inputType === "phone" ? undefined : '100%' }}>
               <TextInput
                 mode="outlined"
-                  placeholder="Mobile number or email"
-                keyboardType="number-pad"
+                placeholder="Enter email or phone number"
+                keyboardType={inputType === "phone" ? "number-pad" : "email-address"}
                 autoCapitalize="none"
                 autoCorrect={false}
                 multiline={false}
                 textContentType={inputType === "phone" ? "telephoneNumber" : "emailAddress"}
+                autoComplete={inputType === "phone" ? "tel" : "email"}
                 value={emailOrPhone}
                 maxLength={50}
                 onChangeText={(t) => {
-                  // If typing digits only, enforce 10-digit cap
-                  const onlyDigits = /^\+?\d*$/.test(t);
-                  if (onlyDigits) {
-                    const digits = t.replace(/\D/g, '').slice(0, 10);
-                    setEmailOrPhone(digits);
-                  } else {
-                    // Allow email input too (fallback)
+                  // Smart input handling - auto-detect phone vs email
+                  const isOnlyDigits = /^\d*$/.test(t);
+                  
+                  if (isOnlyDigits && t.length <= 10) {
+                    // Likely phone number - limit to 10 digits
+                    setEmailOrPhone(t);
+                  } else if (!isOnlyDigits) {
+                    // Contains non-digits, allow full email input
                     setEmailOrPhone(t);
                   }
                 }}
                 style={{ 
                   backgroundColor: "#ffffff",
-                  height: 50,
+                  height: responsive.input.height,
                 }}
                 textColor="#333333"
                 placeholderTextColor="#999999"
@@ -291,7 +315,7 @@ export default function LoginScreen() {
                 activeOutlineColor={BRAND}
                 contentStyle={{
                   paddingVertical: 0,
-                  fontSize: 16,
+                  fontSize: responsive.input.fontSize,
                   textAlign: "left",
                 }}
                 theme={{
@@ -299,6 +323,10 @@ export default function LoginScreen() {
                     onSurfaceVariant: "#666666",
                   }
                 }}
+                left={inputType === "email" ? 
+                  <TextInput.Icon icon="email-outline" size={responsive.size(20)} /> : 
+                  <TextInput.Icon icon="phone-outline" size={responsive.size(20)} />
+                }
               />
             </View>
           </View>
@@ -307,7 +335,13 @@ export default function LoginScreen() {
 
         {/* Validation / auth message with CTA */}
         {validationMessage ? (
-          <View style={{ width: 348, alignSelf: "center", marginTop: -4, marginBottom: 10 }}>
+          <View style={{ 
+            maxWidth: responsive.maxWidth.form,
+            alignSelf: "center", 
+            marginTop: responsive.spacing(-4), 
+            marginBottom: responsive.spacing(10),
+            width: '100%'
+          }}>
             <ErrorBanner
               message={validationMessage}
               tone="error"
@@ -319,58 +353,62 @@ export default function LoginScreen() {
 
 
 
-        <View style={{ width: "100%", alignItems: "center" }}>
-          <View style={{ flexDirection: "row", justifyContent: "center", width: '100%' }}>
-            <Pressable
-              onPress={sendOtp}
-              disabled={busy || !isValidInput}
-              style={{
-                height: 54,
-                borderRadius: 12,
-                backgroundColor: BRAND, // Using brand blue color
-                alignItems: "center",
-                justifyContent: "center",
-                marginTop: 20,
-                marginBottom: 16,
-                width: '100%',
-                maxWidth: 420,
-                opacity: isValidInput ? 1 : 0.5,
-                shadowColor: BRAND,
-                shadowOffset: {
-                  width: 0,
-                  height: 4,
-                },
-                shadowOpacity: isValidInput ? 0.3 : 0,
-                shadowRadius: 12,
-                elevation: isValidInput ? 8 : 0,
-              }}
-            >
-              <Text style={{
-                fontSize: 17,
-                fontWeight: "700",
-                color: "#ffffff",
-                letterSpacing: 0.5,
-              }}>
-                {busy ? "Please wait..." : "Send OTP"}
-              </Text>
-            </Pressable>
-          </View>
+        <View style={{ 
+          width: "100%", 
+          alignItems: "center",
+          maxWidth: responsive.maxWidth.form,
+          alignSelf: 'center'
+        }}>
+          <Pressable
+            onPress={sendOtp}
+            disabled={busy || !isValidInput}
+            style={{
+              height: responsive.button.height,
+              borderRadius: responsive.button.borderRadius,
+              backgroundColor: BRAND,
+              alignItems: "center",
+              justifyContent: "center",
+              marginTop: responsive.spacing(20),
+              marginBottom: responsive.spacing(16),
+              width: '100%',
+              paddingHorizontal: responsive.button.paddingHorizontal,
+              opacity: isValidInput ? 1 : 0.5,
+              shadowColor: BRAND,
+              shadowOffset: {
+                width: 0,
+                height: 4,
+              },
+              shadowOpacity: isValidInput ? 0.3 : 0,
+              shadowRadius: 12,
+              elevation: isValidInput ? 8 : 0,
+            }}
+          >
+            <Text style={{
+              fontSize: responsive.button.fontSize,
+              fontWeight: "700",
+              color: "#ffffff",
+              letterSpacing: 0.5,
+            }}>
+              {busy ? "Please wait..." : "Send OTP"}
+            </Text>
+          </Pressable>
         </View>
 
         {/* Divider */}
         <View style={{ 
           alignItems: "center", 
           flexDirection: "row", 
-          marginTop: 20,
-          marginBottom: 20, 
+          marginTop: responsive.spacing(20),
+          marginBottom: responsive.spacing(20), 
           width: "100%",
-          maxWidth: 350,
+          maxWidth: responsive.maxWidth.form,
+          alignSelf: 'center'
         }}>
           <View style={{ flex: 1, height: 1, backgroundColor: "#e9ecef" }} />
           <Text style={{ 
-            marginHorizontal: 20, 
+            marginHorizontal: responsive.spacing(20), 
             color: "#666666", 
-            fontSize: 14,
+            fontSize: responsive.typography.body2,
             fontWeight: "500",
           }}>
             or
@@ -382,18 +420,20 @@ export default function LoginScreen() {
           <View style={{ 
             flexDirection: "row", 
             justifyContent: "center", 
-            gap: 20, 
-            marginBottom: 20,
+            gap: responsive.spacing(20), 
+            marginBottom: responsive.spacing(20),
             width: "100%",
             alignItems: "center",
+            maxWidth: responsive.maxWidth.form,
+            alignSelf: 'center'
           }}>
             {/* Google Sign-in */}
             {isProviderAvailable('GOOGLE') && (
               <Pressable
                 style={({ pressed }) => [
                   {
-                    width: 56,
-                    height: 56,
+                    width: responsive.size(56),
+                    height: responsive.size(56),
                     borderRadius: 9999,
                     backgroundColor: "transparent",
                     borderWidth: 2,
@@ -412,7 +452,7 @@ export default function LoginScreen() {
                 onPress={signInWithGoogle}
                 disabled={socialLoading}
               >
-                <GoogleGIcon size={26} />
+                <GoogleGIcon size={responsive.size(26)} />
               </Pressable>
             )}
 
@@ -420,8 +460,8 @@ export default function LoginScreen() {
               <Pressable
                 style={({ pressed }) => [
                   {
-                    width: 56,
-                    height: 56,
+                    width: responsive.size(56),
+                    height: responsive.size(56),
                     borderRadius: 9999,
                     backgroundColor: "transparent",
                     borderWidth: 2,
@@ -440,7 +480,7 @@ export default function LoginScreen() {
                 onPress={signInWithLinkedIn}
                 disabled={socialLoading}
               >
-                <AntDesign name="linkedin-square" size={26} color="#0e76a8" />
+                <AntDesign name="linkedin-square" size={responsive.size(26)} color="#0e76a8" />
               </Pressable>
             )}
           </View>
@@ -450,18 +490,21 @@ export default function LoginScreen() {
         
         {/* Footer - Terms and signup link */}
         <View style={{
-          paddingHorizontal: 24,
-          paddingBottom: 20,
-          paddingTop: 10,
+          paddingHorizontal: responsive.padding.lg,
+          paddingBottom: responsive.padding.lg,
+          paddingTop: responsive.padding.sm,
           backgroundColor: "#ffffff",
+          maxWidth: responsive.maxWidth.form,
+          alignSelf: 'center',
+          width: '100%'
         }}>
           {/* Terms and privacy */}
           <Text style={{
-            fontSize: 12,
+            fontSize: responsive.typography.caption,
             color: "#999999",
             textAlign: "center",
-            lineHeight: 18,
-            marginBottom: 12,
+            lineHeight: responsive.fontSize(18),
+            marginBottom: responsive.spacing(12),
           }}>
             By continuing, you agree to our{"\n"}
             <Text style={{ color: "#666666", textDecorationLine: "underline" }}>Terms of Service</Text>
@@ -480,7 +523,7 @@ export default function LoginScreen() {
             style={({ pressed }) => [
               { 
                 transform: [{ scale: pressed ? 0.98 : 1 }],
-                paddingVertical: 8,
+                paddingVertical: responsive.padding.xs,
                 alignItems: "center",
               }
             ]}
@@ -488,8 +531,8 @@ export default function LoginScreen() {
             <Text style={{ 
               color: "#666666", 
               textAlign: "center",
-              fontSize: 14,
-              lineHeight: 20,
+              fontSize: responsive.typography.body2,
+              lineHeight: responsive.fontSize(20),
             }}>
               New to Skill Drill? {" "}
               <Text style={{ 

@@ -48,8 +48,26 @@ export default function CareerRoleScreen() {
         const userData = await authService.getUserData();
         
         if (userData?.career_stage && userData?.role_type) {
-          // User already has career info, redirect to dashboard
-          router.replace("/dashboard");
+          console.log('✅ Career-role: User already has career info, checking next step...');
+          
+          // User already has career info, but let's check what they should do next
+          // If they have onboarding_step set, follow that logic
+          if (userData.onboarding_step === 'CAREER_ROLE_COMPLETED' || userData.onboarding_step === 'SKILLS_SELECTED') {
+            console.log('📋 Career-role: User has proper onboarding step, redirecting to skills');
+            router.replace("/auth/skills");
+          } else {
+            console.log('🔧 Career-role: Updating onboarding step for legacy user');
+            // Legacy user - update their onboarding step
+            try {
+              await updateProfile({
+                onboarding_step: 'CAREER_ROLE_COMPLETED'
+              });
+              router.replace("/auth/skills");
+            } catch (error) {
+              console.error('❌ Failed to update onboarding step:', error);
+              router.replace("/auth/skills");
+            }
+          }
           return;
         }
         
@@ -68,7 +86,7 @@ export default function CareerRoleScreen() {
     };
 
     checkCareerInfo();
-  }, [router]);
+  }, [router, updateProfile]);
 
   const handleSave = async () => {
     if (!canContinue || busy) return;
@@ -79,11 +97,12 @@ export default function CareerRoleScreen() {
       setBusy(true);
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-      // Update profile using AuthContext
+      // Update profile using AuthContext with onboarding step
       console.log('🔄 Career-role: Calling updateProfile...');
       await updateProfile({
         career_stage: careerStage,
         role_type: roleType,
+        onboarding_step: 'CAREER_ROLE_COMPLETED'
       });
       console.log('✅ Career-role: Profile update successful');
 
@@ -96,15 +115,15 @@ export default function CareerRoleScreen() {
       console.log('🔄 Career-role: Refreshing auth state...');
       await checkAuthStatus();
       
-      console.log('🚀 Career-role: Navigating to dashboard...');
+      console.log('🚀 Career-role: Navigating to skills selection...');
       try {
-        router.replace("/dashboard");
-        console.log('✅ Career-role: Navigation to dashboard initiated');
+        router.replace("/auth/skills");
+        console.log('✅ Career-role: Navigation to skills initiated');
       } catch (navigationError) {
         console.error('❌ Career-role: Navigation error:', navigationError);
         // Fallback navigation
         console.log('🔄 Career-role: Trying fallback navigation...');
-        router.push("/dashboard");
+        router.push("/auth/skills");
       }
     } catch (error) {
       console.error('❌ Career-role: Profile update error:', error);

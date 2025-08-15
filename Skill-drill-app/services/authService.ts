@@ -278,7 +278,11 @@ class AuthService {
   }
 
   // Update user profile via API
-  public async updateProfileViaAPI(profileData: { career_stage?: string; role_type?: string }): Promise<ApiResponse<User>> {
+  public async updateProfileViaAPI(profileData: { 
+    career_stage?: string; 
+    role_type?: string; 
+    onboarding_step?: string 
+  }): Promise<ApiResponse<User>> {
     try {
       const response = await apiService.put<User>('/multi-auth/profile', profileData);
       
@@ -290,6 +294,19 @@ class AuthService {
       return response;
     } catch (error) {
       console.error('Profile update API error:', error);
+      throw error;
+    }
+  }
+
+  // Update onboarding step
+  public async updateOnboardingStep(step: string): Promise<ApiResponse<User>> {
+    try {
+      console.log(`🎯 AuthService: Updating onboarding step to: ${step}`);
+      const response = await this.updateProfileViaAPI({ onboarding_step: step });
+      console.log(`✅ AuthService: Onboarding step updated successfully`);
+      return response;
+    } catch (error) {
+      console.error('❌ AuthService: Error updating onboarding step:', error);
       throw error;
     }
   }

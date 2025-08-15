@@ -111,28 +111,33 @@ function WelcomeScreen({ onGetStarted }: { onGetStarted: () => void }) {
     () => [
       {
         id: "s1",
-        headline: "85% of career success depends on soft skills — not hard skills.",
-        caption: "Source: Stanford & Harvard Research",
+        headline: "Master the skills that matter most in today's workplace",
+        caption: "85% of career success depends on soft skills — Stanford & Harvard Research",
+        icon: "🎯",
       },
       {
         id: "s2",
-        headline: "93% of employers value soft skills over technical expertise.",
-        caption: "Source: LinkedIn Global Talent Trends Report",
+        headline: "Stand out in a competitive job market",
+        caption: "93% of employers value soft skills over technical expertise — LinkedIn Report",
+        icon: "🚀",
       },
       {
         id: "s3",
-        headline: "Soft skills boost productivity by 12% and job performance by 256%.",
-        caption: "Source: Harvard Business Review & MIT Studies",
+        headline: "Boost your performance and productivity",
+        caption: "Soft skills increase job performance by 256% — Harvard Business Review",
+        icon: "📈",
       },
       {
         id: "s4",
-        headline: "Top earners have 4x stronger communication and leadership skills.",
-        caption: "Source: Fortune 500 Executive Survey",
+        headline: "Unlock higher earning potential",
+        caption: "Top earners have 4x stronger communication skills — Fortune 500 Survey",
+        icon: "💎",
       },
       {
         id: "s5",
-        headline: "Build skills that AI can't replace — emotional intelligence matters.",
-        caption: "Future-proof your career with SkillSeed",
+        headline: "Future-proof your career with SkillDrill",
+        caption: "Build skills that AI can't replace — emotional intelligence matters",
+        icon: "🛡️",
       },
     ],
     []
@@ -198,9 +203,9 @@ function WelcomeScreen({ onGetStarted }: { onGetStarted: () => void }) {
             >
               <Text 
                 style={{ 
-                  fontSize: 26, 
-                  lineHeight: 34, 
-                  fontWeight: "800",
+                  fontSize: 22, 
+                  lineHeight: 28, 
+                  fontWeight: "700",
                   textAlign: 'center',
                   textShadowColor: 'rgba(0,0,0,0.8)', 
                   textShadowOffset: {width: 0, height: 2}, 
@@ -213,12 +218,13 @@ function WelcomeScreen({ onGetStarted }: { onGetStarted: () => void }) {
               {slides[activeIndex].caption && (
                 <Text 
                   style={{ 
-                    fontSize: 15, 
+                    fontSize: 14, 
                     fontWeight: "500",
                     textAlign: 'center',
                     textShadowColor: 'rgba(0,0,0,0.6)', 
                     textShadowOffset: {width: 0, height: 1}, 
-                    textShadowRadius: 3 
+                    textShadowRadius: 3,
+                    lineHeight: 20
                   }} 
                   className="mt-3 text-gray-100"
                 >
@@ -281,7 +287,7 @@ function WelcomeScreen({ onGetStarted }: { onGetStarted: () => void }) {
                 elevation: 8,
               }}
               labelStyle={{ 
-                fontSize: 18, 
+                fontSize: 16, 
                 fontWeight: "700",
                 color: "#0A66C2",
                 letterSpacing: 0.5,
@@ -307,9 +313,9 @@ function AnimatedWelcome() {
       <Text
         className="text-white text-center"
         style={{ 
-          fontSize: 32, 
-          fontWeight: "800", 
-          letterSpacing: 0.8, 
+          fontSize: 26, 
+          fontWeight: "700", 
+          letterSpacing: 0.6, 
           textShadowColor: 'rgba(0,0,0,0.5)', 
           textShadowOffset: {width: 0, height: 2}, 
           textShadowRadius: 6 
@@ -320,16 +326,16 @@ function AnimatedWelcome() {
       <Text
         className="text-white text-center"
         style={{ 
-          fontSize: 40, 
-          fontWeight: "900", 
-          letterSpacing: 1.2, 
+          fontSize: 32, 
+          fontWeight: "800", 
+          letterSpacing: 1.0, 
           marginTop: 4,
           textShadowColor: 'rgba(0,0,0,0.6)', 
           textShadowOffset: {width: 0, height: 2}, 
           textShadowRadius: 8 
         }}
       >
-        SkillSeed
+        SkillDrill
       </Text>
       <View style={{ 
         height: 3, 
@@ -341,17 +347,32 @@ function AnimatedWelcome() {
       <Text
         className="text-white text-center"
         style={{ 
-          fontSize: 16, 
-          fontWeight: "500", 
+          fontSize: 15, 
+          fontWeight: "600", 
           letterSpacing: 0.3, 
           marginTop: 12,
-          opacity: 0.9,
+          opacity: 0.95,
           textShadowColor: 'rgba(0,0,0,0.4)', 
           textShadowOffset: {width: 0, height: 1}, 
           textShadowRadius: 3 
         }}
       >
-        Your personal platform for growing professional soft skills
+        Practice • Learn • Excel
+      </Text>
+      <Text
+        className="text-white text-center"
+        style={{ 
+          fontSize: 13, 
+          fontWeight: "500", 
+          letterSpacing: 0.1, 
+          marginTop: 6,
+          opacity: 0.85,
+          textShadowColor: 'rgba(0,0,0,0.4)', 
+          textShadowOffset: {width: 0, height: 1}, 
+          textShadowRadius: 3 
+        }}
+      >
+        Master the soft skills that drive career success
       </Text>
     </MotiView>
   );

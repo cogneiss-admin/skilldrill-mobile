@@ -72,7 +72,38 @@ export const useAuth = () => {
   };
 
   const isOnboardingComplete = (user: User | null): boolean => {
-    return !!(user?.career_stage && user?.role_type);
+    return user?.onboarding_step === 'COMPLETED';
+  };
+
+  const getOnboardingNextStep = (user: User | null): string | null => {
+    if (!user) return null;
+    
+    // Check onboarding step progression
+    switch (user.onboarding_step) {
+      case 'EMAIL_VERIFIED':
+        return '/auth/career-role';
+      case 'CAREER_ROLE_COMPLETED':
+        return '/auth/skills';
+      case 'SKILLS_SELECTED':
+        return '/dashboard'; // Could be assessment or dashboard
+      case 'COMPLETED':
+        return '/dashboard';
+      default:
+        // Legacy users or new users without onboarding_step
+        // Need to determine their progress manually
+        
+        // First check: Do they have career/role info?
+        if (!user.career_stage || !user.role_type) {
+          console.log('🔄 getOnboardingNextStep: User missing career/role info, directing to career-role');
+          return '/auth/career-role';
+        }
+        
+        // They have career/role info, but we need to check if they have skills
+        // Since we can't check user skills from this context, we'll assume they need skills
+        // This will be handled by the skills screen itself to check and redirect if needed
+        console.log('🔄 getOnboardingNextStep: Legacy user with career/role, directing to skills');
+        return '/auth/skills';
+    }
   };
 
   const login = async (emailOrPhone: string, password?: string) => {
@@ -256,7 +287,11 @@ export const useAuth = () => {
       console.log('📊 useAuth: Profile data to update:', userData);
       
       // Use the API method to update profile on backend
-      const response = await authService.updateProfileViaAPI(userData as { career_stage?: string; role_type?: string });
+      const response = await authService.updateProfileViaAPI(userData as { 
+        career_stage?: string; 
+        role_type?: string; 
+        onboarding_step?: string 
+      });
       
       console.log('✅ useAuth: Profile update API response:', response);
       
@@ -270,7 +305,8 @@ export const useAuth = () => {
         console.log('📊 useAuth: Updated user data:', {
           career_stage: response.data.career_stage,
           role_type: response.data.role_type,
-          onboardingComplete: !!(response.data.career_stage && response.data.role_type)
+          onboarding_step: response.data.onboarding_step,
+          onboardingComplete: isOnboardingComplete(response.data)
         });
       } else {
         console.error('❌ useAuth: Profile update failed:', response.message);
@@ -286,6 +322,25 @@ export const useAuth = () => {
     }
   };
 
+  const updateOnboardingStep = async (step: string) => {
+    try {
+      console.log(`🎯 useAuth: Updating onboarding step to: ${step}`);
+      await authService.updateOnboardingStep(step);
+      
+      // Refresh user data to get updated onboarding step
+      await checkAuthStatus();
+      
+      console.log(`✅ useAuth: Onboarding step updated to: ${step}`);
+    } catch (error: any) {
+      console.error('❌ useAuth: Error updating onboarding step:', error);
+      setAuthState(prev => ({
+        ...prev,
+        error: error.message,
+      }));
+      throw error;
+    }
+  };
+
   const clearError = () => {
     setAuthState(prev => ({ ...prev, error: null }));
   };
@@ -293,11 +348,13 @@ export const useAuth = () => {
   return {
     ...authState,
     isOnboardingComplete: () => isOnboardingComplete(authState.user),
+    getOnboardingNextStep: () => getOnboardingNextStep(authState.user),
     login,
     signup,
     verifyOtp,
     logout,
     updateProfile,
+    updateOnboardingStep,
     clearError,
     checkAuthStatus,
   };
