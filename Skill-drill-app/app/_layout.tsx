@@ -97,10 +97,10 @@ const AuthMiddleware = React.memo(({ children }: { children: React.ReactNode }) 
       return;
     }
 
-    // Don't redirect if we're on the skills screen - part of onboarding flow
+    // Don't redirect if we're on the skills screen (both signup and assessment modes)
     const isSkillsScreen = segments[0] === 'auth' && segments[1] === 'skills';
     if (isSkillsScreen) {
-      console.log('🧩 AuthMiddleware: On skills screen, not redirecting');
+      console.log('🎯 AuthMiddleware: On skills screen, not redirecting');
       return;
     }
 
@@ -122,13 +122,6 @@ const AuthMiddleware = React.memo(({ children }: { children: React.ReactNode }) 
     const isDashboardScreen = segments[0] === 'dashboard';
     if (isDashboardScreen) {
       console.log('📊 AuthMiddleware: On dashboard screen, not redirecting');
-      return;
-    }
-
-    // Don't redirect if we're on the assessment skill selection screen
-    const isAssessmentSkillSelectionScreen = segments[0] === 'assessment-skill-selection';
-    if (isAssessmentSkillSelectionScreen) {
-      console.log('🎯 AuthMiddleware: On assessment skill selection screen, not redirecting');
       return;
     }
 

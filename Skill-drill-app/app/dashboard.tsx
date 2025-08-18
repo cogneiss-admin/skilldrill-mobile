@@ -43,8 +43,11 @@ export default function DashboardWelcome() {
       setAssessmentLoading(true);
       console.log('🎯 Starting assessment skill selection...');
       
-      // Navigate to assessment skill selection screen
-      router.push('/assessment-skill-selection');
+      // Navigate to unified skills screen in assessment mode
+      router.push({
+        pathname: '/auth/skills',
+        params: { mode: 'assessment' }
+      });
       
     } catch (error) {
       console.error('❌ Assessment error:', error);

@@ -7,7 +7,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import { MotiView } from "moti";
 import * as Haptics from "expo-haptics";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import Constants from "expo-constants";
 import { useResponsive } from "../../utils/responsive";
 import { useAuth } from "../../hooks/useAuth";
@@ -25,14 +25,17 @@ const getSkillIcon = (skillName) => {
     // Communication & Interpersonal
     'communication': 'message-text',
     'active listening': 'ear',
+    'listening': 'ear',
     'presentation': 'presentation',
     'public speaking': 'microphone',
     'written communication': 'pencil',
     'verbal communication': 'chat',
+    'email & message hygiene': 'email',
     
     // Leadership & Management
     'leadership': 'account-group',
     'team leadership': 'account-supervisor',
+    'delegation': 'account-supervisor',
     'strategic thinking': 'chess-king',
     'decision making': 'check-decagram',
     'mentoring': 'account-heart',
@@ -76,10 +79,11 @@ const getSkillIcon = (skillName) => {
     'ideation': 'lightbulb-outline',
     'artistic': 'brush',
     'imagination': 'eye',
-    'innovation': 'rocket-launch',
+    'innovation-creativity': 'rocket-launch',
     
     // Emotional Intelligence
     'emotional intelligence': 'heart',
+    'emotional regulation': 'heart',
     'empathy': 'heart-outline',
     'self-awareness': 'account-eye',
     'social skills': 'account-multiple-outline',
@@ -96,6 +100,7 @@ const getSkillIcon = (skillName) => {
     
     // Growth & Development
     'growth orientation': 'trending-up',
+    'responding to feedback': 'comment-text',
     'personal development': 'account-arrow-up',
     'career development': 'briefcase-account',
     'self-improvement': 'account-edit',
@@ -228,6 +233,10 @@ const getSkillIcon = (skillName) => {
 };
 
 export default function SkillsScreen() {
+  // Get route parameters to determine context
+  const params = useLocalSearchParams();
+  const isAssessmentMode = params.mode === 'assessment';
+  
   // Skill data will be loaded from API
   const [skillsData, setSkillsData] = useState([]);
   const router = useRouter();
@@ -241,15 +250,27 @@ export default function SkillsScreen() {
 
   const canContinue = useMemo(() => selected.length > 0, [selected]);
 
+  // Debug logging (only in development)
+  if (__DEV__) {
+    console.log('🔍 Skills Screen State:', {
+      loading,
+      skillsDataLength: skillsData.length,
+      selectedLength: selected.length,
+      isAssessmentMode,
+      error
+    });
+  }
+
   // Load skills from backend and check if user already has skills
-  const loadSkillsAndCheckProgress = useCallback(async () => {
+  const loadSkillsAndCheckProgress = async () => {
       try {
         // Debug: Log API configuration
         console.log('🔍 Skills: API Configuration:', {
           platform: Platform.OS,
           apiBaseUrl: Constants.expoConfig?.extra?.API_BASE_URL || 'http://10.0.2.2:3000/api',
           isDev: __DEV__,
-          constants: Constants.expoConfig?.extra
+          constants: Constants.expoConfig?.extra,
+          mode: isAssessmentMode ? 'assessment' : 'signup'
         });
 
         // First, test connection to backend
@@ -264,35 +285,41 @@ export default function SkillsScreen() {
           return;
         }
 
-        // First, check if user already has skills selected
-        try {
-          const userSkillsResponse = await apiService.get('/user/skills');
-          if (userSkillsResponse.success && userSkillsResponse.data.length > 0) {
-            console.log('✅ Skills: User already has skills selected, redirecting to dashboard');
-            
-            // Update onboarding step if needed
-            try {
-              await updateOnboardingStep('SKILLS_SELECTED');
-            } catch (error) {
-              console.error('❌ Failed to update onboarding step:', error);
+        // Both signup and assessment modes should show all available skills
+        // The only difference is the button text and navigation
+        console.log('🔍 Loading all available skills for', isAssessmentMode ? 'assessment' : 'signup', 'mode...');
+        
+        // Check if user already has skills (only for signup mode)
+        if (!isAssessmentMode) {
+          try {
+            const userSkillsResponse = await apiService.get('/user/skills');
+            if (userSkillsResponse.success && userSkillsResponse.data.length > 0) {
+              console.log('✅ Skills: User already has skills selected, redirecting to dashboard');
+              
+              // Update onboarding step if needed
+              try {
+                await updateOnboardingStep('SKILLS_SELECTED');
+              } catch (error) {
+                console.error('❌ Failed to update onboarding step:', error);
+              }
+              
+              // Redirect to dashboard
+              router.replace("/dashboard");
+              return;
             }
-            
-            // Redirect to dashboard
-            router.replace("/dashboard");
-            return;
-          }
-        } catch (userSkillsError: any) {
-          // Check if this is an authentication error (401) or a network error
-          if (userSkillsError.status === 401) {
-            console.log('ℹ️ Skills: User not authenticated, proceeding with skill selection');
-          } else if (userSkillsError.status === 404) {
-            console.log('ℹ️ Skills: User has no skills selected yet, proceeding with skill selection');
-          } else {
-            console.log('ℹ️ Skills: Error checking user skills, proceeding with skill selection:', userSkillsError.message);
+          } catch (userSkillsError: any) {
+            // Check if this is an authentication error (401) or a network error
+            if (userSkillsError.status === 401) {
+              console.log('ℹ️ Skills: User not authenticated, proceeding with skill selection');
+            } else if (userSkillsError.status === 404) {
+              console.log('ℹ️ Skills: User has no skills selected yet, proceeding with skill selection');
+            } else {
+              console.log('ℹ️ Skills: Error checking user skills, proceeding with skill selection:', userSkillsError.message);
+            }
           }
         }
         
-        // Load available skills for selection
+        // Load available skills for selection (same for both signup and assessment modes)
         console.log('🔍 Skills: Loading skills from categories endpoint...');
         const response = await apiService.get('/skills/categories');
         
@@ -301,75 +328,54 @@ export default function SkillsScreen() {
         if (response.success) {
           console.log('✅ Skills: Successfully loaded', response.data.length, 'skill groups');
           
-          // Validate that the data is in the expected format
-          if (Array.isArray(response.data)) {
-            // Transform API data to our format
-            const transformedSkills = [];
-            
-            response.data.forEach(category => {
-              if (category.skills && Array.isArray(category.skills)) {
-                category.skills.forEach(skill => {
-                  const skillName = skill.skill_name || skill.name;
-                  const icon = getSkillIcon(skillName);
-                  
-                  // Debug logging to see what skill names we're getting
-                  console.log(`🎯 Skill: "${skillName}" -> Icon: "${icon}"`);
-                  
-                  // Map skill data to our format
-                  transformedSkills.push({
-                    id: skill._id || skill.id, // Use the actual ObjectID from database
-                    name: skillName,
-                    description: skill.description || 'Skill description',
-                    icon: icon,
-                    category: category.title
-                  });
-                });
-              }
-            });
-            
-            console.log('✅ Skills: Transformed', transformedSkills.length, 'skills');
-            setSkillsData(transformedSkills);
-          } else {
-            console.error('❌ Skills: Invalid data format received:', response.data);
-            showToast('error', 'Data Error', 'Invalid data format received from server');
-          }
+          // Transform the API response to match our frontend format
+          const allSkills = [];
+          
+          response.data.forEach((group, groupIndex) => {
+            console.log(`📁 Processing group ${groupIndex}: "${group.title}" with ${group.skills?.length || 0} skills`);
+            if (group.skills && Array.isArray(group.skills)) {
+              group.skills.forEach((skill, skillIndex) => {
+                console.log(`  📝 Processing skill ${skillIndex}:`, skill);
+                const skillName = skill.name || skill.skill_name;
+                const icon = getSkillIcon(skillName.toLowerCase());
+                
+                // Debug logging to see what skill names we're getting
+                console.log(`🎯 Skill: "${skillName}" -> Icon: "${icon}" (ID: ${skill.id})`);
+                
+                // Map skill data to our format
+                const skillData = {
+                  id: skill.id,
+                  name: skillName,
+                  description: skill.description || 'Skill description',
+                  icon: icon,
+                  category: group.title,
+                  tier: skill.tier,
+                  skill_id: skill.skill_id
+                };
+                
+                console.log(`✅ Adding skill: ${skillName} (ID: ${skill.id})`);
+                allSkills.push(skillData);
+              });
+            } else {
+              console.log(`❌ Group "${group.title}" has no skills array or invalid format:`, group);
+            }
+          });
+          
+          console.log('📊 Skills: Transformed', allSkills.length, 'skills from', response.data.length, 'categories');
+          console.log('🔍 Skills: All transformed skills:', allSkills.map(s => ({ name: s.name, id: s.id, icon: s.icon })));
+          console.log('🔍 Skills: Setting skillsData with', allSkills.length, 'skills');
+          setSkillsData(allSkills);
         } else {
           console.error('❌ Skills: API returned error:', response.message);
-          showToast('error', 'Load Error', response.message || 'Failed to load skills');
+          setError(response.message || 'Failed to load skills');
         }
       } catch (error: any) {
-        console.error('Load skills error:', error);
-        
-        // Show error message instead of using fallback data
-        setError('Failed to load skills. Please check your connection and try again.');
-        
-        // Provide more specific error messages based on the error type
-        if (error.status === 0) {
-          // Network error
-          showToast('error', 'Network Error', 'Please check your internet connection and try again.');
-        } else if (error.status === 500) {
-          // Server error
-          showToast('error', 'Server Error', 'Server is temporarily unavailable. Please try again later.');
-        } else if (error.status === 404) {
-          // Not found
-          showToast('error', 'Skills Not Found', 'Skills data not available. Please try again later.');
-        } else if (error.status === 401) {
-          // Unauthorized
-          showToast('error', 'Authentication Error', 'Authentication required. Please login again.');
-        } else if (error.status === 403) {
-          // Forbidden
-          showToast('error', 'Access Denied', 'Access denied. Please check your permissions.');
-        } else if (error.code === 'TIMEOUT') {
-          // Timeout
-          showToast('error', 'Connection Timeout', 'Request timed out. Please check your connection.');
-        } else {
-          // Other errors
-          showToast('error', 'Connection Issue', 'Failed to load skills. Please try again.');
-        }
+        console.error('Skills load error:', error);
+        setError(error.message || 'Failed to load skills. Please try again.');
       } finally {
         setLoading(false);
       }
-    }, []); // Remove dependencies to prevent infinite loop
+    };
 
   // Handle retry action
   const handleRetry = useCallback(() => {
@@ -380,7 +386,7 @@ export default function SkillsScreen() {
   // Load skills on component mount
   useEffect(() => {
     loadSkillsAndCheckProgress();
-  }, []); // Remove dependencies to prevent infinite loop
+  }, []); // Remove dependency to prevent infinite loop
 
   const toggleSkill = (skillId: string) => {
     // Fire haptic feedback without blocking
@@ -396,6 +402,7 @@ export default function SkillsScreen() {
 
   const handleContinue = async () => {
     if (!canContinue || busy) return;
+    
     setBusy(true);
     
     // Fire haptic feedback without blocking
@@ -403,46 +410,60 @@ export default function SkillsScreen() {
     
     try {
       
-      // Filter out any fallback skill IDs that are not valid database IDs
-      const validSkillIds = selected.filter(skillId => 
-        !skillId.startsWith('fallback_') && skillId.length > 10
-      );
-      
-      console.log('🔄 Saving skills:', validSkillIds, 'Count:', validSkillIds.length);
-      console.log('❌ Filtered out invalid IDs:', selected.filter(skillId => 
-        skillId.startsWith('fallback_') || skillId.length <= 10
-      ));
-      
-      if (validSkillIds.length === 0) {
-        showToast('error', 'No Valid Skills', 'Please select valid skills before continuing.');
-        setBusy(false);
-        return;
-      }
-      
-      // Save selected skills to backend
-      const response = await apiService.post('/user/skills', {
-        skill_ids: validSkillIds
-      });
-      
-      if (response.success) {
-        console.log('✅ Skills saved successfully');
+      if (isAssessmentMode) {
+        // Assessment mode: Start assessment with selected skills
+        console.log('🎯 Assessment: Starting assessment for skills:', selected);
         
-        // Show success toast
-        showToast('success', 'Success', 'Skills saved successfully!');
+        // Navigate to assessment screen with selected skills
+        router.push({
+          pathname: '/assessment',
+          params: { selectedSkills: JSON.stringify(selected) }
+        });
         
-        // Update onboarding step to indicate skills have been selected
-        try {
-          await updateOnboardingStep('SKILLS_SELECTED');
-          console.log('✅ Onboarding step updated to SKILLS_SELECTED');
-        } catch (error) {
-          console.error('❌ Failed to update onboarding step:', error);
-          // Continue anyway, skills were saved successfully
+      } else {
+        // Signup mode: Save selected skills to backend
+        
+        // Filter out any fallback skill IDs that are not valid database IDs
+        const validSkillIds = selected.filter(skillId => 
+          !skillId.startsWith('fallback_') && skillId.length > 10
+        );
+        
+        console.log('🔄 Saving skills:', validSkillIds, 'Count:', validSkillIds.length);
+        console.log('❌ Filtered out invalid IDs:', selected.filter(skillId => 
+          skillId.startsWith('fallback_') || skillId.length <= 10
+        ));
+        
+        if (validSkillIds.length === 0) {
+          showToast('error', 'No Valid Skills', 'Please select valid skills before continuing.');
+          setBusy(false);
+          return;
         }
         
-        // Redirect to dashboard (assessment is now optional)
-        router.replace("/dashboard");
-      } else {
-        showToast('error', 'Save Error', response.message || 'Failed to save skills');
+        // Save selected skills to backend
+        const response = await apiService.post('/user/skills', {
+          skill_ids: validSkillIds
+        });
+        
+        if (response.success) {
+          console.log('✅ Skills saved successfully');
+          
+          // Show success toast
+          showToast('success', 'Success', 'Skills saved successfully!');
+          
+          // Update onboarding step to indicate skills have been selected
+          try {
+            await updateOnboardingStep('SKILLS_SELECTED');
+            console.log('✅ Onboarding step updated to SKILLS_SELECTED');
+          } catch (error) {
+            console.error('❌ Failed to update onboarding step:', error);
+            // Continue anyway, skills were saved successfully
+          }
+          
+          // Redirect to dashboard (assessment is now optional)
+          router.replace("/dashboard");
+        } else {
+          showToast('error', 'Save Error', response.message || 'Failed to save skills');
+        }
       }
     } catch (error) {
       console.error('Save skills error:', error);
@@ -452,8 +473,8 @@ export default function SkillsScreen() {
     }
   };
 
-    // Show beautiful loading state only briefly while skills are being loaded
-  if (loading && skillsData.length === 0) {
+    // Show beautiful loading state only while skills are being loaded
+  if (loading) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: BRAND }}>
         <StatusBar style="light" />
@@ -530,7 +551,7 @@ export default function SkillsScreen() {
           <View style={{ flex: 1, justifyContent: "center", paddingHorizontal: responsive.padding.md, paddingBottom: responsive.padding.lg }}>
           <MotiView from={{ opacity: 0, translateY: 6 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: "timing", duration: 480 }}>
               <Text style={{ fontSize: responsive.typography.h3, fontWeight: "900", color: "#ffffff" }}>Choose Your Skills</Text>
-              <Text style={{ marginTop: responsive.spacing(8), color: "#E6F2FF", fontSize: responsive.typography.subtitle }}>Select the skills you want to improve. We'll create personalized assessments for you.</Text>
+              <Text style={{ marginTop: responsive.spacing(8), color: "#E6F2FF", fontSize: responsive.typography.subtitle }}>Select the skills you want to improve. We&apos;ll create personalized assessments for you.</Text>
           </MotiView>
         </View>
       </View>
@@ -726,7 +747,13 @@ export default function SkillsScreen() {
               textColor="#ffffff"
               rippleColor="rgba(255, 255, 255, 0.2)"
             >
-            {busy ? "Saving..." : selected.length > 0 ? `Continue with ${selected.length} Skill${selected.length !== 1 ? 's' : ''}` : "Select at least one skill"}
+            {busy ? (isAssessmentMode ? "Starting Assessment..." : "Saving...") : 
+              selected.length > 0 ? 
+                (isAssessmentMode ? 
+                  `Start Assessment with ${selected.length} Skill${selected.length !== 1 ? 's' : ''}` : 
+                  `Continue with ${selected.length} Skill${selected.length !== 1 ? 's' : ''}`
+                ) : 
+                "Select at least one skill"}
             </Button>
       </View>
     </SafeAreaView>
