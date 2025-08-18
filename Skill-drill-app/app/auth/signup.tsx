@@ -11,6 +11,7 @@ import { useSocialAuth } from "../../hooks/useSocialAuth";
 import { StatusBar } from "expo-status-bar";
 import { AntDesign } from "@expo/vector-icons";
 import GoogleGIcon from "../../components/GoogleGIcon";
+import LinkedInIcon from "../../components/LinkedInIcon";
 import CodeBoxes from "../../components/CodeBoxes";
 
 const logoSrc = require("../../assets/images/logo.png");
@@ -651,7 +652,7 @@ export default function SignupScreen() {
                 onPress={signInWithLinkedIn}
                 disabled={socialLoading || busy}
               >
-                <AntDesign name="linkedin-square" size={26} color="#0e76a8" />
+                <LinkedInIcon size={26} />
               </Pressable>
             )}
           </View>

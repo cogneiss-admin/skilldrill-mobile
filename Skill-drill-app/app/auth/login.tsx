@@ -3,12 +3,15 @@ import React, { useMemo, useState } from "react";
 import { Pressable, View, Image, ScrollView, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TextInput } from "react-native-paper";
-import ErrorBanner from "../../components/ErrorBanner";
+import CompactErrorBanner from "../../components/CompactErrorBanner";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { AntDesign, MaterialIcons } from "@expo/vector-icons";
 import GoogleGIcon from "../../components/GoogleGIcon";
+import LinkedInIcon from "../../components/LinkedInIcon";
 import { StatusBar } from "expo-status-bar";
+import { useToast } from "../../hooks/useToast";
+import { parseApiError, formatErrorMessage } from "../../utils/errorHandler";
 
 const logoSrc = require("../../assets/images/logo.png");
 
@@ -26,6 +29,7 @@ export default function LoginScreen() {
   const [validationMessage, setValidationMessage] = useState("");
   const [showSignupSuggestion, setShowSignupSuggestion] = useState(false);
   const { signInWithGoogle, signInWithLinkedIn, isLoading: socialLoading, isProviderAvailable } = useSocialAuth();
+  const { showError, showSuccess } = useToast();
 
   // Detect if input is email or phone number (simple, user-friendly heuristic)
   const inputType = useMemo(() => detectInputType(emailOrPhone), [emailOrPhone]);
@@ -109,27 +113,21 @@ export default function LoginScreen() {
       }
     } catch (error: any) {
       console.error('❌ Send OTP error:', error);
-      let message = error?.message || 'Cannot send OTP';
-      if (error?.code === 'USER_NOT_FOUND') {
-        message = 'No account found with this email. Please sign up to create a new account.';
+      const apiError = parseApiError(error);
+      const message = formatErrorMessage(apiError);
+      
+      // Show toast notification
+      showError(message);
+      
+      // Set validation message for banner
+      setValidationMessage(message);
+      
+      // Handle specific error codes for UI state
+      if (apiError.code === 'USER_NOT_FOUND') {
         setShowSignupSuggestion(true);
-      } else if (error?.code === 'ACCOUNT_PENDING_VERIFICATION') {
-        message = 'Your account is pending verification. Please complete the signup process.';
-        setShowSignupSuggestion(false);
-      } else if (error?.code === 'ACCOUNT_SUSPENDED') {
-        message = 'Your account has been suspended. Please contact support.';
-        setShowSignupSuggestion(false);
-      } else if (error?.code === 'ACCOUNT_INACTIVE') {
-        message = 'Your account is not active. Please contact support.';
-        setShowSignupSuggestion(false);
-      } else if (error?.code === 'NETWORK_ERROR') {
-        message = 'Cannot connect to server. Please check your internet and try again.';
-        setShowSignupSuggestion(false);
-      } else if (error?.code === 'TIMEOUT') {
-        message = 'Request timeout. Please try again.';
+      } else {
         setShowSignupSuggestion(false);
       }
-      setValidationMessage(message);
     } finally {
       setBusy(false);
     }
@@ -342,12 +340,14 @@ export default function LoginScreen() {
             marginBottom: responsive.spacing(10),
             width: '100%'
           }}>
-            <ErrorBanner
-              message={validationMessage}
-              tone="error"
-              ctaText={/sign up/i.test(validationMessage) ? 'Sign up' : undefined}
-              onCtaPress={/sign up/i.test(validationMessage) ? () => router.replace('/onboarding') : undefined}
-            />
+                    <CompactErrorBanner
+          message={validationMessage}
+          tone="error"
+          dismissible={true}
+          onDismiss={() => setValidationMessage("")}
+          animated={true}
+          showIcon={true}
+        />
           </View>
         ) : null}
 
@@ -480,7 +480,7 @@ export default function LoginScreen() {
                 onPress={signInWithLinkedIn}
                 disabled={socialLoading}
               >
-                <AntDesign name="linkedin-square" size={responsive.size(26)} color="#0e76a8" />
+                <LinkedInIcon size={responsive.size(26)} />
               </Pressable>
             )}
           </View>

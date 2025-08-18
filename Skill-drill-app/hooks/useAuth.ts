@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { User } from '../services/api';
 import authService from '../services/authService';
 
@@ -17,20 +17,45 @@ export const useAuth = () => {
     error: null,
   });
 
+  // Use ref to track if component is mounted
+  const isMountedRef = useRef(true);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   useEffect(() => {
-    checkAuthStatus();
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      // Abort any pending requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, []);
 
   const checkAuthStatus = async () => {
+    // Cancel any existing request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    // Create new abort controller
+    abortControllerRef.current = new AbortController();
+    
     try {
+      if (!isMountedRef.current) return;
+      
       setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
       
       // First check if we have a token
       const isAuthenticated = await authService.isAuthenticated();
       
+      if (!isMountedRef.current) return;
+      
       if (isAuthenticated) {
         // Validate token and get fresh user data
         const { isValid, user } = await authService.validateTokenAndGetUser();
+        
+        if (!isMountedRef.current) return;
         
         if (isValid && user) {
           setAuthState({
@@ -43,6 +68,8 @@ export const useAuth = () => {
         } else {
           // Token is invalid, clear auth data
           await authService.clearAuthData();
+          if (!isMountedRef.current) return;
+          
           setAuthState({
             isAuthenticated: false,
             user: null,
@@ -54,6 +81,8 @@ export const useAuth = () => {
       }
       
       // No token or invalid token
+      if (!isMountedRef.current) return;
+      
       setAuthState({
         isAuthenticated: false,
         user: null,
@@ -61,6 +90,11 @@ export const useAuth = () => {
         error: null,
       });
     } catch (error: any) {
+      if (!isMountedRef.current) return;
+      
+      // Don't set error for aborted requests
+      if (error.name === 'AbortError') return;
+      
       console.error('🔐 useAuth: Error during auth check:', error);
       setAuthState({
         isAuthenticated: false,
@@ -71,11 +105,22 @@ export const useAuth = () => {
     }
   };
 
+  useEffect(() => {
+    checkAuthStatus();
+  }, []);
+
   const isOnboardingComplete = (user: User | null): boolean => {
     if (!user) return false;
     
+    console.log('🔍 isOnboardingComplete: Checking user:', {
+      onboarding_step: user.onboarding_step,
+      career_stage: user.career_stage,
+      role_type: user.role_type
+    });
+    
     // Check if user has completed onboarding
     if (user.onboarding_step === 'COMPLETED' || user.onboarding_step === 'SKILLS_SELECTED') {
+      console.log('✅ isOnboardingComplete: User has completed onboarding');
       return true;
     }
     
@@ -83,24 +128,40 @@ export const useAuth = () => {
     if (!user.onboarding_step) {
       // Legacy users need career info and skills to be considered complete
       // Since we can't check skills here, we'll assume they need to go through the flow
+      console.log('⚠️ isOnboardingComplete: Legacy user without onboarding_step, assuming incomplete');
       return false;
     }
     
+    console.log('❌ isOnboardingComplete: User has not completed onboarding');
     return false;
   };
 
   const getOnboardingNextStep = (user: User | null): string | null => {
     if (!user) return null;
     
+    console.log('🔄 getOnboardingNextStep: Checking user onboarding state:', {
+      onboarding_step: user.onboarding_step,
+      career_stage: user.career_stage,
+      role_type: user.role_type
+    });
+    
     // Check onboarding step progression
     switch (user.onboarding_step) {
       case 'EMAIL_VERIFIED':
+        // User just signed up, needs to complete career role
+        console.log('🔄 getOnboardingNextStep: User at EMAIL_VERIFIED, directing to career-role');
         return '/auth/career-role';
       case 'CAREER_ROLE_COMPLETED':
+        // User completed career role, needs to select skills
+        console.log('🔄 getOnboardingNextStep: User at CAREER_ROLE_COMPLETED, directing to skills');
         return '/auth/skills';
       case 'SKILLS_SELECTED':
-        return '/dashboard'; // Could be assessment or dashboard
+        // User completed skills selection, can go to dashboard
+        console.log('🔄 getOnboardingNextStep: User at SKILLS_SELECTED, directing to dashboard');
+        return '/dashboard';
       case 'COMPLETED':
+        // User completed full onboarding
+        console.log('🔄 getOnboardingNextStep: User at COMPLETED, directing to dashboard');
         return '/dashboard';
       default:
         // Legacy users or new users without onboarding_step
@@ -112,11 +173,10 @@ export const useAuth = () => {
           return '/auth/career-role';
         }
         
-        // They have career/role info, assume they might be complete
-        // Send them to dashboard instead of skills to avoid unnecessary skills screen loading
-        // The dashboard can handle any further routing if needed
-        console.log('🔄 getOnboardingNextStep: Legacy user with career/role, assuming complete, directing to dashboard');
-        return '/dashboard';
+        // They have career/role info, check if they have skills
+        // For now, assume they need to complete skills selection
+        console.log('🔄 getOnboardingNextStep: Legacy user with career/role, directing to skills');
+        return '/auth/skills';
     }
   };
 

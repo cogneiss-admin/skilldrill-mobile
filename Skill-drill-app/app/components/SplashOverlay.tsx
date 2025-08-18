@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useMemo, useCallback } from "react";
 import { Dimensions, StyleSheet, Image, Animated as RNAnimated } from "react-native";
 import Animated, {
   useSharedValue,
@@ -27,12 +27,16 @@ interface SplashOverlayProps {
   logoOpacityTarget?: number;
 }
 
-export default function SplashOverlay({ onFinish, logoSizePct = 0.4, logoOpacityTarget = 1 }: SplashOverlayProps) {
+const SplashOverlay = React.memo(({ onFinish, logoSizePct = 0.4, logoOpacityTarget = 1 }: SplashOverlayProps) => {
   // Animate logo with React Native Animated to guarantee visibility
   const rnLogoScale = useRef(new RNAnimated.Value(0.5)).current;
   const rnLogoOpacity = useRef(new RNAnimated.Value(0)).current;
   const fadeOut = useSharedValue(1);
   const particleRadius = useSharedValue(0);
+
+  const handleFinish = useCallback(() => {
+    onFinish();
+  }, [onFinish]);
 
   useEffect(() => {
     const opacityAnim = RNAnimated.timing(rnLogoOpacity, {
@@ -58,7 +62,7 @@ export default function SplashOverlay({ onFinish, logoSizePct = 0.4, logoOpacity
     // Fade out after particles
     const fadeTimeout = setTimeout(() => {
       fadeOut.value = withTiming(0, { duration: 800 }, () => {
-        runOnJS(onFinish)();
+        runOnJS(handleFinish)();
       });
     }, 2500);
     return () => {
@@ -68,12 +72,12 @@ export default function SplashOverlay({ onFinish, logoSizePct = 0.4, logoOpacity
       clearTimeout(particleTimeout);
       clearTimeout(fadeTimeout);
     };
-  }, []);
+  }, [logoOpacityTarget, handleFinish]);
 
-  const logoStyle = {
+  const logoStyle = useMemo(() => ({
     opacity: rnLogoOpacity,
     transform: [{ scale: rnLogoScale }],
-  } as const;
+  }), [rnLogoOpacity, rnLogoScale]);
 
   const containerStyle = useAnimatedStyle(() => ({
     opacity: fadeOut.value,
@@ -106,7 +110,9 @@ export default function SplashOverlay({ onFinish, logoSizePct = 0.4, logoOpacity
       />
     </Animated.View>
   );
-}
+});
+
+SplashOverlay.displayName = 'SplashOverlay';
 
 const styles = StyleSheet.create({
   container: {
@@ -131,3 +137,5 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
 });
+
+export default SplashOverlay;

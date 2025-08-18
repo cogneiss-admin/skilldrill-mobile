@@ -84,11 +84,12 @@ export default function CareerRoleScreen() {
           return;
         }
         
-        // Pre-populate if partial data exists
-        if (userData?.career_stage) {
+        // Only pre-populate if user has completed onboarding and has career info
+        // For new users, don't pre-populate anything
+        if (userData?.onboarding_step && userData?.career_stage) {
           setCareerStage(userData.career_stage as CareerStage);
         }
-        if (userData?.role_type) {
+        if (userData?.onboarding_step && userData?.role_type) {
           setRoleType(userData.role_type as RoleType);
         }
       } catch (error) {

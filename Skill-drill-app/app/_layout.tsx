@@ -9,6 +9,8 @@ import { Provider as PaperProvider, MD3LightTheme } from "react-native-paper";
 import { Provider as ReduxProvider } from "react-redux";
 import { store } from "../store";
 import { useAuth } from "../hooks/useAuth";
+import ToastContainer from "../components/ToastContainer";
+import { useToast } from "../hooks/useToast";
 
 const BRAND = "#0A66C2";
 
@@ -26,7 +28,7 @@ function GlobalOtpSheet() {
   return null; // reserved for future global portal
 }
 
-function SmallLogo() {
+const SmallLogo = React.memo(() => {
   const scale = new RNAnimated.Value(1);
   RNAnimated.loop(
     RNAnimated.sequence([
@@ -41,10 +43,12 @@ function SmallLogo() {
       style={{ width: 96, height: 96, transform: [{ scale }] }}
     />
   );
-}
+});
+
+SmallLogo.displayName = 'SmallLogo';
 
 // Authentication middleware component
-function AuthMiddleware({ children }: { children: React.ReactNode }) {
+const AuthMiddleware = React.memo(({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, user, isLoading, isOnboardingComplete, getOnboardingNextStep } = useAuth();
   const segments = useSegments();
   const router = useRouter();
@@ -69,6 +73,13 @@ function AuthMiddleware({ children }: { children: React.ReactNode }) {
     // Don't redirect if we're on the root path - let the splash screen handle it
     if (isRootPath) {
       console.log('🏠 AuthMiddleware: On root path, not redirecting');
+      return;
+    }
+
+    // If still loading, redirect ALL screens to splash screen
+    if (isLoading) {
+      console.log('🔄 AuthMiddleware: Still loading, redirecting to splash screen');
+      router.replace('/');
       return;
     }
 
@@ -149,15 +160,18 @@ function AuthMiddleware({ children }: { children: React.ReactNode }) {
       console.log('🚪 AuthMiddleware: User not authenticated, redirecting to login');
       router.replace('/auth/login');
     }
-  }, [isAuthenticated, user, isLoading, segments, router]);
+  }, [isAuthenticated, user, isLoading, segments, router, isOnboardingComplete, getOnboardingNextStep]);
 
   return <>{children}</>;
-}
+});
 
-export default function RootLayout() {
+AuthMiddleware.displayName = 'AuthMiddleware';
+
+const RootLayout = React.memo(() => {
   const navState = useRootNavigationState();
   const segments = useSegments();
   const [routeOverlayVisible, setRouteOverlayVisible] = useState(false);
+  const { toasts, dismissToast } = useToast();
 
   // Disable previous blue flash overlay during navigation for smoother transitions
   const segmentKey = useMemo(() => segments.join("/"), [segments]);
@@ -178,6 +192,8 @@ export default function RootLayout() {
             </Suspense>
             {/* Global OTP Bottom Sheet Portal */}
             <GlobalOtpSheet />
+            {/* Toast Container */}
+            <ToastContainer toasts={toasts} onDismiss={dismissToast} />
           </>
         ) : (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: BRAND }}>
@@ -187,4 +203,8 @@ export default function RootLayout() {
       </PaperProvider>
     </ReduxProvider>
   );
-}
+});
+
+RootLayout.displayName = 'RootLayout';
+
+export default RootLayout;

@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useMemo, useRef, useState, useEffect } from "react";
+import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import { Dimensions, Text, View, StyleSheet, Animated as RNAnimated, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -19,13 +19,20 @@ const logoSrc = require("../assets/images/logo.png");
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const BRAND = "#0A66C2"; // keep consistent with splash
 
-export default function App() {
+const App = React.memo(() => {
   const [isSplashDone, setSplashDone] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
   const router = useRouter();
-  const { isAuthenticated, user, isLoading, isOnboardingComplete, getOnboardingNextStep } = useAuth();
+  const { 
+    isAuthenticated, 
+    user, 
+    isLoading, 
+    isOnboardingComplete, 
+    getOnboardingNextStep,
+    checkAuthStatus 
+  } = useAuth();
 
-  const handleSplashFinish = () => {
+  const handleSplashFinish = useCallback(() => {
     console.log('🎬 Index: Splash finished');
     console.log('🔐 Index: Auth state:', { isAuthenticated, isLoading, user: user ? { id: user.id, name: user.name } : null });
     
@@ -40,17 +47,17 @@ export default function App() {
       // If authenticated, handle routing directly
       handleRouting();
     }
-  };
+  }, [isAuthenticated, isLoading, user]);
 
-  const handleGetStarted = () => {
+  const handleGetStarted = useCallback(() => {
     setShowWelcome(false);
     
     // Since welcome screen only shows for unauthenticated users,
     // we can directly navigate to login
     router.replace('/auth/login');
-  };
+  }, [router]);
 
-  const handleRouting = () => {
+  const handleRouting = useCallback(() => {
     console.log('🧭 Index: Handling routing...');
     console.log('📊 Index: Routing state:', { isAuthenticated, isLoading, onboardingComplete: isOnboardingComplete() });
     
@@ -69,7 +76,7 @@ export default function App() {
       console.log('🔐 Index: Navigating to login');
       router.replace('/auth/login');
     }
-  };
+  }, [isAuthenticated, isLoading, isOnboardingComplete, getOnboardingNextStep, router]);
 
   // Handle authentication state changes after splash
   useEffect(() => {
@@ -80,7 +87,7 @@ export default function App() {
         handleRouting();
       }
     }
-  }, [isAuthenticated, isLoading, isSplashDone, showWelcome]);
+  }, [isAuthenticated, isLoading, isSplashDone, showWelcome, handleRouting]);
 
   return (
     <View style={{ flex: 1, backgroundColor: BRAND }}>
@@ -106,9 +113,13 @@ export default function App() {
       )}
     </View>
   );
-}
+});
 
-function WelcomeScreen({ onGetStarted }: { onGetStarted: () => void }) {
+App.displayName = 'App';
+
+export default App;
+
+const WelcomeScreen = React.memo(({ onGetStarted }: { onGetStarted: () => void }) => {
   const slides = useMemo(
     () => [
       {
@@ -147,6 +158,10 @@ function WelcomeScreen({ onGetStarted }: { onGetStarted: () => void }) {
 
   const [activeIndex, setActiveIndex] = useState(0);
 
+  const handleSnapToItem = useCallback((index: number) => {
+    setActiveIndex(index);
+  }, []);
+
   return (
     <SafeAreaView className="flex-1">
       <StatusBar style="light" />
@@ -163,7 +178,7 @@ function WelcomeScreen({ onGetStarted }: { onGetStarted: () => void }) {
             loop
             pagingEnabled
             data={slides}
-            onSnapToItem={(index) => setActiveIndex(index)}
+            onSnapToItem={handleSnapToItem}
             renderItem={() => <View />}
           />
         </View>
@@ -302,7 +317,9 @@ function WelcomeScreen({ onGetStarted }: { onGetStarted: () => void }) {
       </View>
     </SafeAreaView>
   );
-}
+});
+
+WelcomeScreen.displayName = 'WelcomeScreen';
 
 function AnimatedWelcome() {
   return (

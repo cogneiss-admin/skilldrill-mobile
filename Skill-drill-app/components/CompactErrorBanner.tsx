@@ -1,63 +1,63 @@
 // @ts-nocheck
 import React, { useEffect, useRef } from 'react';
-import { View, Text, Pressable, ViewStyle, Animated, StyleSheet } from 'react-native';
+import { View, Text, Pressable, Animated, StyleSheet } from 'react-native';
 import { AntDesign, Ionicons } from '@expo/vector-icons';
 import { useResponsive } from '../utils/responsive';
 import * as Haptics from 'expo-haptics';
 
-type Props = {
+type ErrorTone = 'error' | 'warning' | 'success' | 'info';
+
+interface CompactErrorBannerProps {
   message?: string | null;
-  tone?: 'error' | 'success' | 'info';
-  compact?: boolean;
-  ctaText?: string;
-  onCtaPress?: () => void;
-  style?: ViewStyle;
+  tone?: ErrorTone;
   dismissible?: boolean;
   onDismiss?: () => void;
   animated?: boolean;
   showIcon?: boolean;
-};
+  style?: any;
+}
 
-const COLORS = {
+const TONE_CONFIG = {
   error: {
-    bg: '#FEF2F2',
+    bg: '#FEF7F7',
     border: '#FCA5A5',
     text: '#991B1B',
     icon: '#B91C1C',
-    bgLight: '#FEF7F7',
+  },
+  warning: {
+    bg: '#FFFBEB',
+    border: '#FCD34D',
+    text: '#92400E',
+    icon: '#D97706',
   },
   success: {
-    bg: '#ECFDF5',
+    bg: '#F0FDF4',
     border: '#A7F3D0',
     text: '#065F46',
     icon: '#059669',
-    bgLight: '#F0FDF4',
   },
   info: {
-    bg: '#EFF6FF',
+    bg: '#F8FAFF',
     border: '#BFDBFE',
     text: '#1E40AF',
     icon: '#2563EB',
-    bgLight: '#F8FAFF',
   },
 } as const;
 
-export default function ErrorBanner({ 
-  message, 
-  tone = 'error', 
-  compact = false, 
-  ctaText, 
-  onCtaPress, 
-  style,
-  dismissible = false,
+export default function CompactErrorBanner({
+  message,
+  tone = 'error',
+  dismissible = true,
   onDismiss,
   animated = true,
   showIcon = true,
-}: Props) {
+  style,
+}: CompactErrorBannerProps) {
   const responsive = useResponsive();
-  const slideAnim = useRef(new Animated.Value(-50)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.95)).current;
+  const slideAnim = React.useRef(new Animated.Value(-50)).current;
+  const opacityAnim = React.useRef(new Animated.Value(0)).current;
+
+  const config = TONE_CONFIG[tone];
 
   useEffect(() => {
     if (message && animated) {
@@ -68,18 +68,12 @@ export default function ErrorBanner({
       Animated.parallel([
         Animated.timing(slideAnim, {
           toValue: 0,
-          duration: 300,
+          duration: 250,
           useNativeDriver: true,
         }),
         Animated.timing(opacityAnim, {
           toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.spring(scaleAnim, {
-          toValue: 1,
-          tension: 100,
-          friction: 8,
+          duration: 250,
           useNativeDriver: true,
         }),
       ]).start();
@@ -96,11 +90,6 @@ export default function ErrorBanner({
           duration: 200,
           useNativeDriver: true,
         }),
-        Animated.timing(scaleAnim, {
-          toValue: 0.95,
-          duration: 200,
-          useNativeDriver: true,
-        }),
       ]).start();
     }
   }, [message, animated]);
@@ -112,85 +101,67 @@ export default function ErrorBanner({
     }
   };
 
-  const handleCtaPress = () => {
-    if (onCtaPress) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      onCtaPress();
-    }
-  };
-
   if (!message) return null;
-  const palette = COLORS[tone];
-  
+
   const bannerContent = (
     <View
       style={[
         styles.banner,
         {
-          backgroundColor: palette.bgLight,
-          borderColor: palette.border,
+          backgroundColor: config.bg,
+          borderColor: config.border,
           borderRadius: responsive.card.borderRadius,
-          paddingVertical: compact ? responsive.padding.xs : responsive.padding.sm,
-          paddingHorizontal: compact ? responsive.padding.sm : responsive.padding.md,
+          paddingVertical: responsive.padding.sm,
+          paddingHorizontal: responsive.padding.md,
           maxWidth: responsive.maxWidth.form,
           alignSelf: 'center',
           width: '100%',
-          shadowColor: palette.icon,
+          shadowColor: config.icon,
           shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: 0.08,
-          shadowRadius: 3,
-          elevation: 2,
-          ...(style || {}),
+          shadowOpacity: 0.06,
+          shadowRadius: 2,
+          elevation: 1,
+          ...style,
         },
       ]}
     >
       <View style={styles.content}>
         {showIcon && (
           <View style={styles.iconContainer}>
-            <AntDesign 
-              name={tone === 'success' ? 'checkcircle' : tone === 'info' ? 'infocirlceo' : 'exclamationcircleo'} 
-              size={responsive.size(16)} 
-              color={palette.icon} 
+            <AntDesign
+              name={tone === 'success' ? 'checkcircle' : tone === 'info' ? 'infocirlceo' : 'exclamationcircleo'}
+              size={responsive.size(18)}
+              color={config.icon}
             />
           </View>
         )}
-        
+
         <View style={styles.textContainer}>
-          <Text style={[
-            styles.message,
-            { 
-              color: palette.text, 
-              fontWeight: '500', 
-              fontSize: compact ? responsive.typography.caption : responsive.typography.body2 
-            }
-          ]} numberOfLines={2}>
+          <Text
+            style={[
+              styles.message,
+              {
+                color: config.text,
+                fontSize: responsive.typography.body2,
+                fontWeight: '500',
+              },
+            ]}
+            numberOfLines={1}
+          >
             {message}
           </Text>
-          {ctaText && onCtaPress && (
-            <Text onPress={handleCtaPress} style={[
-              styles.ctaText,
-              { 
-                color: '#0A66C2', 
-                fontSize: compact ? responsive.typography.caption : responsive.typography.body2,
-                fontWeight: '600',
-                marginTop: responsive.spacing(2),
-              }
-            ]}>
-              {ctaText}
-            </Text>
-          )}
         </View>
 
         {dismissible && onDismiss && (
           <Pressable
             onPress={handleDismiss}
             style={styles.dismissButton}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Ionicons
               name="close"
-              size={responsive.size(14)}
-              color={palette.text}
+              size={responsive.size(16)}
+              color={config.text}
             />
           </Pressable>
         )}
@@ -204,10 +175,7 @@ export default function ErrorBanner({
         style={[
           styles.animatedContainer,
           {
-            transform: [
-              { translateY: slideAnim },
-              { scale: scaleAnim },
-            ],
+            transform: [{ translateY: slideAnim }],
             opacity: opacityAnim,
           },
         ]}
@@ -239,14 +207,9 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   message: {
-    lineHeight: 18,
-  },
-  ctaText: {
-    fontWeight: '600',
+    lineHeight: 20,
   },
   dismissButton: {
     padding: 4,
   },
 });
-
-
