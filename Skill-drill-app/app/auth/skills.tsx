@@ -413,12 +413,15 @@ export default function SkillsScreen() {
       if (isAssessmentMode) {
         // Assessment mode: Start assessment with selected skills
         console.log('🎯 Assessment: Starting assessment for skills:', selected);
+        console.log('📱 Navigating to assessment screen...');
         
         // Navigate to assessment screen with selected skills
         router.push({
           pathname: '/assessment',
           params: { selectedSkills: JSON.stringify(selected) }
         });
+        
+        console.log('✅ Navigation triggered');
         
       } else {
         // Signup mode: Save selected skills to backend

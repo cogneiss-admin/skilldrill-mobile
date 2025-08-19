@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, Image, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -7,6 +7,8 @@ import { Button } from "react-native-paper";
 import { useAuth } from "../hooks/useAuth";
 import { useRouter } from "expo-router";
 import { useResponsive } from "../utils/responsive";
+import { apiService } from "../services/api";
+import { useToast } from "../hooks/useToast";
 
 const BRAND = "#0A66C2";
 const APP_NAME = "Skill Drill";
@@ -16,7 +18,10 @@ export default function DashboardWelcome() {
   const { logout, user } = useAuth();
   const router = useRouter();
   const responsive = useResponsive();
+  const { showToast } = useToast();
   const [assessmentLoading, setAssessmentLoading] = useState(false);
+  const [userSkills, setUserSkills] = useState([]);
+  const [loadingSkills, setLoadingSkills] = useState(true);
 
   console.log('🎯 Dashboard: Component loaded');
   console.log('📊 Dashboard: User data:', user ? {
@@ -38,20 +43,62 @@ export default function DashboardWelcome() {
     }
   };
 
+  // Load user skills on component mount
+  useEffect(() => {
+    loadUserSkills();
+  }, []);
+
+  const loadUserSkills = async () => {
+    try {
+      setLoadingSkills(true);
+      console.log('🔍 Loading user skills...');
+      
+      const response = await apiService.get('/user/skills');
+      
+      if (response.success) {
+        console.log('✅ User skills loaded:', response.data);
+        setUserSkills(response.data);
+      } else {
+        console.log('ℹ️ No skills found for user');
+        setUserSkills([]);
+      }
+    } catch (error) {
+      console.error('❌ Error loading user skills:', error);
+      setUserSkills([]);
+    } finally {
+      setLoadingSkills(false);
+    }
+  };
+
   const handleStartAssessment = async () => {
     try {
       setAssessmentLoading(true);
-      console.log('🎯 Starting assessment skill selection...');
+      console.log('🎯 Starting assessment...');
       
-      // Navigate to unified skills screen in assessment mode
-      router.push({
-        pathname: '/auth/skills',
-        params: { mode: 'assessment' }
-      });
+      if (userSkills && userSkills.length > 0) {
+        // User already has skills, start assessment directly
+        console.log('✅ User has skills, starting assessment directly');
+        console.log('📊 Skills for assessment:', userSkills.map(skill => skill.skill?.id || skill.id));
+        
+        // Navigate directly to assessment with existing skills
+        router.push({
+          pathname: '/assessment',
+          params: { 
+            selectedSkills: JSON.stringify(userSkills.map(skill => skill.skill?.id || skill.id))
+          }
+        });
+      } else {
+        // User doesn't have skills, navigate to skills selection
+        console.log('📝 User needs to select skills first');
+        router.push({
+          pathname: '/auth/skills',
+          params: { mode: 'assessment' }
+        });
+      }
       
     } catch (error) {
       console.error('❌ Assessment error:', error);
-      alert('Failed to start assessment. Please try again.');
+      showToast('error', 'Assessment Error', 'Failed to start assessment. Please try again.');
     } finally {
       setAssessmentLoading(false);
     }
@@ -136,13 +183,46 @@ export default function DashboardWelcome() {
           width: "100%", 
           maxWidth: responsive.size(300) 
         }}>
+          <View style={{ 
+            flexDirection: "row", 
+            justifyContent: "space-between", 
+            alignItems: "center",
+            marginBottom: responsive.spacing(8)
+          }}>
+            <Text style={{ 
+              fontSize: responsive.typography.body2, 
+              color: "#0369a1", 
+              fontWeight: "600"
+            }}>
+              Assessment Status
+            </Text>
+            <TouchableOpacity
+              onPress={loadUserSkills}
+              disabled={loadingSkills}
+              style={{
+                padding: responsive.spacing(4),
+                opacity: loadingSkills ? 0.5 : 1
+              }}
+            >
+              <Text style={{ 
+                fontSize: responsive.typography.body2, 
+                color: "#0369a1", 
+                fontWeight: "600"
+              }}>
+                🔄
+              </Text>
+            </TouchableOpacity>
+          </View>
           <Text style={{ 
             fontSize: responsive.typography.body2, 
             color: "#0369a1", 
             textAlign: "center",
             fontWeight: "600"
           }}>
-            📊 Assessment Status: Not Started
+            {loadingSkills ? "Loading..." : 
+             userSkills && userSkills.length > 0 ? 
+             `Assessment Ready (${userSkills.length} skills)` : 
+             "Skills Not Selected"}
           </Text>
           <Text style={{ 
             fontSize: responsive.typography.body2, 
@@ -150,7 +230,10 @@ export default function DashboardWelcome() {
             textAlign: "center",
             marginTop: responsive.spacing(4)
           }}>
-            Complete the assessment to get personalized skill insights
+            {loadingSkills ? "Checking your skills..." :
+             userSkills && userSkills.length > 0 ? 
+             "You have skills selected. Click below to start your assessment." :
+             "Select your skills first to start the assessment"}
           </Text>
         </View>
         
@@ -178,7 +261,8 @@ export default function DashboardWelcome() {
               fontSize: responsive.button.fontSize
             }}
                       >
-              {assessmentLoading ? "Loading..." : "Start Assessment"}
+              {assessmentLoading ? "Loading..." : 
+               userSkills && userSkills.length > 0 ? "Start Assessment" : "Select Skills First"}
             </Button>
           
           <Text style={{ 
@@ -187,7 +271,9 @@ export default function DashboardWelcome() {
             textAlign: "center",
             fontStyle: "italic"
           }}>
-            Assess your skills and get personalized recommendations
+            {userSkills && userSkills.length > 0 ? 
+             "Assess your skills and get personalized recommendations" :
+             "Select your skills to start the assessment process"}
           </Text>
         </View>
 

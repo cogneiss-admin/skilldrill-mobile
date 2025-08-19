@@ -125,6 +125,13 @@ const AuthMiddleware = React.memo(({ children }: { children: React.ReactNode }) 
       return;
     }
 
+    // Don't redirect if we're on the assessment screen
+    const isAssessmentScreen = segments[0] === 'assessment';
+    if (isAssessmentScreen) {
+      console.log('🎯 AuthMiddleware: On assessment screen, not redirecting');
+      return;
+    }
+
     if (isAuthenticated) {
       const onboardingComplete = isOnboardingComplete();
       const nextStep = getOnboardingNextStep();
