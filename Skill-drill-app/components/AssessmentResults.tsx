@@ -338,3 +338,4 @@ export const AssessmentResults: React.FC<AssessmentResultsProps> = ({
     </SafeAreaView>
   );
 };
+

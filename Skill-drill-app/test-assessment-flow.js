@@ -276,3 +276,4 @@ module.exports = { AssessmentTester, runTest };
 if (require.main === module) {
   runTest();
 }
+
