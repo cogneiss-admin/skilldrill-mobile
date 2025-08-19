@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, View, Pressable, Text, TextInput, KeyboardAvoidingView, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -7,6 +7,8 @@ import * as Haptics from "expo-haptics";
 import { StatusBar } from "expo-status-bar";
 import { AntDesign } from "@expo/vector-icons";
 import CodeBoxes from "../../components/CodeBoxes";
+
+import { useAuth } from "../../hooks/useAuth";
 
 const BRAND = "#0A66C2";
 
@@ -26,6 +28,7 @@ export default function OtpScreen() {
   console.log('🎯 OTP Screen loaded!');
   const router = useRouter();
   const { phone, email } = useLocalSearchParams<{ phone?: string; email?: string }>();
+  const { verifyOtp: verifyOtpFromAuth } = useAuth();
   
   console.log('📱 OTP Screen params:', { phone, email });
 
@@ -85,7 +88,7 @@ export default function OtpScreen() {
     }
   };
 
-  const verifyOtp = async () => {
+  const verifyOtp = useCallback(async () => {
     if (busy) return false;
     if (!/^\d{6}$/.test(code)) {
       setErrorMessage("Enter valid OTP");
@@ -95,60 +98,22 @@ export default function OtpScreen() {
       setBusy(true);
       setErrorMessage("");
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      
-      // Import auth service dynamically to avoid circular dependencies
-      const { authService } = await import("../../services/authService");
-      
-      const response = await authService.verifyOtp({
-        identifier: contactInfo,
-        otp: code
-      });
-      
+
+      const response = await verifyOtpFromAuth(contactInfo, code);
+
       if (response.success) {
         try { await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
         setVerified(true);
-        
-        // Check if user already has career info
+
         const userData = response.data.user;
-        console.log('🎯 OTP verification successful, user data:', userData);
-        
+
         if (userData?.career_stage && userData?.role_type) {
-          // User already has career info, go directly to dashboard
-          console.log('✅ User has career info, navigating to dashboard');
-          console.log('🎯 User data for navigation:', {
-            career_stage: userData.career_stage,
-            role_type: userData.role_type,
-            is_verified: userData.is_verified,
-            account_status: userData.account_status
-          });
-          
-          setTimeout(async () => {
-            try {
-              console.log('🚀 Attempting navigation to dashboard...');
-              await router.replace("/dashboard");
-              console.log('✅ Navigation to dashboard completed');
-            } catch (navError) {
-              console.error('❌ Navigation to dashboard failed:', navError);
-              // Fallback: try navigating to root first
-              try {
-                console.log('🔄 Trying fallback navigation to root...');
-                await router.replace("/");
-                console.log('✅ Fallback navigation completed');
-              } catch (fallbackError) {
-                console.error('❌ Fallback navigation also failed:', fallbackError);
-              }
-            }
+          setTimeout(() => {
+            router.replace("/dashboard");
           }, 700);
         } else {
-          // User needs to complete career info
-          console.log('📝 User needs career info, navigating to career-role');
-          setTimeout(async () => {
-            try {
-              await router.replace({ pathname: "/auth/career-role", params: { phone, email } });
-              console.log('✅ Navigation to career-role completed');
-            } catch (navError) {
-              console.error('❌ Navigation to career-role failed:', navError);
-            }
+          setTimeout(() => {
+            router.replace({ pathname: "/auth/career-role", params: { phone, email } });
           }, 700);
         }
         return true;
@@ -157,8 +122,6 @@ export default function OtpScreen() {
         return false;
       }
     } catch (error: any) {
-      console.error('OTP verification error:', error);
-      // If server indicates OTP rate limit, enforce client-side lockout and show clear message
       const isOtpRateLimited = error?.code === 'OTP_RATE_LIMIT_EXCEEDED' || /Too many OTP requests/i.test(error?.message || '');
       if (isOtpRateLimited) {
         const retryAfter = Number(error?.data?.retry_after || error?.data?.retryAfter || 300);
@@ -171,11 +134,11 @@ export default function OtpScreen() {
     } finally {
       setBusy(false);
     }
-  };
+  }, [busy, code, contactInfo, email, phone, router, setTo, verifyOtpFromAuth]);
 
   // Auto-verify as soon as 6 digits are entered
   useEffect(() => {
-    if (code.length === 6) {
+    if (code.length === 6 && !verified) {
       verifyOtp().then((ok) => {
         if (!ok) {
           // Reset code on failure so user can re-enter quickly
@@ -186,10 +149,9 @@ export default function OtpScreen() {
       // Clear error while user is typing
       setErrorMessage("");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [code]);
+  }, [code, verified, errorMessage, verifyOtp]);
 
-  const resend = async () => {
+  const resend = useCallback(async () => {
     if (remaining > 0) return;
     
     try {
@@ -227,7 +189,7 @@ export default function OtpScreen() {
         Alert.alert("Error", error.message || "Failed to resend OTP");
       }
     }
-  };
+  }, [remaining, contactInfo, isEmail, reset, setTo]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#ffffff" }}>
