@@ -14,60 +14,14 @@ import { useResponsive } from "../../utils/responsive";
 import { useAuth } from "../../hooks/useAuth";
 import { apiService } from "../../services/api";
 import { useToast } from "../../hooks/useToast";
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { AntDesign } from '@expo/vector-icons';
 import { useSkillsRedux } from "../../hooks/useSkillsRedux";
 
 const BRAND = "#0A66C2";
 const APP_NAME = "Skill Drill";
 const logoSrc = require("../../assets/images/logo.png");
 
-// Helper function to map skill names to icons
-const getSkillIcon = (skillName) => {
-  const iconMap = {
-    'communication': 'message-text',
-    'time management': 'clock',
-    'listening': 'ear',
-    'collaboration': 'account-multiple',
-    'accountability': 'shield-check',
-    'emotional regulation': 'heart',
-    'follow-through': 'check-decagram',
-    'email & message hygiene': 'email',
-    'responding to feedback': 'comment-text',
-    'delegation': 'account-supervisor',
-    'negotiation': 'handshake',
-    'stakeholder management': 'account-cog',
-    'conflict management': 'handshake-outline',
-    'visibility & self-advocacy': 'bullhorn',
-    'performance feedback delivery': 'comment-text-outline',
-    'managing up': 'account-arrow-up',
-    'strategic thinking': 'chess-king',
-    'vision communication': 'presentation',
-    'cross-functional alignment': 'account-network',
-    'executive presence': 'account-tie',
-    'talent magnetism': 'account-star',
-    'change leadership': 'swap-horizontal',
-    'crisis communication': 'alert-circle',
-    'decision making under uncertainty': 'help-circle',
-    'strategic influence': 'handshake',
-    'culture building': 'account-group'
-  };
-  
-  const lowerName = skillName.toLowerCase().trim();
-  
-  // Try exact match first
-  if (iconMap[lowerName]) {
-    return iconMap[lowerName];
-  }
-  
-  // Try partial matches
-  for (const [key, icon] of Object.entries(iconMap)) {
-    if (lowerName.includes(key) || key.includes(lowerName)) {
-      return icon;
-    }
-  }
-  
-  return 'star-circle';
-};
+
 
 export default function SkillsScreen() {
   const params = useLocalSearchParams();
@@ -85,9 +39,9 @@ export default function SkillsScreen() {
 
   const canContinue = useMemo(() => selected.length > 0, [selected]);
 
-  // Load persisted selection after skills are loaded
+  // Load persisted selection after skills are loaded (only in assessment mode)
   useEffect(() => {
-    if (skillsData.length > 0) {
+    if (skillsData.length > 0 && isAssessmentMode) {
       AsyncStorage.getItem('selectedSkills')
         .then((persisted) => {
           if (persisted) {
@@ -99,17 +53,17 @@ export default function SkillsScreen() {
               );
               
               setSelected(validSelections);
-            } catch (error) {
+              } catch (error) {
               console.error('Failed to parse persisted selection:', error);
             }
           }
         })
         .catch(console.error);
     }
-  }, [skillsData]);
+  }, [skillsData, isAssessmentMode]);
 
-  const toggleSkill = useCallback((skillId) => {
-    Haptics.selectionAsync().catch(() => {});
+  const toggleSkill = useCallback(async (skillId) => {
+    try { await Haptics.selectionAsync(); } catch {}
     
     setSelected((prev) => {
       const has = prev.includes(skillId);
@@ -197,85 +151,27 @@ export default function SkillsScreen() {
       <StatusBar style="light" />
 
       {/* Hero header */}
-      <View style={{ 
-        backgroundColor: "#ffffff", 
-        borderBottomWidth: 1,
-        borderBottomColor: "#E5E7EB",
-        paddingHorizontal: 20,
-        paddingTop: 15,
-        paddingBottom: 24
-      }}>
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "flex-start", marginBottom: 16 }}>
-          <View style={{
-            width: 40,
-            height: 40,
-            borderRadius: 8,
-            backgroundColor: BRAND,
-            alignItems: 'center',
-            justifyContent: 'center',
-            shadowColor: BRAND,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.2,
-            shadowRadius: 4,
-            elevation: 2
-          }}>
-            <Image source={logoSrc} style={{ width: 24, height: 24 }} resizeMode="contain" />
-          </View>
-          <Text style={{ 
-            marginLeft: 12, 
-            color: "#111827", 
-            fontSize: 18, 
-            fontWeight: "700"
-          }}>
-            {APP_NAME}
-          </Text>
+      <View style={{ minHeight: 200, position: "relative" }}>
+        <LinearGradient colors={["#0A66C2", "#0E75D1", "#1285E0"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: "absolute", inset: 0 }} />
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "flex-start", paddingHorizontal: 18, paddingTop: 10 }}>
+          <Image source={logoSrc} style={{ width: 56, height: 56, shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 10 }} resizeMode="contain" />
+          <Text style={{ marginLeft: 12, color: "#ffffff", fontSize: 22, fontWeight: "900", letterSpacing: 0.8, textShadowColor: 'rgba(0,0,0,0.35)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6 }}>{APP_NAME}</Text>
         </View>
-        
-        <View style={{ alignItems: "flex-start" }}>
-          <Text style={{ 
-            fontSize: 24, 
-            fontWeight: "800", 
-            color: "#111827",
-            marginBottom: 8,
-            textAlign: 'left'
-          }}>
-            Select Your Skills
-          </Text>
-          <Text style={{ 
-            fontSize: 16, 
-            color: "#6B7280", 
-            lineHeight: 22,
-            textAlign: 'left',
-            marginBottom: 8
-          }}>
-            Choose the skills you want to assess and improve
-          </Text>
-          <Text style={{ 
-            fontSize: 14, 
-            color: "#3B82F6", 
-            fontWeight: "600",
-            textAlign: 'left',
-            marginBottom: 8
-          }}>
-            We'll provide personalized assessments based on your selections
-          </Text>
-          <Text style={{ 
-            fontSize: 12, 
-            color: "#9CA3AF",
-            textAlign: 'left'
-          }}>
-            {selected.length > 0 ? `${selected.length} skill${selected.length !== 1 ? 's' : ''} selected` : 'Select at least one skill to continue'}
-          </Text>
-
-
-          
+        <View style={{ flex: 1, justifyContent: "center", paddingHorizontal: 18, paddingBottom: 20 }}>
+          <MotiView from={{ opacity: 0, translateY: 6 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: "timing", duration: 480 }}>
+            <Text style={{ fontSize: 24, fontWeight: "900", color: "#ffffff" }}>Select Your Skills</Text>
+            <Text style={{ marginTop: 8, color: "#E6F2FF", fontSize: 15 }}>Choose the skills you want to assess and improve</Text>
+            <Text style={{ marginTop: 4, color: "#E6F2FF", fontSize: 13, opacity: 0.9 }}>
+              {selected.length > 0 ? `${selected.length} skill${selected.length !== 1 ? 's' : ''} selected` : 'Select at least one skill to continue'}
+            </Text>
+          </MotiView>
         </View>
       </View>
 
       {/* Content card */}
       <View style={{ flex: 1, marginTop: -24 }}>
-        <View style={{ flex: 1, backgroundColor: "#ffffff", borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 18 }}>
-          <ScrollView contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
+        <View style={{ flex: 1, backgroundColor: "#ffffff", borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 24, shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 16 }}>
+          <ScrollView contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 100, maxWidth: 560, width: '100%', alignSelf: 'center' }} showsVerticalScrollIndicator={false}>
             
                         {/* Skills organized by tier */}
             {(() => {
@@ -324,76 +220,99 @@ export default function SkillsScreen() {
                 
                 const config = tierConfig[tierKey];
                 
-                return (
+            return (
                   <View key={tierKey} style={{ marginBottom: 32 }}>
                     {/* Tier Header */}
-                    <View style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      marginBottom: 16,
-                      paddingHorizontal: 20
-                    }}>
-                      <Text style={{ fontSize: 24, marginRight: 12 }}>
-                        {config.icon}
-                      </Text>
-                      <Text style={{ 
-                        fontSize: 18, 
-                        fontWeight: "700", 
-                        color: "#111827"
+                    <MotiView from={{ opacity: 0, translateY: 8 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: "timing", duration: 420, delay: 100 }}>
+                      <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        marginBottom: 16,
+                        paddingHorizontal: 20
                       }}>
-                        {config.name}
-                      </Text>
-                    </View>
-
+                        <Text style={{ fontSize: 24, marginRight: 12 }}>
+                          {config.icon}
+                        </Text>
+                        <Text style={{ 
+                          fontSize: 18, 
+                          fontWeight: "700", 
+                          color: "#111827"
+                        }}>
+                          {config.name}
+                        </Text>
+                      </View>
+                    </MotiView>
+                    
                     {/* Skills under this tier */}
                     <View style={{ paddingHorizontal: 20 }}>
                       {tierSkills.map((skill, index) => {
                         const isSelected = selected.includes(skill.id);
                         
                         const cardStyle = {
-                          backgroundColor: isSelected ? "#2563EB" : "#ffffff",
+                          backgroundColor: "#ffffff",
                           padding: 16,
-                          borderRadius: 8,
-                          borderWidth: 1,
-                          borderColor: isSelected ? "#2563EB" : "#E5E7EB",
-                          marginBottom: 8
+                          paddingHorizontal: 14,
+                          borderRadius: 16,
+                          borderWidth: isSelected ? 2 : 1,
+                          borderColor: isSelected ? BRAND : "#E5E7EB",
+                          marginBottom: 12,
+                          shadowColor: "#000",
+                          shadowOpacity: 0.06,
+                          shadowRadius: 8,
+                          elevation: 2
                         };
                         
                         const textStyle = {
-                          color: isSelected ? "#ffffff" : "#000000",
-                          fontSize: 16,
-                          fontWeight: "600"
+                          color: "#0f172a",
+                          fontSize: 15,
+                          fontWeight: "900"
                         };
                         
                         const categoryStyle = {
-                          color: isSelected ? "#ffffff" : "#666666",
+                          color: "#64748b",
                           fontSize: 14,
                           marginTop: 4
                         };
                         
                         return (
-                          <Pressable
-                            key={skill.id}
-                            onPress={() => toggleSkill(skill.id)}
-                            style={cardStyle}
-                          >
-                            <Text style={textStyle}>
-                              {skill.name || 'Unknown Skill'}
-                            </Text>
-                            <Text style={categoryStyle}>
-                              {skill.category ? skill.category.replace(/_/g, ' ') : 'Personal Effectiveness'}
-                            </Text>
-                            {isSelected && (
-                              <Text style={{ color: "#ffffff", fontSize: 12, marginTop: 4 }}>
-                                ✓ Selected
-                              </Text>
-                            )}
-                          </Pressable>
+                          <MotiView key={skill.id} from={{ opacity: 0, translateY: 8 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: "timing", duration: 350, delay: index * 60 }} style={{ marginBottom: 12 }}>
+                            <Pressable
+                              onPress={() => toggleSkill(skill.id)}
+                              style={({ pressed }) => ({
+                                width: '100%',
+                                paddingVertical: 16,
+                                paddingHorizontal: 14,
+                                borderRadius: 16,
+                                backgroundColor: "#ffffff",
+                                borderWidth: isSelected ? 2 : 1,
+                                borderColor: isSelected ? BRAND : "#E5E7EB",
+                                shadowColor: "#000",
+                                shadowOpacity: pressed ? 0.12 : 0.06,
+                                shadowRadius: pressed ? 12 : 8,
+                                transform: [{ scale: pressed ? 0.98 : 1 }],
+                              })}
+                            >
+                              {isSelected ? (
+                                <LinearGradient colors={["#E6F2FF", "#ffffff"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: "absolute", inset: 0, borderRadius: 16 }} />
+                              ) : null}
+                              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                                <View style={{ flex: 1 }}>
+                                  <Text style={{ color: "#0f172a", fontSize: 15, fontWeight: "900" }}>
+                                    {skill.name || 'Unknown Skill'}
+                                  </Text>
+                                  <Text style={{ color: "#64748b", marginTop: 4 }}>
+                                    {skill.category ? skill.category.replace(/_/g, ' ') : 'Personal Effectiveness'}
+                                  </Text>
+                                </View>
+                                {isSelected ? <AntDesign name="checkcircle" size={22} color="#16A34A" /> : null}
+                              </View>
+                            </Pressable>
+                          </MotiView>
                         );
                       })}
                     </View>
                   </View>
-                );
+                    );
               });
             })()}
         
@@ -443,53 +362,30 @@ export default function SkillsScreen() {
             </View>
         )}
 
-            {/* Bottom spacing */}
-            <View style={{ height: 180 }} />
           </ScrollView>
-        </View>
-      </View>
-
-                    {/* Sticky footer CTA */}
-          <View style={{ 
-            position: "absolute", 
-            left: 0, 
-            right: 0, 
-            bottom: 0, 
-            backgroundColor: "#ffffff",
-        paddingHorizontal: 20, 
-        paddingTop: 16, 
-        paddingBottom: 24,
-            borderTopWidth: 1,
-            borderTopColor: "#E5E7EB"
-          }}>
+          
+          {/* Sticky footer CTA */}
+          <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 18, paddingTop: 12, paddingBottom: 34, zIndex: 1000, backgroundColor: "#ffffff" }}>
+            <LinearGradient colors={["#0A66C2", "#0E75D1", "#1285E0"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: "absolute", inset: 0, opacity: 0.1 }} />
             <Button
               mode="contained"
               onPress={handleContinue}
               loading={busy}
               disabled={!canContinue || busy}
-              style={{ 
-            borderRadius: 12,
-            backgroundColor: canContinue ? BRAND : "#E5E7EB",
-            elevation: 0
-          }}
-          contentStyle={{ 
-            height: 52,
-            paddingHorizontal: 24
-              }}
-              labelStyle={{ 
-                fontWeight: "600", 
-            fontSize: 16,
-            color: canContinue ? "#ffffff" : "#9CA3AF"
-              }}
+              contentStyle={{ height: 56 }}
+              style={{ borderRadius: 28, backgroundColor: BRAND, opacity: canContinue ? 1 : 0.7, shadowColor: BRAND, shadowOpacity: 0.35, shadowRadius: 14 }}
+              labelStyle={{ fontWeight: "800", letterSpacing: 0.3 }}
             >
-            {busy ? (isAssessmentMode ? "Starting Assessment..." : "Saving...") : 
-              selected.length > 0 ? 
-                (isAssessmentMode ? 
-                `Start Assessment (${selected.length} skills)` : 
-                  `Continue with ${selected.length} Skill${selected.length !== 1 ? 's' : ''}`
-                ) : 
-                "Select at least one skill"}
+              {busy ? (isAssessmentMode ? "Starting Assessment..." : "Saving...") : 
+                selected.length > 0 ? 
+                  (isAssessmentMode ? 
+                  `Start Assessment (${selected.length} skills)` : 
+                    `Continue with ${selected.length} Skill${selected.length !== 1 ? 's' : ''}`
+                  ) : 
+                  "Select at least one skill"}
             </Button>
+          </View>
+        </View>
       </View>
     </SafeAreaView>
   );
