@@ -109,7 +109,7 @@ export default function OtpScreen() {
 
         if (userData?.career_stage && userData?.role_type) {
           setTimeout(() => {
-            router.replace("/dashboard");
+            router.replace("/session-loading");
           }, 700);
         } else {
           setTimeout(() => {

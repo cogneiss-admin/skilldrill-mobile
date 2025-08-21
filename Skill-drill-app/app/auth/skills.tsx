@@ -15,7 +15,8 @@ import { useAuth } from "../../hooks/useAuth";
 import { apiService } from "../../services/api";
 import { useToast } from "../../hooks/useToast";
 import { AntDesign } from '@expo/vector-icons';
-import { useSkillsRedux } from "../../hooks/useSkillsRedux";
+// Temporarily disabled Redux hook to fix import error
+// import { useSkillsRedux } from "../../hooks/useSkillsRedux";
 
 const BRAND = "#0A66C2";
 const APP_NAME = "Skill Drill";
@@ -25,7 +26,10 @@ const logoSrc = require("../../assets/images/logo.png");
 
 export default function SkillsScreen() {
   const params = useLocalSearchParams();
-  const isAssessmentMode = params.mode === 'assessment';
+  const isAssessmentMode = params.mode === 'assessment' || params.assessment === 'true' || params.fromAssessment === 'true';
+  const isAddToAssessmentMode = params.mode === 'add-to-assessment';
+
+  console.log('🎯 Skills Screen - Assessment Mode:', isAssessmentMode, 'Add-to-Assessment Mode:', isAddToAssessmentMode, 'Params:', params);
   
   const router = useRouter();
   const responsive = useResponsive();
@@ -34,24 +38,127 @@ export default function SkillsScreen() {
   const [selected, setSelected] = useState([]);
   const [busy, setBusy] = useState(false);
 
-  // Use the Redux-based skills hook
-  const { skills: skillsData, loading, error, refreshSkills } = useSkillsRedux();
+  // Use simple state management instead of Redux
+  const [skillsData, setSkillsData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const canContinue = useMemo(() => selected.length > 0, [selected]);
 
+  // Check if user already has skills and redirect to dashboard (but not in add-to-assessment mode)
+  useEffect(() => {
+    const checkExistingSkills = async () => {
+      try {
+        console.log('🔍 Skills Screen: Checking if user already has skills...');
+        console.log('🔍 Add-to-assessment mode:', isAddToAssessmentMode);
+        
+        // Don't redirect if we're in add-to-assessment mode
+        if (isAddToAssessmentMode) {
+          console.log('➕ Add-to-assessment mode: Allowing user to add more skills');
+          return;
+        }
+        
+        const response = await apiService.get('/user/skills');
+        
+        if (response.success && response.data && response.data.length > 0) {
+          console.log('✅ Skills Screen: User already has skills, redirecting to dashboard');
+          showToast('info', 'Skills Already Selected', 'You have already selected skills. Redirecting to dashboard.');
+          router.replace('/dashboard');
+          return;
+        }
+      } catch (error) {
+        console.log('ℹ️ Skills Screen: Error checking existing skills (user may not have any):', error.message);
+      }
+    };
+
+    checkExistingSkills();
+  }, [router, isAddToAssessmentMode]);
+
+  // Load skills data
+  const loadSkills = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      console.log('🔄 Loading skills...');
+      // Use the correct skills endpoint
+      const response = await apiService.get('/skills/categories');
+
+      if (response.success) {
+        console.log('✅ Skills loaded successfully:', response.data.length, 'groups');
+        const allSkills = [];
+
+        // Transform the API response format
+        response.data.forEach((group) => {
+          if (group.skills && Array.isArray(group.skills)) {
+            group.skills.forEach((skill) => {
+              allSkills.push({
+                id: skill.skill_id || skill.id,
+                skill_id: skill.skill_id || skill.id,
+                name: skill.name || skill.skill_name || 'Unknown Skill',
+                description: skill.description || '',
+                category: skill.category || 'Personal Effectiveness',
+                tier: skill.tier || 'TIER_1_CORE_SURVIVAL',
+                mongo_id: skill.mongo_id || skill.id
+              });
+            });
+          }
+        });
+
+        console.log('📊 Processed skills:', allSkills.length);
+        setSkillsData(allSkills);
+      } else {
+        setError('Failed to load skills');
+      }
+    } catch (error) {
+      console.error('❌ Error loading skills:', error);
+      setError('Failed to load skills. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Load user's current skills when in add-to-assessment mode
+  useEffect(() => {
+    if (skillsData.length > 0 && isAddToAssessmentMode) {
+      const loadCurrentSkills = async () => {
+        try {
+          console.log('🔍 Loading current user skills for add-to-assessment mode...');
+          const response = await apiService.get('/user/skills');
+          
+          if (response.success && response.data && response.data.length > 0) {
+            // Get the skill IDs that the user already has
+            const currentSkillIds = response.data.map(userSkill => 
+              userSkill.skill?.id || userSkill.skill_id || userSkill.id
+            );
+            
+            console.log('📊 Current user skills:', currentSkillIds);
+            
+            // Mark these skills as already selected (but don't allow deselection)
+            setSelected(currentSkillIds);
+          }
+        } catch (error) {
+          console.error('❌ Error loading current skills:', error);
+        }
+      };
+      
+      loadCurrentSkills();
+    }
+  }, [skillsData, isAddToAssessmentMode]);
+
   // Load persisted selection after skills are loaded (only in assessment mode)
   useEffect(() => {
-    if (skillsData.length > 0 && isAssessmentMode) {
+    if (skillsData.length > 0 && isAssessmentMode && !isAddToAssessmentMode) {
       AsyncStorage.getItem('selectedSkills')
         .then((persisted) => {
           if (persisted) {
             try {
               const parsed = JSON.parse(persisted);
               // Only set selection if the IDs exist in current skills data
-              const validSelections = parsed.filter(id => 
+              const validSelections = parsed.filter(id =>
                 skillsData.some(skill => skill.id === id)
               );
-              
+
               setSelected(validSelections);
               } catch (error) {
               console.error('Failed to parse persisted selection:', error);
@@ -60,21 +167,41 @@ export default function SkillsScreen() {
         })
         .catch(console.error);
     }
-  }, [skillsData, isAssessmentMode]);
+  }, [skillsData, isAssessmentMode, isAddToAssessmentMode]);
+
+  // Load skills on component mount
+  useEffect(() => {
+    loadSkills();
+  }, [loadSkills]);
+
+  // Log selected skills count whenever it changes
+  useEffect(() => {
+    console.log('🎯 Selected skills count:', selected.length);
+  }, [selected]);
 
   const toggleSkill = useCallback(async (skillId) => {
     try { await Haptics.selectionAsync(); } catch {}
     
     setSelected((prev) => {
       const has = prev.includes(skillId);
+      
+      // In add-to-assessment mode, only allow adding new skills, not removing existing ones
+      if (isAddToAssessmentMode && has) {
+        // Check if this is a skill the user already has (shouldn't be removable)
+        // For now, we'll allow toggling but show a message
+        console.log('⚠️ Attempting to deselect skill in add-to-assessment mode');
+      }
+      
       const newSelected = has ? prev.filter((s) => s !== skillId) : [...prev, skillId];
       
-      // Persist the selection state
-      AsyncStorage.setItem('selectedSkills', JSON.stringify(newSelected)).catch(console.error);
+      // Persist the selection state (only for regular assessment mode)
+      if (!isAddToAssessmentMode) {
+        AsyncStorage.setItem('selectedSkills', JSON.stringify(newSelected)).catch(console.error);
+      }
       
       return newSelected;
     });
-  }, [selected]);
+  }, [selected, isAddToAssessmentMode]);
 
   const handleContinue = async () => {
     if (!canContinue || busy) return;
@@ -83,14 +210,84 @@ export default function SkillsScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     
     try {
-      if (isAssessmentMode) {
-        // For assessment mode, pass the skill_id values (not MongoDB IDs)
-        AsyncStorage.removeItem('selectedSkills').catch(console.error);
-        
-        router.push({
-          pathname: '/assessment',
-          params: { selectedSkills: JSON.stringify(selected) }
+      if (isAddToAssessmentMode) {
+        // For add-to-assessment mode, call the add skills API
+        console.log('➕ Add-to-Assessment Mode: Adding skills to existing session...');
+
+        // Convert skill_id selections to MongoDB IDs for backend
+        const validSkillIds = selected
+          .map(skillId => {
+            const skill = skillsData.find(s => s.id === skillId);
+            return skill?.mongo_id;
+          })
+          .filter(id => id && !id.startsWith('fallback_') && id.length > 10);
+
+        console.log('➕ Valid skill IDs to add:', validSkillIds);
+
+        if (validSkillIds.length === 0) {
+          showToast('error', 'No Valid Skills', 'Please select valid skills before continuing.');
+          setBusy(false);
+          return;
+        }
+
+        // Add skills to existing session
+        const response = await apiService.post('/assessment/session/add-skills', {
+          skillIds: validSkillIds
         });
+
+        if (response.success) {
+          console.log('✅ Skills added to session successfully');
+          
+          // Clear persisted selection
+          AsyncStorage.removeItem('selectedSkills').catch(console.error);
+          
+          showToast('success', 'Skills Added!', `${response.data.addedSkills} skill(s) added to your assessment.`);
+          
+          router.replace('/dashboard');
+          return;
+        } else {
+          console.error('❌ Failed to add skills to session:', response.message);
+          showToast('error', 'Add Skills Error', response.message || 'Failed to add skills to assessment');
+        }
+      } else if (isAssessmentMode) {
+        // For assessment mode, we need to save skills to backend first
+        // because assessment creation requires skill IDs to exist
+        console.log('🎯 Assessment Mode: Saving skills before assessment...');
+
+        // Convert skill_id selections to MongoDB IDs for backend
+        const validSkillIds = selected
+          .map(skillId => {
+            const skill = skillsData.find(s => s.id === skillId);
+            return skill?.mongo_id;
+          })
+          .filter(id => id && !id.startsWith('fallback_') && id.length > 10);
+
+        console.log('🎯 Valid skill IDs for assessment:', validSkillIds);
+
+        if (validSkillIds.length === 0) {
+          showToast('error', 'No Valid Skills', 'Please select valid skills before continuing.');
+          setBusy(false);
+          return;
+        }
+
+        // Save skills to backend (required for assessment)
+        const response = await apiService.post('/user/skills', {
+          skill_ids: validSkillIds
+        });
+
+        if (response.success) {
+          console.log('✅ Skills saved, navigating to assessment...');
+          AsyncStorage.removeItem('selectedSkills').catch(console.error);
+
+          router.replace({
+            pathname: '/assessment-intro',
+            params: { selectedSkills: JSON.stringify(validSkillIds) }
+          });
+          return; // Exit early to prevent dashboard navigation
+        } else {
+          console.error('❌ Failed to save skills for assessment:', response.message);
+          showToast('error', 'Save Error', response.message || 'Failed to save skills');
+        }
       } else {
         // Convert skill_id selections to MongoDB IDs for backend
         const validSkillIds = selected
@@ -116,12 +313,15 @@ export default function SkillsScreen() {
           // Clear persisted selection
           AsyncStorage.removeItem('selectedSkills').catch(console.error);
           
-          try {
-            await updateOnboardingStep('SKILLS_SELECTED');
-          } catch (error) {
-            console.error('❌ Failed to update onboarding step:', error);
+          // Only update onboarding step if NOT in assessment mode
+          if (!isAssessmentMode) {
+            try {
+              await updateOnboardingStep('SKILLS_SELECTED');
+            } catch (error) {
+              console.error('❌ Failed to update onboarding step:', error);
+            }
           }
-          
+
           router.replace("/dashboard");
         } else {
           showToast('error', 'Save Error', response.message || 'Failed to save skills');
@@ -159,10 +359,17 @@ export default function SkillsScreen() {
         </View>
         <View style={{ flex: 1, justifyContent: "center", paddingHorizontal: 18, paddingBottom: 20 }}>
           <MotiView from={{ opacity: 0, translateY: 6 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: "timing", duration: 480 }}>
-            <Text style={{ fontSize: 24, fontWeight: "900", color: "#ffffff" }}>Select Your Skills</Text>
-            <Text style={{ marginTop: 8, color: "#E6F2FF", fontSize: 15 }}>Choose the skills you want to assess and improve</Text>
+            <Text style={{ fontSize: 24, fontWeight: "900", color: "#ffffff" }}>
+              {isAddToAssessmentMode ? 'Add More Skills' : 'Select Your Skills'}
+            </Text>
+            <Text style={{ marginTop: 8, color: "#E6F2FF", fontSize: 15 }}>
+              {isAddToAssessmentMode ? 'Choose additional skills to add to your current assessment' : 'Choose the skills you want to assess and improve'}
+            </Text>
             <Text style={{ marginTop: 4, color: "#E6F2FF", fontSize: 13, opacity: 0.9 }}>
-              {selected.length > 0 ? `${selected.length} skill${selected.length !== 1 ? 's' : ''} selected` : 'Select at least one skill to continue'}
+              {isAddToAssessmentMode 
+                ? (selected.length > 0 ? `${selected.length} skill${selected.length !== 1 ? 's' : ''} will be added to assessment` : 'Select additional skills to add')
+                : (selected.length > 0 ? `${selected.length} skill${selected.length !== 1 ? 's' : ''} selected` : 'Select at least one skill to continue')
+              }
             </Text>
           </MotiView>
         </View>
@@ -330,14 +537,17 @@ export default function SkillsScreen() {
                   fontWeight: "600",
                   marginBottom: 4
             }}>
-              {selected.length} of {skillsData.length} skills selected
+              {isAddToAssessmentMode 
+                ? `${selected.length} skill${selected.length !== 1 ? 's' : ''} will be added`
+                : `${selected.length} of ${skillsData.length} skills selected`
+              }
             </Text>
                 <Text style={{ 
                   textAlign: "center",
                   color: "#6B7280", 
                   fontSize: 14
                 }}>
-                  Ready to continue
+                  {isAddToAssessmentMode ? "Ready to add to assessment" : "Ready to continue"}
                 </Text>
               </View>
             )}
@@ -376,13 +586,18 @@ export default function SkillsScreen() {
               style={{ borderRadius: 28, backgroundColor: BRAND, opacity: canContinue ? 1 : 0.7, shadowColor: BRAND, shadowOpacity: 0.35, shadowRadius: 14 }}
               labelStyle={{ fontWeight: "800", letterSpacing: 0.3 }}
             >
-              {busy ? (isAssessmentMode ? "Starting Assessment..." : "Saving...") : 
-                selected.length > 0 ? 
-                  (isAssessmentMode ? 
-                  `Start Assessment (${selected.length} skills)` : 
+              {busy ? 
+                (isAddToAssessmentMode ? "Adding Skills..." : 
+                 isAssessmentMode ? "Starting Assessment..." : "Saving...") :
+                selected.length > 0 ?
+                  (isAddToAssessmentMode ?
+                    `Add ${selected.length} Skill${selected.length !== 1 ? 's' : ''} to Assessment` :
+                   isAssessmentMode ?
+                    `Start Assessment (${selected.length} skill${selected.length !== 1 ? 's' : ''})` :
                     `Continue with ${selected.length} Skill${selected.length !== 1 ? 's' : ''}`
-                  ) : 
-                  "Select at least one skill"}
+                  ) :
+                  (isAddToAssessmentMode ? "Select skills to add" :
+                   isAssessmentMode ? "Select skills to assess" : "Select at least one skill")}
             </Button>
           </View>
         </View>

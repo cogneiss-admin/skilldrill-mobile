@@ -5,28 +5,28 @@ import { Platform } from 'react-native';
 
 // Environment variables with platform detection
 const getApiBaseUrl = () => {
+  // Force use of the correct IP address for development
+  if (__DEV__) {
+    return 'http://192.168.1.40:3000/api';
+  }
+  
   // If environment variable is set, use it
   if (Constants.expoConfig?.extra?.API_BASE_URL) {
     return Constants.expoConfig.extra.API_BASE_URL;
   }
   
-  // For development, always use localhost to ensure connectivity
-  if (__DEV__) {
-    return 'http://localhost:3000/api';
-  }
-  
   // Otherwise, use platform-specific defaults
   if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:3000/api'; // Android emulator
+    return 'http://192.168.1.40:3000/api'; // Use your actual IP for Android
   } else if (Platform.OS === 'ios') {
-    return 'http://localhost:3000/api'; // iOS simulator
+    return 'http://192.168.1.40:3000/api'; // Use your actual IP for iOS
   } else {
-    return 'http://localhost:3000/api'; // Web or other platforms
+    return 'http://192.168.1.40:3000/api'; // Use your actual IP for other platforms
   }
 };
 
 const API_BASE_URL = getApiBaseUrl();
-const API_TIMEOUT = Constants.expoConfig?.extra?.API_TIMEOUT || 10000;
+const API_TIMEOUT = Constants.expoConfig?.extra?.API_TIMEOUT || 30000; // Increased timeout for assessment creation
 const ACCESS_TOKEN_KEY = Constants.expoConfig?.extra?.ACCESS_TOKEN_KEY || 'skilldrill_access_token';
 const REFRESH_TOKEN_KEY = Constants.expoConfig?.extra?.REFRESH_TOKEN_KEY || 'skilldrill_refresh_token';
 
@@ -266,9 +266,20 @@ class ApiService {
 
   public async post<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     try {
+      console.log('📤 Making POST request to:', url);
+      console.log('📤 Full URL:', `${this.api.defaults.baseURL}${url}`);
+      console.log('📤 Request data:', data);
       const response: AxiosResponse<ApiResponse<T>> = await this.api.post(url, data, config);
+      console.log('✅ POST response:', response.data);
       return response.data;
     } catch (error: any) {
+      console.error('❌ POST request failed:', {
+        url,
+        data,
+        error: error.message,
+        status: error.status,
+        code: error.code
+      });
       throw this.handleError(error);
     }
   }

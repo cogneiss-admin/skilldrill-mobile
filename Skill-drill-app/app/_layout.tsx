@@ -52,6 +52,8 @@ const AuthMiddleware = React.memo(({ children }: { children: React.ReactNode }) 
   const { isAuthenticated, user, isLoading, isOnboardingComplete, getOnboardingNextStep } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const [isChecking, setIsChecking] = useState(false);
+  const [checkComplete, setCheckComplete] = useState(false);
 
   useEffect(() => {
     // Only redirect if we're on the root path and auth check is complete
@@ -132,6 +134,13 @@ const AuthMiddleware = React.memo(({ children }: { children: React.ReactNode }) 
       return;
     }
 
+    // Don't redirect if we're on the session-loading screen
+    const isSessionLoadingScreen = segments[0] === 'session-loading';
+    if (isSessionLoadingScreen) {
+      console.log('⏳ AuthMiddleware: On session-loading screen, not redirecting');
+      return;
+    }
+
     if (isAuthenticated) {
       const onboardingComplete = isOnboardingComplete();
       const nextStep = getOnboardingNextStep();
@@ -146,6 +155,12 @@ const AuthMiddleware = React.memo(({ children }: { children: React.ReactNode }) 
       });
 
       if (onboardingComplete) {
+        // Don't auto-redirect to dashboard if user is on auth screens (let them complete their flow)
+        const isOnAuthFlow = segments[0] === 'auth' || segments.includes('auth');
+        if (isOnAuthFlow) {
+          console.log('🔐 AuthMiddleware: User on auth flow, letting them complete naturally');
+          return;
+        }
         console.log('🎯 AuthMiddleware: User authenticated and onboarding complete, redirecting to dashboard');
         router.replace('/dashboard');
       } else if (nextStep) {
@@ -161,6 +176,14 @@ const AuthMiddleware = React.memo(({ children }: { children: React.ReactNode }) 
       router.replace('/auth/login');
     }
   }, [isAuthenticated, user, isLoading, segments, router, isOnboardingComplete, getOnboardingNextStep]);
+
+  // Reset check state when user changes
+  useEffect(() => {
+    if (user) {
+      setIsChecking(false);
+      setCheckComplete(false);
+    }
+  }, [user?.id]);
 
   return <>{children}</>;
 });

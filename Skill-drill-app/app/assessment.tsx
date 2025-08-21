@@ -1,22 +1,29 @@
 // @ts-nocheck
 import React, { useState, useEffect } from "react";
-import { View, Text, ScrollView, TextInput, Alert, Modal } from "react-native";
+import { View, Text, ScrollView, TextInput, Alert, Modal, Pressable, Image, BackHandler } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { Button, Surface, ProgressBar, Portal, Dialog } from "react-native-paper";
+import { Button, Surface, ProgressBar, Portal, Dialog, Chip, Badge } from "react-native-paper";
+import { LinearGradient } from "expo-linear-gradient";
+import { MotiView } from "moti";
+import * as Haptics from "expo-haptics";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useResponsive } from "../utils/responsive";
 import { useAuth } from "../hooks/useAuth";
 import { apiService } from "../services/api";
 import { useToast } from "../hooks/useToast";
+import Constants from "expo-constants";
+import { AntDesign } from '@expo/vector-icons';
 
 const BRAND = "#0A66C2";
+const APP_NAME = "Skill Drill";
+const logoSrc = require("../assets/images/logo.png");
 
 export default function AssessmentScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const responsive = useResponsive();
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const { showToast } = useToast();
   
   // Assessment session state
@@ -38,21 +45,67 @@ export default function AssessmentScreen() {
   // Modal state
   const [showSkillCompleteModal, setShowSkillCompleteModal] = useState(false);
   const [completedSkillName, setCompletedSkillName] = useState("");
+  
+  // Prevent infinite initialization loop
+  const [hasInitialized, setHasInitialized] = useState(false);
+  const [lastSessionCheck, setLastSessionCheck] = useState(0);
+  
+  // Back button double-tap state
+  const [backButtonPressed, setBackButtonPressed] = useState(false);
+  const [showBackWarning, setShowBackWarning] = useState(false);
+  const [realProgress, setRealProgress] = useState(null);
+  
+  // Double-tap to exit functionality
+  const [showExitWarning, setShowExitWarning] = useState(false);
+  const [lastBackPress, setLastBackPress] = useState(0);
 
-  // Parse skills safely
+  // Hardware back button handler
+  useEffect(() => {
+    const backAction = () => {
+      handleBackToDashboard();
+      return true; // Prevent default back behavior
+    };
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+
+    return () => backHandler.remove();
+  }, [backButtonPressed, showBackWarning]);
+
+  // Parse skills or session data safely
   useEffect(() => {
     try {
       console.log('🎯 Assessment screen initializing...');
       console.log('📊 Raw params:', params);
-      console.log('📊 Raw selectedSkills param:', params.selectedSkills);
       
+      // Check if this is a resume session
+      if (params.resume === 'true' && params.sessionId) {
+        console.log('🔄 Resuming existing session:', params.sessionId);
+        console.log('📊 Resume params:', { resume: params.resume, sessionId: params.sessionId });
+        setSessionId(params.sessionId);
+        // Don't set skills here - we'll get them from the session
+        setLoading(false);
+        return;
+      }
+
+      // Handle new assessment with selected skills
       if (params.selectedSkills) {
-        const parsed = JSON.parse(params.selectedSkills);
+        let parsed;
+        try {
+          parsed = JSON.parse(params.selectedSkills);
+        } catch (parseError) {
+          console.error('❌ JSON parse error:', parseError);
+          // Try to handle as string array
+          if (typeof params.selectedSkills === 'string') {
+            parsed = [params.selectedSkills];
+          } else {
+            throw parseError;
+          }
+        }
+        
         console.log('📊 Parsed skills:', parsed);
         console.log('📊 Parsed skills type:', typeof parsed);
         console.log('📊 Is array?', Array.isArray(parsed));
-        console.log('📊 Skills length:', parsed?.length);
-        
+
         if (Array.isArray(parsed)) {
           // Validate that all skills are valid IDs (strings or numbers)
           const validSkills = parsed.filter(skillId => {
@@ -62,88 +115,256 @@ export default function AssessmentScreen() {
             }
             return isValid;
           });
-          
+
           console.log('📊 Valid skills:', validSkills);
-          setSelectedSkills(validSkills);
-          setTotalSkills(validSkills.length);
+          console.log('📊 Skills length:', validSkills?.length || 0);
+          setSelectedSkills(validSkills || []);
+          setTotalSkills(validSkills?.length || 0);
+          
+          // If we have valid skills, trigger initialization
+          if (validSkills && validSkills.length > 0) {
+            console.log('✅ Skills parsed successfully, will initialize assessment');
+          }
         } else {
           console.error('❌ Parsed skills is not an array:', parsed);
           setSelectedSkills([]);
+          setTotalSkills(0);
           setError('Invalid skills format - expected array');
         }
       } else {
-        console.log('❌ No skills provided');
+        // No skills provided - this might be a direct redirect from AuthMiddleware
+        // We'll need to get skills from the user's profile
+        console.log('📝 No skills provided in params - will fetch from user profile');
         setSelectedSkills([]);
-        setError('No skills selected for assessment');
+        setTotalSkills(0);
+        // Don't set error yet, we'll try to fetch skills
       }
     } catch (error) {
       console.error('❌ Error parsing skills:', error);
       setSelectedSkills([]);
+      setTotalSkills(0);
       setError('Invalid skills data format');
     } finally {
       setLoading(false);
     }
-  }, [params.selectedSkills]);
+  }, [params.selectedSkills, params.resume, params.sessionId]);
+
+  // Auto-initialize assessment when component is ready
+  useEffect(() => {
+    let isMounted = true;
+    
+    // Wait for authentication to be ready before initializing
+    if (authLoading) {
+      console.log('⏳ Waiting for authentication to be ready...');
+      return;
+    }
+    
+    console.log('🔍 Checking initialization conditions...');
+    console.log('📊 Loading:', loading);
+    console.log('📊 Has initialized:', hasInitialized);
+    console.log('📊 Selected skills length:', selectedSkills?.length || 0);
+    console.log('📊 Session ID:', sessionId);
+    console.log('📊 Params resume:', params.resume);
+    console.log('📊 Params selectedSkills:', params.selectedSkills);
+    
+    // Initialize if we have skills, or if we're resuming a session
+    const shouldInitialize = !loading && !hasInitialized && (
+      (selectedSkills && selectedSkills.length > 0) || 
+      (sessionId && params.resume === 'true')
+    );
+    
+    console.log('🔍 Initialization check:', {
+      loading,
+      hasInitialized,
+      selectedSkillsLength: selectedSkills?.length || 0,
+      sessionId,
+      resumeParam: params.resume,
+      shouldInitialize
+    });
+    
+    if (shouldInitialize) {
+      console.log('🚀 Initializing assessment...');
+      setHasInitialized(true);
+      if (isMounted) {
+        initializeAssessment();
+      }
+    } else {
+      console.log('⏸️ Not initializing yet - conditions not met');
+    }
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [loading, selectedSkills, sessionId, params.resume, hasInitialized, authLoading]);
 
   // Initialize assessment session
   const initializeAssessment = async () => {
     try {
       setLoading(true);
-      console.log('🚀 Starting assessment with skills:', selectedSkills);
       
-      if (!selectedSkills || selectedSkills.length === 0) {
-        setError('No skills selected for assessment');
-        return;
-      }
-
-      // Log the exact data being sent
-      const requestData = {
-        skillIds: selectedSkills
-      };
-      console.log('📤 Sending request data:', JSON.stringify(requestData, null, 2));
-
-      const response = await apiService.post('/assessment/session/start', requestData);
-
-      console.log('✅ Assessment response:', response);
-
-      if (response.success) {
-        console.log('✅ Assessment started:', response.data);
-        console.log('📊 Assessment data structure:', JSON.stringify(response.data, null, 2));
-        console.log('📊 Current assessment:', response.data.currentAssessment);
-        console.log('📊 Assessment template:', response.data.currentAssessment?.template);
-        console.log('📊 Prompts:', response.data.currentAssessment?.template?.prompts);
-        console.log('📊 Number of prompts:', response.data.currentAssessment?.template?.prompts?.length || 0);
-        
-        setSessionId(response.data.sessionId);
-        setCurrentSkillIndex(response.data.currentSkillIndex);
-        setTotalSkills(response.data.totalSkills);
-        setCurrentAssessment(response.data.currentAssessment);
-        setCurrentView('scenario');
-      } else {
-        console.error('❌ Assessment failed:', response.message);
-        setError(response.message || 'Failed to start assessment');
-      }
-    } catch (error) {
-      console.error('❌ Assessment error:', error);
-      console.error('❌ Error details:', {
-        message: error.message,
-        status: error.status,
-        code: error.code,
-        data: error.data
+      // Add timeout for assessment creation
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Assessment creation timeout')), 30000); // 30 seconds
       });
       
-      // Show more detailed error message
-      let errorMessage = 'Failed to start assessment';
-      if (error.message) {
-        errorMessage = error.message;
-      } else if (error.data?.message) {
-        errorMessage = error.data.message;
-      }
+      const assessmentPromise = performAssessmentInitialization();
       
-      setError(errorMessage);
+      await Promise.race([assessmentPromise, timeoutPromise]);
+    } catch (error) {
+      console.error('❌ Assessment initialization error:', error);
+      if (error.message === 'Assessment creation timeout') {
+        setError('Assessment creation is taking too long. Please try again.');
+      } else {
+        setError(error.message || 'Failed to initialize assessment');
+      }
+      // Reset initialization flag on error so user can retry
+      setHasInitialized(false);
     } finally {
       setLoading(false);
     }
+  };
+
+    const performAssessmentInitialization = async () => {
+    // Handle resume session
+    if (sessionId && params.resume === 'true') {
+      console.log('🔄 Resuming existing session:', sessionId);
+      
+      try {
+        // Prevent rapid API calls - only check once every 5 seconds
+        const now = Date.now();
+        if (now - lastSessionCheck < 5000) {
+          console.log('⏱️ Skipping session check - too soon since last check');
+          return;
+        }
+        setLastSessionCheck(now);
+        
+        const sessionStatusResponse = await apiService.get('/assessment/session/status');
+        
+        if (sessionStatusResponse.success && sessionStatusResponse.data.hasActiveSession) {
+          console.log('✅ Successfully loaded existing session:', sessionStatusResponse.data);
+          
+          setSessionId(sessionStatusResponse.data.sessionId);
+          setCurrentSkillIndex(sessionStatusResponse.data.currentSkillIndex);
+          setTotalSkills(sessionStatusResponse.data.totalSkills);
+          setSelectedSkills(sessionStatusResponse.data.selectedSkills || []);
+          
+          // Load current assessment using the specific endpoint
+          try {
+            console.log('🔍 Loading current assessment for session:', sessionStatusResponse.data.sessionId);
+            const currentAssessmentResponse = await apiService.get(`/assessment/session/${sessionStatusResponse.data.sessionId}/current`);
+            
+            if (currentAssessmentResponse.success && currentAssessmentResponse.data.assessment) {
+              console.log('✅ Current assessment loaded:', currentAssessmentResponse.data.assessment);
+              setCurrentAssessment(currentAssessmentResponse.data.assessment);
+              setCurrentView('scenario');
+              
+              // Show resume message
+              showToast('info', 'Session Resumed', 'Welcome back! Your assessment has been resumed.');
+            } else if (currentAssessmentResponse.success && currentAssessmentResponse.data.completed) {
+              console.log('✅ All assessments completed');
+              setError('All assessments have been completed. Great job!');
+            } else {
+              console.error('❌ No assessment data in response:', currentAssessmentResponse);
+              setError('Failed to load assessment data. The system will try to create a new assessment.');
+            }
+          } catch (assessmentError) {
+            console.error('❌ Error loading current assessment:', assessmentError);
+            console.error('❌ Error details:', {
+              message: assessmentError.message,
+              status: assessmentError.status,
+              data: assessmentError.data
+            });
+            
+            // Check if it's a 404 (assessment not found) - show create button
+            if (assessmentError.status === 404) {
+              console.log('🔄 Assessment not found, showing create button...');
+              setError('Failed to load assessment data. Please try again.');
+            } else {
+              setError('Failed to load assessment data. Please try again.');
+            }
+          }
+          return;
+        } else {
+          // No active session found - this is normal for new assessments
+          console.log('ℹ️ No active session found, will start new assessment');
+          // Don't set error here, let the flow continue to create new assessment
+        }
+      } catch (sessionError) {
+        console.log('ℹ️ No existing session found or error checking session:', sessionError.message);
+        // Continue with starting new session - don't set error
+      }
+    }
+
+    // Handle new assessment
+    console.log('🚀 Starting new assessment with skills:', selectedSkills);
+    console.log('📊 Selected skills length:', selectedSkills?.length || 0);
+    console.log('📊 Selected skills type:', typeof selectedSkills);
+    
+    // Skills should always be provided via params from dashboard
+    if (!selectedSkills || selectedSkills.length === 0) {
+      console.error('❌ No skills provided for assessment');
+      setError('No skills selected for assessment. Please select skills first and try again.');
+      return;
+    }
+
+    // First, check if there's an existing active session
+    try {
+      console.log('🔍 Checking for existing active session...');
+      
+      // Prevent rapid API calls - only check once every 5 seconds
+      const now = Date.now();
+      if (now - lastSessionCheck < 5000) {
+        console.log('⏱️ Skipping session check - too soon since last check');
+        return;
+      }
+      setLastSessionCheck(now);
+      
+      const sessionStatusResponse = await apiService.get('/assessment/session/status');
+      
+      if (sessionStatusResponse.success && sessionStatusResponse.data.hasActiveSession) {
+        console.log('🔄 Found existing active session:', sessionStatusResponse.data);
+        
+        // Check if the existing session has the same skills
+        const existingSkillIds = sessionStatusResponse.data.selectedSkills || [];
+        const skillsMatch = selectedSkills.length === existingSkillIds.length && 
+                           selectedSkills.every(id => existingSkillIds.includes(id));
+        
+        if (skillsMatch) {
+          console.log('✅ Resuming existing session with same skills');
+          
+          // Resume the existing session
+          const skillsToUse = selectedSkills && selectedSkills.length > 0 ? selectedSkills : [];
+          console.log('📊 Skills to use for resuming session:', skillsToUse);
+          
+          const resumeResponse = await apiService.post('/assessment/session/start', {
+            skillIds: skillsToUse
+          });
+          
+          if (resumeResponse.success && resumeResponse.data.resumed) {
+            console.log('✅ Successfully resumed existing session');
+            setSessionId(resumeResponse.data.sessionId);
+            setCurrentSkillIndex(resumeResponse.data.currentSkillIndex);
+            setTotalSkills(resumeResponse.data.totalSkills);
+            setCurrentAssessment(resumeResponse.data.currentAssessment);
+            setCurrentView('scenario');
+            
+            // Show resume message
+            showToast('info', 'Session Resumed', 'Welcome back! Your assessment has been resumed.');
+            return;
+          }
+        } else {
+          console.log('⚠️ Existing session has different skills, will start new session');
+        }
+      }
+    } catch (sessionError) {
+      console.log('ℹ️ No existing session found or error checking session:', sessionError.message);
+      // Continue with starting new session
+    }
+
+    // For new assessments, show the create button instead of auto-creating
+    console.log('🆕 New assessment flow - showing create button');
+    setError('Failed to load assessment data. Please try again.');
+    setLoading(false);
   };
 
   // Handle start assessment
@@ -155,9 +376,80 @@ export default function AssessmentScreen() {
     }
   };
 
+  // Handle create assessment
+  const handleCreateAssessment = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      console.log('🔄 Creating new assessment for skills:', selectedSkills);
+      
+      // Create assessment session with the selected skills
+      const response = await apiService.post('/assessment/session/start', {
+        skillIds: selectedSkills
+      });
+
+      if (response.success) {
+        console.log('✅ Assessment created successfully:', response.data);
+        setSessionId(response.data.sessionId);
+        setCurrentSkillIndex(response.data.currentSkillIndex);
+        setTotalSkills(response.data.totalSkills);
+        setCurrentAssessment(response.data.currentAssessment);
+        setCurrentView('scenario');
+        showToast('success', 'Assessment Created', 'Your personalized assessment is ready!');
+      } else {
+        console.error('❌ Failed to create assessment:', response.message);
+        setError('Failed to create assessment: ' + response.message);
+      }
+    } catch (error) {
+      console.error('❌ Error creating assessment:', error);
+      setError('Failed to create assessment. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Handle back to dashboard
+  // Handle back button press with double-tap to exit
+  const handleBackPress = () => {
+    const now = Date.now();
+    const DOUBLE_TAP_DELAY = 2000; // 2 seconds
+    
+    if (now - lastBackPress < DOUBLE_TAP_DELAY) {
+      // Double tap detected - exit
+      setShowExitWarning(false);
+      setLastBackPress(0);
+      router.replace('/dashboard');
+    } else {
+      // First tap - show warning
+      setLastBackPress(now);
+      setShowExitWarning(true);
+      
+      // Auto-hide warning after delay
+      setTimeout(() => {
+        setShowExitWarning(false);
+        setLastBackPress(0);
+      }, DOUBLE_TAP_DELAY);
+    }
+  };
+
   const handleBackToDashboard = () => {
-    router.replace('/dashboard');
+    if (!backButtonPressed) {
+      // First press - show warning
+      setBackButtonPressed(true);
+      setShowBackWarning(true);
+      
+      // Reset after 2 seconds
+      setTimeout(() => {
+        setBackButtonPressed(false);
+        setShowBackWarning(false);
+      }, 2000);
+    } else {
+      // Second press - navigate to dashboard
+      setBackButtonPressed(false);
+      setShowBackWarning(false);
+      router.replace('/dashboard');
+    }
   };
 
   // Handle next scenario
@@ -198,6 +490,37 @@ export default function AssessmentScreen() {
     }
   };
 
+  // Fetch real progress data from backend
+  const fetchRealProgress = async () => {
+    try {
+      if (currentAssessment?.id) {
+        const response = await apiService.get('/assessment/session/status');
+        if (response.success && response.data.progress) {
+          const progressData = response.data.progress;
+          const progressPercentage = progressData.totalPrompts > 0 
+            ? (progressData.completedResponses / progressData.totalPrompts) * 100 
+            : 0;
+          
+          setRealProgress({
+            totalPrompts: progressData.totalPrompts,
+            completedResponses: progressData.completedResponses,
+            percentage: progressPercentage,
+            status: progressData.status
+          });
+        }
+      }
+    } catch (error) {
+      console.log('⚠️ Could not fetch real progress:', error);
+    }
+  };
+
+  // Fetch progress when assessment loads
+  useEffect(() => {
+    if (currentAssessment && currentAssessment.id) {
+      fetchRealProgress();
+    }
+  }, [currentAssessment]);
+
   // Handle complete skill assessment
   const handleCompleteSkillAssessment = async () => {
     try {
@@ -230,15 +553,31 @@ export default function AssessmentScreen() {
       }
 
       console.log('📤 Submitting skill assessment responses:', allResponses);
+      console.log('📤 Current assessment ID:', currentAssessment.id);
+      console.log('📤 Prompts:', prompts);
       
-      // Submit responses to backend
-      const response = await apiService.post('/assessment/response/bulk', {
+      const requestData = {
         assessmentId: currentAssessment.id,
         responses: Object.entries(allResponses).map(([index, response]) => ({
           promptId: prompts[parseInt(index)].id,
           response: response
         }))
-      });
+      };
+      
+      console.log('📤 Request data:', JSON.stringify(requestData, null, 2));
+      console.log('📤 API Service base URL:', apiService.api?.defaults?.baseURL);
+      
+      // Test connection first
+      try {
+        console.log('🔍 Testing connection to backend...');
+        const testResponse = await apiService.get('/auth/health');
+        console.log('✅ Backend connection test successful:', testResponse);
+      } catch (testError) {
+        console.error('❌ Backend connection test failed:', testError);
+      }
+      
+      // Submit responses to backend
+      const response = await apiService.post('/assessment/response/bulk', requestData);
 
       if (response.success) {
         console.log('✅ Skill assessment completed:', response.data);
@@ -309,16 +648,16 @@ export default function AssessmentScreen() {
   };
 
   // Show loading state
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: "#ffffff" }}>
         <StatusBar style="dark" />
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
           <Text style={{ fontSize: 18, color: BRAND, marginBottom: 16 }}>
-            Loading Assessment...
+            {authLoading ? 'Loading Authentication...' : 'Loading Assessment...'}
           </Text>
           <Text style={{ fontSize: 14, color: "#64748b", textAlign: "center" }}>
-            Preparing your assessment
+            {authLoading ? 'Checking your login status' : 'Preparing your assessment'}
           </Text>
         </View>
       </SafeAreaView>
@@ -327,6 +666,47 @@ export default function AssessmentScreen() {
 
   // Show error state
   if (error) {
+    // Check if this is a "no assessment" error that should show create button
+    const isNoAssessmentError = error.includes('Failed to load assessment data') || 
+                               error.includes('Assessment not found') ||
+                               error.includes('no assessment found');
+    
+    if (isNoAssessmentError && selectedSkills && selectedSkills.length > 0) {
+      return (
+        <SafeAreaView style={{ flex: 1, backgroundColor: "#ffffff" }}>
+          <StatusBar style="dark" />
+          <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 20 }}>
+            <Text style={{ fontSize: 18, color: BRAND, marginBottom: 16, textAlign: "center" }}>
+              Create Assessment
+            </Text>
+            <Text style={{ fontSize: 14, color: "#64748b", textAlign: "center", marginBottom: 24 }}>
+              No assessment found for your selected skills. Click below to generate a personalized assessment using AI.
+            </Text>
+            <Button
+              mode="contained"
+              onPress={handleCreateAssessment}
+              loading={loading}
+              disabled={loading}
+              style={{ backgroundColor: BRAND, marginBottom: 16 }}
+              contentStyle={{ height: 48 }}
+              labelStyle={{ fontWeight: "600", fontSize: 16 }}
+            >
+              Create Assessment
+            </Button>
+            <Button
+              mode="outlined"
+              onPress={handleBackToDashboard}
+              style={{ borderColor: BRAND }}
+              labelStyle={{ color: BRAND }}
+            >
+              Back to Dashboard
+            </Button>
+          </View>
+        </SafeAreaView>
+      );
+    }
+    
+    // Show regular error state
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: "#ffffff" }}>
         <StatusBar style="dark" />
@@ -352,49 +732,101 @@ export default function AssessmentScreen() {
   // Show start screen
   if (currentView === 'start') {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: "#ffffff" }}>
-        <StatusBar style="dark" />
-        <ScrollView 
-          style={{ flex: 1 }}
-          contentContainerStyle={{ 
-            paddingHorizontal: 20, 
-            paddingVertical: 20 
-          }}
-        >
+      <SafeAreaView style={{ flex: 1, backgroundColor: BRAND }}>
+        <StatusBar style="light" />
+
+        {/* Hero header */}
+        <View style={{ minHeight: 200, position: "relative" }}>
+          <LinearGradient colors={["#0A66C2", "#0E75D1", "#1285E0"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: "absolute", inset: 0 }} />
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "flex-start", paddingHorizontal: 18, paddingTop: 10 }}>
+            <Image source={logoSrc} style={{ width: 56, height: 56, shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 10 }} resizeMode="contain" />
+            <Text style={{ marginLeft: 12, color: "#ffffff", fontSize: 22, fontWeight: "900", letterSpacing: 0.8, textShadowColor: 'rgba(0,0,0,0.35)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6 }}>{APP_NAME}</Text>
+          </View>
+          <View style={{ flex: 1, justifyContent: "center", paddingHorizontal: 18, paddingBottom: 20 }}>
+            <MotiView from={{ opacity: 0, translateY: 6 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: "timing", duration: 480 }}>
+              <Text style={{ fontSize: 24, fontWeight: "900", color: "#ffffff" }}>Assessment Ready</Text>
+              <Text style={{ marginTop: 8, color: "#E6F2FF", fontSize: 15 }}>Scenario-based Assessment</Text>
+              <Text style={{ marginTop: 4, color: "#E6F2FF", fontSize: 13, opacity: 0.9 }}>
+                {selectedSkills.length} skill{selectedSkills.length !== 1 ? 's' : ''} selected • 60 minutes total
+              </Text>
+            </MotiView>
+          </View>
+        </View>
+
+        {/* Content card */}
+        <View style={{ flex: 1, marginTop: -24 }}>
+          <View style={{ flex: 1, backgroundColor: "#ffffff", borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 24, shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 16 }}>
+            <ScrollView contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 100, maxWidth: 560, width: '100%', alignSelf: 'center' }} showsVerticalScrollIndicator={false}>
+
+              {/* Instructions */}
+              <MotiView from={{ opacity: 0, translateY: 8 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: "timing", duration: 420, delay: 100 }}>
           <Surface style={{ 
             padding: 20, 
-            borderRadius: 12,
-            marginBottom: 20
-          }}>
-            <Text style={{ fontSize: 24, fontWeight: "bold", color: "#0f172a", marginBottom: 12 }}>
-              Assessment Ready
-            </Text>
-            <Text style={{ fontSize: 16, color: BRAND, marginBottom: 20 }}>
-              Scenario-based Assessment
+                  borderRadius: 16,
+                  marginBottom: 20,
+                  shadowColor: "#000",
+                  shadowOpacity: 0.06,
+                  shadowRadius: 8,
+                  elevation: 2
+                }}>
+                  <Text style={{ fontSize: 18, fontWeight: "600", color: "#0f172a", marginBottom: 16 }}>
+                    📖 Instructions
             </Text>
             
-            <View style={{ marginBottom: 20 }}>
-              <Text style={{ fontSize: 14, color: "#374151", marginBottom: 8 }}>
-                Selected Skills: {selectedSkills.length}
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={{ fontSize: 14, color: "#374151", lineHeight: 20 }}>
+                      • Read each scenario carefully and provide detailed written responses
+                    </Text>
+                  </View>
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={{ fontSize: 14, color: "#374151", lineHeight: 20 }}>
+                      • Answer based on your actual experience and approach
               </Text>
-              <Text style={{ fontSize: 14, color: "#374151", marginBottom: 8 }}>
-                Duration: 60 minutes
+                  </View>
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={{ fontSize: 14, color: "#374151", lineHeight: 20 }}>
+                      • Each skill has 3 scenarios to assess different aspects
               </Text>
-              <Text style={{ fontSize: 14, color: "#374151" }}>
-                Type: Scenario-based
+                  </View>
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={{ fontSize: 14, color: "#374151", lineHeight: 20 }}>
+                      • All responses are text-based - no audio or voice recording required
+              </Text>
+                  </View>
+                  <View style={{ marginBottom: 0 }}>
+                    <Text style={{ fontSize: 14, color: "#374151", lineHeight: 20 }}>
+                      • You can navigate between scenarios before submitting
               </Text>
             </View>
+                </Surface>
+              </MotiView>
+
+            </ScrollView>
             
+            {/* Sticky footer CTA */}
+            <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 18, paddingTop: 12, paddingBottom: 34, zIndex: 1000, backgroundColor: "#ffffff" }}>
+              <LinearGradient colors={["#0A66C2", "#0E75D1", "#1285E0"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: "absolute", inset: 0, opacity: 0.1 }} />
             <Button
               mode="contained"
               onPress={handleStartAssessment}
               loading={loading}
-              style={{ backgroundColor: BRAND }}
-            >
-              Begin Assessment
+                disabled={loading}
+                contentStyle={{ height: 56 }}
+                style={{
+                  borderRadius: 28,
+                  backgroundColor: BRAND,
+                  opacity: 1,
+                  shadowColor: BRAND,
+                  shadowOpacity: 0.35,
+                  shadowRadius: 14
+                }}
+                labelStyle={{ fontWeight: "800", letterSpacing: 0.3 }}
+              >
+                {loading ? "Starting Assessment..." : "Begin Assessment"}
             </Button>
-          </Surface>
-        </ScrollView>
+            </View>
+          </View>
+        </View>
       </SafeAreaView>
     );
   }
@@ -403,155 +835,545 @@ export default function AssessmentScreen() {
   if (currentView === 'scenario') {
     const prompts = currentAssessment?.template?.prompts || [];
     const currentPrompt = prompts[currentScenarioIndex];
-    const totalScenarios = prompts.length;
-    const progress = (currentScenarioIndex + 1) / totalScenarios;
-    const hasResponse = currentResponse.trim().length >= 50;
-    const wordCount = currentResponse.trim().split(/\s+/).filter(word => word.length > 0).length;
+    const totalScenarios = prompts ? prompts.length : 3; // Default to 3 if undefined
+    // Use real progress from backend if available, otherwise fallback to scenario-based progress
+    const progress = realProgress ? realProgress.percentage / 100 : (currentScenarioIndex + 1) / totalScenarios;
+    const hasResponse = currentResponse ? currentResponse.trim().length >= 50 : false;
+    const wordCount = currentResponse ? currentResponse.trim().split(/\s+/).filter(word => word.length > 0).length : 0;
     const isWithinLimit = wordCount <= 100;
     
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: "#ffffff" }}>
-        <StatusBar style="dark" />
+      <SafeAreaView style={{ flex: 1, backgroundColor: BRAND }}>
+        <StatusBar style="light" />
         
-        {/* Header with Progress */}
-        <Surface style={{ 
-          paddingHorizontal: 20, 
-          paddingVertical: 16,
-          elevation: 2
-        }}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <Text style={{ fontSize: 14, fontWeight: "600", color: "#6B7280" }}>
-              Skill {currentSkillIndex + 1} of {totalSkills} • Scenario {currentScenarioIndex + 1} of {totalScenarios}
-            </Text>
-            <Text style={{ fontSize: 14, color: "#6B7280" }}>
-              {Math.round(progress * 100)}% Complete
+        {/* Back Button Warning Overlay - Footer */}
+        {showBackWarning && (
+          <View style={{
+            position: 'absolute',
+            bottom: 20,
+            left: 16,
+            right: 16,
+            zIndex: 1000,
+            backgroundColor: '#ffffff',
+            paddingVertical: 12,
+            paddingHorizontal: 16,
+            borderRadius: 12,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.15,
+            shadowRadius: 8,
+            elevation: 5,
+            alignItems: 'center',
+            borderWidth: 1,
+            borderColor: '#e5e7eb'
+          }}>
+            <Text style={{
+              color: '#374151',
+              fontSize: 14,
+              fontWeight: '500',
+              textAlign: 'center'
+            }}>
+              Press back again to exit assessment
             </Text>
           </View>
-          <ProgressBar 
-            progress={progress} 
-            color={BRAND} 
-            style={{ height: 4, borderRadius: 2 }}
-          />
-        </Surface>
+        )}
+        
+        {/* Blue Header */}
+        <View style={{ 
+          paddingHorizontal: 16, 
+          paddingTop: 8, 
+          paddingBottom: 16,
+          backgroundColor: BRAND
+        }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Image source={logoSrc} style={{ width: 32, height: 32 }} resizeMode="contain" />
+              <Text style={{ 
+                marginLeft: 10, 
+                color: "#ffffff", 
+                fontSize: 16, 
+                fontWeight: "900", 
+                letterSpacing: 0.4 
+              }}>{APP_NAME}</Text>
+            </View>
+            
+            {/* Progress indicator */}
+            <View style={{
+              backgroundColor: "rgba(255, 255, 255, 0.2)",
+              paddingHorizontal: 10,
+              paddingVertical: 6,
+              borderRadius: 12
+            }}>
+              <Text style={{
+                fontSize: 12,
+                color: "#ffffff",
+                fontWeight: "700"
+              }}>
+                {currentScenarioIndex + 1} of {totalScenarios}
+              </Text>
+            </View>
+          </View>
+          
+          {/* Assessment title */}
+          <Text style={{ 
+            fontSize: 20, 
+            fontWeight: "700", 
+            color: "#ffffff",
+            marginTop: 12
+          }}>
+            Assessment for {currentAssessment?.skill?.skill_name || "Skill"}
+          </Text>
+          
+          {/* Progress text */}
+          <Text style={{ 
+            fontSize: 14, 
+            color: "#E6F2FF", 
+            marginTop: 4,
+            opacity: 0.9
+          }}>
+            Skill {currentSkillIndex + 1} of {totalSkills} • {realProgress ? `${realProgress.completedResponses} of ${realProgress.totalPrompts} questions answered` : `${Math.round(progress * 100)}% Complete`}
+          </Text>
+        </View>
 
-        <ScrollView 
+                <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ 
-            paddingHorizontal: 20, 
-            paddingVertical: 20 
+          contentContainerStyle={{
+            paddingHorizontal: 16,
+            paddingTop: 24, // Space after blue header
+            paddingBottom: 100, // Account for bottom buttons
+            maxWidth: 520,
+            width: '100%',
+            alignSelf: 'center'
           }}
+          showsVerticalScrollIndicator={false}
         >
+          {/* Background Gradient Overlay */}
+          <View style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: BRAND + "01" // Very subtle brand color overlay
+          }} />
           {currentAssessment && currentPrompt ? (
             <>
               {/* Scenario Header */}
+              <MotiView
+                from={{ opacity: 0, translateY: 8, scale: 0.95 }}
+                animate={{ opacity: 1, translateY: 0, scale: 1 }}
+                transition={{ type: "timing", duration: 420, delay: 100 }}
+              >
               <Surface style={{ 
-                padding: 20, 
-                borderRadius: 12,
-                marginBottom: 20
-              }}>
-                <Text style={{ fontSize: 20, fontWeight: "bold", color: "#0f172a", marginBottom: 12 }}>
-                  {currentAssessment.skill?.skill_name || "Assessment"}
-                </Text>
-                <Text style={{ fontSize: 16, color: BRAND, marginBottom: 16 }}>
-                  Scenario {currentScenarioIndex + 1}
-                </Text>
-                
-                <Text style={{ fontSize: 16, color: "#374151", lineHeight: 24, marginBottom: 16 }}>
-                  {currentPrompt?.prompt_text || currentPrompt?.instruction || "Loading scenario..."}
-                </Text>
-              </Surface>
-
-              {/* Response Section */}
-              <Surface style={{ 
-                padding: 20, 
-                borderRadius: 12,
-                marginBottom: 20
-              }}>
-                <Text style={{ fontSize: 18, fontWeight: "600", color: "#0f172a", marginBottom: 12 }}>
-                  Your Response
-                </Text>
-                
-                <TextInput
-                  style={{
-                    borderWidth: 1,
-                    borderColor: isWithinLimit ? "#D1D5DB" : "#DC2626",
-                    borderRadius: 8,
-                    padding: 16,
-                    minHeight: 200,
-                    backgroundColor: "#F9FAFB",
-                    fontSize: 16,
-                    color: "#374151",
-                    textAlignVertical: "top"
-                  }}
-                  multiline
-                  placeholder="Share your solution and approach..."
-                  value={currentResponse}
-                  onChangeText={setCurrentResponse}
-                  maxLength={500}
-                />
-                
-                <View style={{ 
-                  flexDirection: "row", 
-                  justifyContent: "space-between", 
-                  alignItems: "center",
-                  marginTop: 12
+                  padding: 20,
+                  borderRadius: 16,
+                  marginBottom: 20,
+                  shadowColor: "#000",
+                  shadowOpacity: 0.06,
+                  shadowRadius: 8,
+                  elevation: 3,
+                  backgroundColor: "#ffffff"
                 }}>
-                  <Text style={{ fontSize: 14, color: "#6B7280" }}>
-                    {wordCount} / 100 words
-                  </Text>
-                  <Text style={{ fontSize: 14, color: hasResponse && isWithinLimit ? "#16A34A" : "#9CA3AF" }}>
-                    {hasResponse && isWithinLimit ? "✓ Response ready" : "50-100 words required"}
-                  </Text>
-                </View>
-              </Surface>
+                  {/* Scenario Badge */}
+                  <View style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginBottom: 16,
+                    backgroundColor: BRAND + "08",
+                    paddingHorizontal: 10,
+                    paddingVertical: 6,
+                    borderRadius: 10,
+                    alignSelf: "flex-start"
+                  }}>
+                    <Text style={{ fontSize: 16, marginRight: 6 }}>📝</Text>
+                    <Text style={{
+                      fontSize: 14,
+                      fontWeight: "700",
+                      color: BRAND,
+                      letterSpacing: 0.4
+                    }}>
+                      SCENARIO {currentScenarioIndex + 1}
+                </Text>
+                  </View>
 
-              {/* Navigation Buttons */}
-              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                {currentScenarioIndex > 0 && (
-                  <Button
-                    mode="outlined"
-                    onPress={handlePreviousScenario}
-                    style={{ flex: 1, marginRight: 8 }}
-                    labelStyle={{ color: BRAND }}
-                  >
-                    Previous
-                  </Button>
-                )}
-                
-                <Button
-                  mode="contained"
-                  onPress={handleNextScenario}
-                  loading={submitting}
-                  disabled={!hasResponse || !isWithinLimit || submitting}
-                  style={{ 
-                    flex: 1, 
-                    backgroundColor: BRAND,
-                    marginLeft: currentScenarioIndex > 0 ? 8 : 0
-                  }}
-                  labelStyle={{ color: "#ffffff" }}
-                >
-                  {submitting ? "Submitting..." : 
-                   currentScenarioIndex < totalScenarios - 1 ? "Next Scenario" : "Submit Assessment"}
-                </Button>
-              </View>
+                  {/* Scenario Text */}
+                  <Text style={{
+                    fontSize: 16,
+                    color: "#1f2937",
+                    lineHeight: 24,
+                    marginBottom: 20,
+                    fontWeight: "500"
+                  }}>
+                    {currentPrompt?.prompt_text || currentPrompt?.instruction || "Loading scenario..."}
+                  </Text>
+
+                  {!currentPrompt && (
+                    <Text style={{ fontSize: 14, color: "#9CA3AF", textAlign: "center", marginTop: 20 }}>
+                      Loading scenario content...
+                    </Text>
+                  )}
+              </Surface>
+              </MotiView>
+
+                            {/* Response Section */}
+              <MotiView
+                from={{ opacity: 0, translateY: 8, scale: 0.95 }}
+                animate={{ opacity: 1, translateY: 0, scale: 1 }}
+                transition={{ type: "timing", duration: 420, delay: 200 }}
+              >
+                <Surface style={{
+                  padding: 20,
+                  borderRadius: 16,
+                  marginBottom: 20,
+                  shadowColor: "#000",
+                  shadowOpacity: 0.06,
+                  shadowRadius: 8,
+                  elevation: 3,
+                  backgroundColor: "#ffffff"
+                }}>
+                  {/* Response Header */}
+                  <View style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginBottom: 20,
+                    backgroundColor: "#f8fafc",
+                    paddingHorizontal: 16,
+                    paddingVertical: 12,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: "#e2e8f0"
+                  }}>
+                    <View style={{
+                      backgroundColor: BRAND + "15",
+                      padding: 8,
+                      borderRadius: 8,
+                      marginRight: 12
+                    }}>
+                      <AntDesign name="edit" size={18} color={BRAND} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{
+                        fontSize: 16,
+                        fontWeight: "700",
+                        color: "#1f2937",
+                        marginBottom: 2
+                      }}>
+                        Your Response
+                      </Text>
+                      <Text style={{
+                        fontSize: 13,
+                        color: "#64748b"
+                      }}>
+                        Share your thoughts and experience
+                      </Text>
+                    </View>
+                    <View style={{
+                      backgroundColor: hasResponse ? "#dcfce7" : "#f1f5f9",
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: hasResponse ? "#bbf7d0" : "#e2e8f0"
+                    }}>
+                      <Text style={{
+                        fontSize: 12,
+                        color: hasResponse ? "#16A34A" : "#64748b",
+                        fontWeight: "600"
+                      }}>
+                        {hasResponse ? "✓ Draft Saved" : "⏳ Not Started"}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Response Input */}
+                  <View style={{
+                    marginBottom: 12
+                  }}>
+                    <View style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      marginBottom: 8
+                    }}>
+                      <AntDesign name="message1" size={14} color="#6B7280" />
+                      <Text style={{
+                        fontSize: 13,
+                        color: "#6B7280",
+                        marginLeft: 6,
+                        fontWeight: "500"
+                      }}>
+                        Write your detailed response below
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={{
+                    position: "relative",
+                    marginBottom: 16
+                  }}>
+                    <TextInput
+                      style={{
+                        borderWidth: 2,
+                        borderColor: isWithinLimit
+                          ? (hasResponse ? "#10B981" : "#E5E7EB")
+                          : "#EF4444",
+                        borderRadius: 16,
+                        padding: 20,
+                        minHeight: 200,
+                        backgroundColor: "#ffffff",
+                        fontSize: 15,
+                        color: "#1f2937",
+                        textAlignVertical: "top",
+                        shadowColor: "#000",
+                        shadowOpacity: 0.04,
+                        shadowRadius: 8,
+                        elevation: 2
+                      }}
+                      multiline
+                      placeholder="Share your thoughts, experiences, and insights about this scenario..."
+                      placeholderTextColor="#9CA3AF"
+                      value={currentResponse}
+                      onChangeText={setCurrentResponse}
+                      maxLength={500}
+                    />
+
+                    {/* Word Count Badge */}
+                    <View style={{
+                      position: "absolute",
+                      top: -8,
+                      right: 10,
+                      backgroundColor: isWithinLimit ? "#ffffff" : "#FEF2F2",
+                      borderWidth: 1,
+                      borderColor: isWithinLimit ? "#E5E7EB" : "#FECACA",
+                      borderRadius: 10,
+                      paddingHorizontal: 10,
+                      paddingVertical: 4,
+                      shadowColor: "#000",
+                      shadowOpacity: 0.04,
+                      shadowRadius: 4,
+                      elevation: 2
+                    }}>
+                      <Text style={{
+                        fontSize: 11,
+                        color: isWithinLimit ? "#6B7280" : "#DC2626",
+                        fontWeight: "600"
+                      }}>
+                        {wordCount}/100 words
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Progress Bar */}
+                  <View style={{
+                    marginBottom: 10
+                  }}>
+                    <View style={{
+                      height: 3,
+                      backgroundColor: "#F3F4F6",
+                      borderRadius: 2,
+                      overflow: "hidden"
+                    }}>
+                      <View style={{
+                        height: "100%",
+                        backgroundColor: isWithinLimit
+                          ? (wordCount >= 50 ? "#10B981" : "#E5E7EB")
+                          : "#EF4444",
+                        width: `${Math.min(100, (wordCount / 100) * 100)}%`,
+                        borderRadius: 2
+                      }} />
+                    </View>
+                  </View>
+
+                  {/* Status Indicator */}
+                  <View style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginTop: 16,
+                    paddingTop: 16,
+                    borderTopWidth: 1,
+                    borderTopColor: "#f1f5f9"
+                  }}>
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                      <View style={{
+                        backgroundColor: hasResponse && isWithinLimit ? "#dcfce7" :
+                                         hasResponse && !isWithinLimit ? "#fef3c7" : "#f1f5f9",
+                        padding: 6,
+                        borderRadius: 6,
+                        marginRight: 8
+                      }}>
+                        {hasResponse && isWithinLimit ? (
+                          <AntDesign name="check" size={14} color="#16A34A" />
+                        ) : hasResponse && !isWithinLimit ? (
+                          <AntDesign name="exclamation" size={14} color="#F59E0B" />
+                        ) : (
+                          <AntDesign name="clockcircle" size={14} color="#9CA3AF" />
+                        )}
+                      </View>
+                      <Text style={{
+                        fontSize: 13,
+                        color: hasResponse && isWithinLimit ? "#16A34A" :
+                               hasResponse && !isWithinLimit ? "#F59E0B" : "#9CA3AF",
+                        fontWeight: "600"
+                      }}>
+                        {hasResponse && isWithinLimit ? "Ready to submit" :
+                         hasResponse && !isWithinLimit ? "Word limit exceeded" :
+                         "Waiting for your response"}
+                      </Text>
+                    </View>
+
+                    {wordCount > 0 && wordCount < 50 && (
+                      <View style={{
+                        backgroundColor: "#fef3c7",
+                        paddingHorizontal: 8,
+                        paddingVertical: 4,
+                        borderRadius: 6
+                      }}>
+                        <Text style={{
+                          fontSize: 11,
+                          color: "#F59E0B",
+                          fontWeight: "600"
+                        }}>
+                          {50 - wordCount} more words needed
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </Surface>
+              </MotiView>
+
+                            {/* Navigation Buttons */}
+              <MotiView
+                from={{ opacity: 0, translateY: 8, scale: 0.95 }}
+                animate={{ opacity: 1, translateY: 0, scale: 1 }}
+                transition={{ type: "timing", duration: 420, delay: 300 }}
+              >
+                <Surface style={{
+                  padding: 20,
+                  borderRadius: 16,
+                  marginTop: 24,
+                  shadowColor: "#000",
+                  shadowOpacity: 0.06,
+                  shadowRadius: 8,
+                  elevation: 3,
+                  backgroundColor: "#ffffff"
+                }}>
+                  <View style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center"
+                  }}>
+                    {currentScenarioIndex > 0 && (
+                      <Button
+                        mode="outlined"
+                        onPress={handlePreviousScenario}
+                        style={{
+                          flex: 1,
+                          marginRight: 12,
+                          borderRadius: 12,
+                          borderColor: "#D1D5DB",
+                          borderWidth: 2,
+                          backgroundColor: "#ffffff"
+                        }}
+                        contentStyle={{ height: 52 }}
+                        labelStyle={{ color: "#6B7280", fontWeight: "600", fontSize: 15 }}
+                        icon={() => <AntDesign name="left" size={18} color="#6B7280" />}
+                      >
+                        Previous
+                      </Button>
+                    )}
+
+                    <Button
+                      mode="contained"
+                      onPress={handleNextScenario}
+                      loading={submitting}
+                      disabled={!hasResponse || !isWithinLimit || submitting}
+                      style={{
+                        flex: currentScenarioIndex > 0 ? 1 : 1,
+                        backgroundColor: hasResponse && isWithinLimit ? "#10B981" : "#F3F4F6",
+                        borderRadius: 12,
+                        shadowColor: hasResponse && isWithinLimit ? "#10B981" : "#000",
+                        shadowOpacity: hasResponse && isWithinLimit ? 0.3 : 0.04,
+                        shadowRadius: 8,
+                        elevation: hasResponse && isWithinLimit ? 4 : 1
+                      }}
+                      contentStyle={{ height: 52 }}
+                      labelStyle={{
+                        color: hasResponse && isWithinLimit ? "#ffffff" : "#9CA3AF",
+                        fontWeight: "700",
+                        fontSize: 15
+                      }}
+                      icon={submitting ? undefined : () =>
+                        <AntDesign
+                          name={currentScenarioIndex < totalScenarios - 1 ? "right" : "check"}
+                          size={16}
+                          color={hasResponse && isWithinLimit ? "#ffffff" : "#9CA3AF"}
+                        />
+                      }
+                    >
+                      {submitting ? "Submitting..." :
+                       currentScenarioIndex < totalScenarios - 1 ? "Next Scenario" : "Complete Assessment"}
+                    </Button>
+                  </View>
+
+                  {/* Progress Indicator */}
+                  <View style={{
+                    marginTop: 12,
+                    alignItems: "center"
+                  }}>
+                    <Text style={{
+                      fontSize: 11,
+                      color: "#9CA3AF",
+                      fontWeight: "500"
+                    }}>
+                      {currentScenarioIndex + 1} of {totalScenarios} scenarios
+                    </Text>
+                    <View style={{
+                      flexDirection: "row",
+                      marginTop: 6,
+                      alignItems: "center"
+                    }}>
+                      {Array.from({ length: totalScenarios || 3 }, (_, i) => (
+                        <View
+                          key={i}
+                          style={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: 3,
+                            backgroundColor: i <= currentScenarioIndex ? "#10B981" : "#E5E7EB",
+                            marginHorizontal: 2
+                          }}
+                        />
+                      ))}
+                    </View>
+                  </View>
+                </Surface>
+              </MotiView>
             </>
           ) : (
             <Surface style={{ 
-              padding: 20, 
-              borderRadius: 12,
-              marginBottom: 20
+              padding: 16, 
+              borderRadius: 14,
+              marginBottom: 16,
+              shadowColor: "#000",
+              shadowOpacity: 0.06,
+              shadowRadius: 6,
+              elevation: 2
             }}>
-              <Text style={{ fontSize: 18, color: BRAND, marginBottom: 16 }}>
+              <Text style={{ fontSize: 16, color: BRAND, marginBottom: 12, textAlign: "center" }}>
                 Loading Scenarios...
               </Text>
-              <Text style={{ fontSize: 16, color: "#374151", marginBottom: 20 }}>
+              <Text style={{ fontSize: 14, color: "#374151", textAlign: "center", marginBottom: 16 }}>
                 Preparing your assessment questions.
               </Text>
               
               <Button
                 mode="contained"
                 onPress={handleBackToDashboard}
-                style={{ backgroundColor: BRAND }}
+                style={{
+                  backgroundColor: BRAND,
+                  borderRadius: 10
+                }}
+                contentStyle={{ height: 44 }}
+                labelStyle={{ fontWeight: "600", fontSize: 14 }}
               >
                 Back to Dashboard
               </Button>
@@ -561,31 +1383,56 @@ export default function AssessmentScreen() {
 
         {/* Skill Completion Modal */}
         <Portal>
-          <Dialog
+          <Modal
             visible={showSkillCompleteModal}
-            dismissable={false}
-            style={{ backgroundColor: "#ffffff", borderRadius: 12 }}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => {}}
           >
-            <Dialog.Title style={{ textAlign: "center", color: "#16A34A" }}>
-              🎉 Assessment Complete!
-            </Dialog.Title>
-            <Dialog.Content>
-              <Text style={{ fontSize: 16, textAlign: "center", marginBottom: 20 }}>
-                You completed <Text style={{ fontWeight: "bold" }}>{completedSkillName}</Text> assessment!
+            <View style={{
+              flex: 1,
+              backgroundColor: "rgba(0,0,0,0.5)",
+              justifyContent: "center",
+              alignItems: "center",
+              paddingHorizontal: 20
+            }}>
+              <View style={{
+                backgroundColor: "#ffffff",
+                borderRadius: 16,
+                padding: 20,
+                width: "100%",
+                maxWidth: 360,
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 16 },
+                shadowOpacity: 0.25,
+                shadowRadius: 16,
+                elevation: 16
+              }}>
+                <View style={{ alignItems: "center", marginBottom: 20 }}>
+                  <Text style={{ fontSize: 40, marginBottom: 12 }}>🎉</Text>
+                  <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a", textAlign: "center" }}>
+                    Assessment Complete!
+                  </Text>
+                  <Text style={{ fontSize: 14, color: "#64748b", textAlign: "center", marginTop: 6 }}>
+                    You completed <Text style={{ fontWeight: "600", color: BRAND }}>{completedSkillName}</Text> assessment!
               </Text>
-              <Text style={{ fontSize: 14, color: "#64748b", textAlign: "center", marginBottom: 20 }}>
-                What would you like to do next?
+                </View>
+
+                <Text style={{ fontSize: 14, color: "#374151", textAlign: "center", marginBottom: 20, lineHeight: 20 }}>
+                  Great job! What would you like to do next?
               </Text>
-            </Dialog.Content>
-            <Dialog.Actions style={{ flexDirection: "column", paddingHorizontal: 20, paddingBottom: 20 }}>
+
+                <View style={{ gap: 10 }}>
               <Button
                 mode="contained"
                 onPress={handleSeeResults}
                 style={{ 
                   backgroundColor: BRAND, 
-                  marginBottom: 12,
-                  width: "100%"
+                      borderRadius: 10,
+                      height: 44
                 }}
+                    contentStyle={{ height: 44 }}
+                    labelStyle={{ fontWeight: "600", fontSize: 15 }}
               >
                 See Results Now
               </Button>
@@ -593,16 +1440,22 @@ export default function AssessmentScreen() {
                 mode="outlined"
                 onPress={handleContinueToNextSkill}
                 loading={submitting}
+                    disabled={submitting}
                 style={{ 
                   borderColor: BRAND,
-                  width: "100%"
+                      borderWidth: 2,
+                      borderRadius: 10,
+                      height: 44
                 }}
-                labelStyle={{ color: BRAND }}
+                    contentStyle={{ height: 44 }}
+                    labelStyle={{ color: BRAND, fontWeight: "600", fontSize: 15 }}
               >
                 Continue to Next Skill
               </Button>
-            </Dialog.Actions>
-          </Dialog>
+                </View>
+              </View>
+            </View>
+          </Modal>
         </Portal>
       </SafeAreaView>
     );
@@ -611,22 +1464,109 @@ export default function AssessmentScreen() {
   // Show completion screen
   if (currentView === 'complete') {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: "#ffffff" }}>
-        <StatusBar style="dark" />
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 20 }}>
-          <Text style={{ fontSize: 18, color: "#16A34A", marginBottom: 16 }}>
-            All Assessments Complete!
+      <SafeAreaView style={{ flex: 1, backgroundColor: BRAND }}>
+        <StatusBar style="light" />
+
+        {/* Hero header */}
+        <View style={{ minHeight: 200, position: "relative" }}>
+          <LinearGradient colors={["#0A66C2", "#0E75D1", "#1285E0"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: "absolute", inset: 0 }} />
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "flex-start", paddingHorizontal: 18, paddingTop: 10 }}>
+            <Image source={logoSrc} style={{ width: 56, height: 56, shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 10 }} resizeMode="contain" />
+            <Text style={{ marginLeft: 12, color: "#ffffff", fontSize: 22, fontWeight: "900", letterSpacing: 0.8, textShadowColor: 'rgba(0,0,0,0.35)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6 }}>{APP_NAME}</Text>
+          </View>
+          <View style={{ flex: 1, justifyContent: "center", paddingHorizontal: 18, paddingBottom: 20 }}>
+            <MotiView from={{ opacity: 0, translateY: 6 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: "timing", duration: 480 }}>
+              <Text style={{ fontSize: 24, fontWeight: "900", color: "#ffffff" }}>All Assessments Complete!</Text>
+              <Text style={{ marginTop: 8, color: "#E6F2FF", fontSize: 15 }}>🎉 Congratulations!</Text>
+            </MotiView>
+          </View>
+        </View>
+
+        {/* Content card */}
+        <View style={{ flex: 1, marginTop: -24 }}>
+          <View style={{ flex: 1, backgroundColor: "#ffffff", borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 24, shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 16 }}>
+            <ScrollView contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 100, maxWidth: 560, width: '100%', alignSelf: 'center' }} showsVerticalScrollIndicator={false}>
+
+              <MotiView from={{ opacity: 0, translateY: 8 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: "timing", duration: 420, delay: 100 }}>
+                <Surface style={{
+                  padding: 24,
+                  borderRadius: 16,
+                  marginBottom: 20,
+                  shadowColor: "#000",
+                  shadowOpacity: 0.06,
+                  shadowRadius: 8,
+                  elevation: 2,
+                  alignItems: "center"
+                }}>
+                  <Text style={{ fontSize: 48, marginBottom: 16 }}>🏆</Text>
+                  <Text style={{ fontSize: 18, fontWeight: "600", color: "#0f172a", textAlign: "center", marginBottom: 8 }}>
+                    Excellent Work!
+                  </Text>
+                  <Text style={{ fontSize: 16, color: "#64748b", textAlign: "center", lineHeight: 22 }}>
+                    You have successfully completed all skill assessments. Your results and personalized recommendations are now available.
+                  </Text>
+                </Surface>
+              </MotiView>
+
+              <MotiView from={{ opacity: 0, translateY: 8 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: "timing", duration: 420, delay: 200 }}>
+                <Surface style={{
+                  padding: 20,
+                  borderRadius: 16,
+                  marginBottom: 20,
+                  shadowColor: "#000",
+                  shadowOpacity: 0.06,
+                  shadowRadius: 8,
+                  elevation: 2
+                }}>
+                  <Text style={{ fontSize: 18, fontWeight: "600", color: "#0f172a", marginBottom: 16 }}>
+                    📊 What Happens Next?
+                  </Text>
+
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={{ fontSize: 14, color: "#374151", lineHeight: 20 }}>
+                      • View detailed results for each skill you assessed
+                    </Text>
+                  </View>
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={{ fontSize: 14, color: "#374151", lineHeight: 20 }}>
+                      • Get personalized recommendations for improvement
+                    </Text>
+                  </View>
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={{ fontSize: 14, color: "#374151", lineHeight: 20 }}>
+                      • Track your progress over time
           </Text>
-          <Text style={{ fontSize: 14, color: "#64748b", textAlign: "center", marginBottom: 24 }}>
-            You have successfully completed all skill assessments.
+                  </View>
+                  <View style={{ marginBottom: 0 }}>
+                    <Text style={{ fontSize: 14, color: "#374151", lineHeight: 20 }}>
+                      • Set goals for your next skill development phase
           </Text>
+                  </View>
+                </Surface>
+              </MotiView>
+
+            </ScrollView>
+
+            {/* Sticky footer CTA */}
+            <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 18, paddingTop: 12, paddingBottom: 34, zIndex: 1000, backgroundColor: "#ffffff" }}>
+              <LinearGradient colors={["#0A66C2", "#0E75D1", "#1285E0"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: "absolute", inset: 0, opacity: 0.1 }} />
           <Button
             mode="contained"
             onPress={handleBackToDashboard}
-            style={{ backgroundColor: BRAND }}
+                contentStyle={{ height: 56 }}
+                style={{
+                  borderRadius: 28,
+                  backgroundColor: BRAND,
+                  shadowColor: BRAND,
+                  shadowOpacity: 0.35,
+                  shadowRadius: 14
+                }}
+                labelStyle={{ fontWeight: "800", letterSpacing: 0.3 }}
           >
             Back to Dashboard
           </Button>
+            </View>
+          </View>
         </View>
       </SafeAreaView>
     );

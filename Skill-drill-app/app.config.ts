@@ -45,7 +45,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   extra: {
     // Backend API Configuration
     // Use environment variable or default based on platform
-    API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'http://10.0.2.2:3000/api', // Default to Android
+    API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.40:3000/api', // Use your actual IP
     API_TIMEOUT: parseInt(process.env.EXPO_PUBLIC_API_TIMEOUT || process.env.API_TIMEOUT || '10000'),
     
     // Authentication
