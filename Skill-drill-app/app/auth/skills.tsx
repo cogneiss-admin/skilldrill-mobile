@@ -1,20 +1,20 @@
 // @ts-nocheck
 import React, { useMemo, useState, useEffect, useCallback } from "react";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { View, Text, Pressable, ScrollView, Image, Platform, Dimensions } from "react-native";
+import { View, Text, ScrollView, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Button, Chip, Surface, Badge } from "react-native-paper";
+import { Button } from "react-native-paper";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import { MotiView } from "moti";
 import * as Haptics from "expo-haptics";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import Constants from "expo-constants";
-import { useResponsive } from "../../utils/responsive";
 import { useAuth } from "../../hooks/useAuth";
 import { apiService } from "../../services/api";
 import { useToast } from "../../hooks/useToast";
-import { AntDesign } from '@expo/vector-icons';
+import TierSection from "../components/TierSection";
+import { getSkillsCtaLabel } from "../components/ctaLabel";
+import { useSkillsData } from "../../hooks/useSkillsData";
 // Temporarily disabled Redux hook to fix import error
 // import { useSkillsRedux } from "../../hooks/useSkillsRedux";
 
@@ -28,22 +28,28 @@ export default function SkillsScreen() {
   const params = useLocalSearchParams();
   const isAssessmentMode = params.mode === 'assessment' || params.assessment === 'true' || params.fromAssessment === 'true';
   const isAddToAssessmentMode = params.mode === 'add-to-assessment';
+  const isFromCompleted = params.fromCompleted === 'true';
 
   console.log('🎯 Skills Screen - Assessment Mode:', isAssessmentMode, 'Add-to-Assessment Mode:', isAddToAssessmentMode, 'Params:', params);
   
   const router = useRouter();
-  const responsive = useResponsive();
   const { updateOnboardingStep } = useAuth();
   const { showToast } = useToast();
-  const [selected, setSelected] = useState([]);
   const [busy, setBusy] = useState(false);
 
-  // Use simple state management instead of Redux
-  const [skillsData, setSkillsData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  const canContinue = useMemo(() => selected.length > 0, [selected]);
+  const {
+    skillsData,
+    skillsByTier,
+    selected,
+    loading,
+    error,
+    canContinue,
+    toggleSkill,
+    setSelected,
+  } = useSkillsData({
+    isAssessmentMode,
+    isAddToAssessmentMode,
+  });
 
   // Check if user already has skills and redirect to dashboard (but not in add-to-assessment mode)
   useEffect(() => {
@@ -55,6 +61,21 @@ export default function SkillsScreen() {
         // Don't redirect if we're in add-to-assessment mode
         if (isAddToAssessmentMode) {
           console.log('➕ Add-to-assessment mode: Allowing user to add more skills');
+          return;
+        }
+        
+        // For assessment mode, if user already has skills, start assessment directly
+        // But if they're coming from dashboard after completing assessments, allow them to add new skills
+        if (isAssessmentMode && !isFromCompleted) {
+          console.log('🎯 Assessment mode with existing skills: Starting assessment directly');
+          showToast('info', 'Starting Assessment', 'You already have skills selected. Starting your assessment...');
+          router.replace('/assessment-intro');
+          return;
+        }
+        
+        // If coming from completed assessment, allow adding new skills
+        if (isFromCompleted) {
+          console.log('✅ Coming from completed assessment - allowing to add new skills');
           return;
         }
         
@@ -74,134 +95,16 @@ export default function SkillsScreen() {
     checkExistingSkills();
   }, [router, isAddToAssessmentMode]);
 
-  // Load skills data
-  const loadSkills = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError("");
-
-      console.log('🔄 Loading skills...');
-      // Use the correct skills endpoint
-      const response = await apiService.get('/skills/categories');
-
-      if (response.success) {
-        console.log('✅ Skills loaded successfully:', response.data.length, 'groups');
-        const allSkills = [];
-
-        // Transform the API response format
-        response.data.forEach((group) => {
-          if (group.skills && Array.isArray(group.skills)) {
-            group.skills.forEach((skill) => {
-              allSkills.push({
-                id: skill.skill_id || skill.id,
-                skill_id: skill.skill_id || skill.id,
-                name: skill.name || skill.skill_name || 'Unknown Skill',
-                description: skill.description || '',
-                category: skill.category || 'Personal Effectiveness',
-                tier: skill.tier || 'TIER_1_CORE_SURVIVAL',
-                mongo_id: skill.mongo_id || skill.id
-              });
-            });
-          }
-        });
-
-        console.log('📊 Processed skills:', allSkills.length);
-        setSkillsData(allSkills);
-      } else {
-        setError('Failed to load skills');
-      }
-    } catch (error) {
-      console.error('❌ Error loading skills:', error);
-      setError('Failed to load skills. Please try again.');
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (selected) {
+      console.log('🎯 Selected skills count:', selected.length);
     }
-  }, []);
-
-  // Load user's current skills when in add-to-assessment mode
-  useEffect(() => {
-    if (skillsData.length > 0 && isAddToAssessmentMode) {
-      const loadCurrentSkills = async () => {
-        try {
-          console.log('🔍 Loading current user skills for add-to-assessment mode...');
-          const response = await apiService.get('/user/skills');
-          
-          if (response.success && response.data && response.data.length > 0) {
-            // Get the skill IDs that the user already has
-            const currentSkillIds = response.data.map(userSkill => 
-              userSkill.skill?.id || userSkill.skill_id || userSkill.id
-            );
-            
-            console.log('📊 Current user skills:', currentSkillIds);
-            
-            // Mark these skills as already selected (but don't allow deselection)
-            setSelected(currentSkillIds);
-          }
-        } catch (error) {
-          console.error('❌ Error loading current skills:', error);
-        }
-      };
-      
-      loadCurrentSkills();
-    }
-  }, [skillsData, isAddToAssessmentMode]);
-
-  // Load persisted selection after skills are loaded (only in assessment mode)
-  useEffect(() => {
-    if (skillsData.length > 0 && isAssessmentMode && !isAddToAssessmentMode) {
-      AsyncStorage.getItem('selectedSkills')
-        .then((persisted) => {
-          if (persisted) {
-            try {
-              const parsed = JSON.parse(persisted);
-              // Only set selection if the IDs exist in current skills data
-              const validSelections = parsed.filter(id =>
-                skillsData.some(skill => skill.id === id)
-              );
-
-              setSelected(validSelections);
-              } catch (error) {
-              console.error('Failed to parse persisted selection:', error);
-            }
-          }
-        })
-        .catch(console.error);
-    }
-  }, [skillsData, isAssessmentMode, isAddToAssessmentMode]);
-
-  // Load skills on component mount
-  useEffect(() => {
-    loadSkills();
-  }, [loadSkills]);
-
-  // Log selected skills count whenever it changes
-  useEffect(() => {
-    console.log('🎯 Selected skills count:', selected.length);
   }, [selected]);
 
-  const toggleSkill = useCallback(async (skillId) => {
+  const handleToggleSkill = useCallback(async (skillId) => {
     try { await Haptics.selectionAsync(); } catch {}
-    
-    setSelected((prev) => {
-      const has = prev.includes(skillId);
-      
-      // In add-to-assessment mode, only allow adding new skills, not removing existing ones
-      if (isAddToAssessmentMode && has) {
-        // Check if this is a skill the user already has (shouldn't be removable)
-        // For now, we'll allow toggling but show a message
-        console.log('⚠️ Attempting to deselect skill in add-to-assessment mode');
-      }
-      
-      const newSelected = has ? prev.filter((s) => s !== skillId) : [...prev, skillId];
-      
-      // Persist the selection state (only for regular assessment mode)
-      if (!isAddToAssessmentMode) {
-        AsyncStorage.setItem('selectedSkills', JSON.stringify(newSelected)).catch(console.error);
-      }
-      
-      return newSelected;
-    });
-  }, [selected, isAddToAssessmentMode]);
+    toggleSkill(skillId);
+  }, [toggleSkill]);
 
   const handleContinue = async () => {
     if (!canContinue || busy) return;
@@ -382,144 +285,28 @@ export default function SkillsScreen() {
             
                         {/* Skills organized by tier */}
             {(() => {
-              // Group skills by tier
-              const tierGroups = {};
-              skillsData.forEach(skill => {
-                const tierName = skill.tier || 'TIER_1_CORE_SURVIVAL';
-                if (!tierGroups[tierName]) {
-                  tierGroups[tierName] = [];
-                }
-                // Create a proper copy of the skill object to prevent modification
-                tierGroups[tierName].push({
-                  ...skill,
-                  id: skill.id,
-                  name: skill.name,
-                  category: skill.category,
-                  tier: skill.tier
-                });
-              });
-
-              // Define tier display names and icons
               const tierConfig = {
-                'TIER_1_CORE_SURVIVAL': {
-                  name: 'Core Survival Skills',
-                  icon: '🛡️',
-                  color: '#3B82F6'
-                },
-                'TIER_2_PROGRESSION': {
-                  name: 'Progression Enabler Skills',
-                  icon: '🚀',
-                  color: '#1D4ED8'
-                },
-                'TIER_3_EXECUTIVE': {
-                  name: 'Executive & Strategic Multipliers',
-                  icon: '👑',
-                  color: '#1E3A8A'
-                }
-              };
-
-              // Sort tiers in order
-              const tierOrder = ['TIER_1_CORE_SURVIVAL', 'TIER_2_PROGRESSION', 'TIER_3_EXECUTIVE'];
-              
-              return tierOrder.map(tierKey => {
-                const tierSkills = tierGroups[tierKey];
+                'TIER_1_CORE_SURVIVAL': { name: 'Core Survival Skills', icon: '🛡️', color: '#3B82F6' },
+                'TIER_2_PROGRESSION': { name: 'Progression Enabler Skills', icon: '🚀', color: '#1D4ED8' },
+                'TIER_3_EXECUTIVE': { name: 'Executive & Strategic Multipliers', icon: '👑', color: '#1E3A8A' }
+              } as const;
+              const tierOrder = ['TIER_1_CORE_SURVIVAL', 'TIER_2_PROGRESSION', 'TIER_3_EXECUTIVE'] as const;
+              return tierOrder.map((tierKey) => {
+                const tierSkills = skillsByTier[tierKey as keyof typeof skillsByTier];
                 if (!tierSkills || tierSkills.length === 0) return null;
-                
                 const config = tierConfig[tierKey];
-                
-            return (
-                  <View key={tierKey} style={{ marginBottom: 32 }}>
-                    {/* Tier Header */}
-                    <MotiView from={{ opacity: 0, translateY: 8 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: "timing", duration: 420, delay: 100 }}>
-                      <View style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        marginBottom: 16,
-                        paddingHorizontal: 20
-                      }}>
-                        <Text style={{ fontSize: 24, marginRight: 12 }}>
-                          {config.icon}
-                        </Text>
-                        <Text style={{ 
-                          fontSize: 18, 
-                          fontWeight: "700", 
-                          color: "#111827"
-                        }}>
-                          {config.name}
-                        </Text>
-                      </View>
-                    </MotiView>
-                    
-                    {/* Skills under this tier */}
-                    <View style={{ paddingHorizontal: 20 }}>
-                      {tierSkills.map((skill, index) => {
-                        const isSelected = selected.includes(skill.id);
-                        
-                        const cardStyle = {
-                          backgroundColor: "#ffffff",
-                          padding: 16,
-                          paddingHorizontal: 14,
-                          borderRadius: 16,
-                          borderWidth: isSelected ? 2 : 1,
-                          borderColor: isSelected ? BRAND : "#E5E7EB",
-                          marginBottom: 12,
-                          shadowColor: "#000",
-                          shadowOpacity: 0.06,
-                          shadowRadius: 8,
-                          elevation: 2
-                        };
-                        
-                        const textStyle = {
-                          color: "#0f172a",
-                          fontSize: 15,
-                          fontWeight: "900"
-                        };
-                        
-                        const categoryStyle = {
-                          color: "#64748b",
-                          fontSize: 14,
-                          marginTop: 4
-                        };
-                        
-                        return (
-                          <MotiView key={skill.id} from={{ opacity: 0, translateY: 8 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: "timing", duration: 350, delay: index * 60 }} style={{ marginBottom: 12 }}>
-                            <Pressable
-                              onPress={() => toggleSkill(skill.id)}
-                              style={({ pressed }) => ({
-                                width: '100%',
-                                paddingVertical: 16,
-                                paddingHorizontal: 14,
-                                borderRadius: 16,
-                                backgroundColor: "#ffffff",
-                                borderWidth: isSelected ? 2 : 1,
-                                borderColor: isSelected ? BRAND : "#E5E7EB",
-                                shadowColor: "#000",
-                                shadowOpacity: pressed ? 0.12 : 0.06,
-                                shadowRadius: pressed ? 12 : 8,
-                                transform: [{ scale: pressed ? 0.98 : 1 }],
-                              })}
-                            >
-                              {isSelected ? (
-                                <LinearGradient colors={["#E6F2FF", "#ffffff"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: "absolute", inset: 0, borderRadius: 16 }} />
-                              ) : null}
-                              <View style={{ flexDirection: "row", alignItems: "center" }}>
-                                <View style={{ flex: 1 }}>
-                                  <Text style={{ color: "#0f172a", fontSize: 15, fontWeight: "900" }}>
-                                    {skill.name || 'Unknown Skill'}
-                                  </Text>
-                                  <Text style={{ color: "#64748b", marginTop: 4 }}>
-                                    {skill.category ? skill.category.replace(/_/g, ' ') : 'Personal Effectiveness'}
-                                  </Text>
-                                </View>
-                                {isSelected ? <AntDesign name="checkcircle" size={22} color="#16A34A" /> : null}
-                              </View>
-                            </Pressable>
-                          </MotiView>
-                        );
-                      })}
-                    </View>
-                  </View>
-                    );
+                return (
+                  <TierSection
+                    key={tierKey}
+                    tierKey={tierKey}
+                    title={config.name}
+                    icon={config.icon}
+                    skills={tierSkills}
+                    selectedIds={selected}
+                    onToggle={handleToggleSkill}
+                    brand={BRAND}
+                  />
+                );
               });
             })()}
         
@@ -539,6 +326,8 @@ export default function SkillsScreen() {
             }}>
               {isAddToAssessmentMode 
                 ? `${selected.length} skill${selected.length !== 1 ? 's' : ''} will be added`
+                : isFromCompleted
+                ? `${selected.length} skill${selected.length !== 1 ? 's' : ''} for new assessment`
                 : `${selected.length} of ${skillsData.length} skills selected`
               }
             </Text>
@@ -547,7 +336,8 @@ export default function SkillsScreen() {
                   color: "#6B7280", 
                   fontSize: 14
                 }}>
-                  {isAddToAssessmentMode ? "Ready to add to assessment" : "Ready to continue"}
+                  {isAddToAssessmentMode ? "Ready to add to assessment" : 
+                   isFromCompleted ? "Ready to start new assessment" : "Ready to continue"}
                 </Text>
               </View>
             )}
@@ -586,18 +376,13 @@ export default function SkillsScreen() {
               style={{ borderRadius: 28, backgroundColor: BRAND, opacity: canContinue ? 1 : 0.7, shadowColor: BRAND, shadowOpacity: 0.35, shadowRadius: 14 }}
               labelStyle={{ fontWeight: "800", letterSpacing: 0.3 }}
             >
-              {busy ? 
-                (isAddToAssessmentMode ? "Adding Skills..." : 
-                 isAssessmentMode ? "Starting Assessment..." : "Saving...") :
-                selected.length > 0 ?
-                  (isAddToAssessmentMode ?
-                    `Add ${selected.length} Skill${selected.length !== 1 ? 's' : ''} to Assessment` :
-                   isAssessmentMode ?
-                    `Start Assessment (${selected.length} skill${selected.length !== 1 ? 's' : ''})` :
-                    `Continue with ${selected.length} Skill${selected.length !== 1 ? 's' : ''}`
-                  ) :
-                  (isAddToAssessmentMode ? "Select skills to add" :
-                   isAssessmentMode ? "Select skills to assess" : "Select at least one skill")}
+              {getSkillsCtaLabel({
+                busy,
+                isAddToAssessmentMode,
+                isAssessmentMode,
+                isFromCompleted,
+                selectedCount: selected.length,
+              })}
             </Button>
           </View>
         </View>

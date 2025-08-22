@@ -18,13 +18,13 @@ const logoSrc = require("../../assets/images/logo.png");
 type CareerStage = "ENTRY_LEVEL" | "MID_LEVEL" | "EXPERIENCED";
 type RoleType = "INDIVIDUAL_CONTRIBUTOR" | "TEAM_LEADER_MANAGER" | "SENIOR_LEADER_EXECUTIVE";
 
-const careerOptions: Array<{ key: CareerStage; label: string; sub?: string; emoji: string }> = [
+const careerOptions: { key: CareerStage; label: string; sub?: string; emoji: string }[] = [
   { key: "ENTRY_LEVEL", label: "Entry-Level (0-3 Years)", sub: "Starting out, learning and growing", emoji: "🌱" },
   { key: "MID_LEVEL", label: "Mid-Level (4-10 Years)", sub: "Building expertise and impact", emoji: "🚀" },
   { key: "EXPERIENCED", label: "Experienced (11+ Years)", sub: "Leading with depth and vision", emoji: "🏆" },
 ];
 
-const roleOptions: Array<{ key: RoleType; label: string; sub?: string; emoji: string }> = [
+const roleOptions: { key: RoleType; label: string; sub?: string; emoji: string }[] = [
   { key: "INDIVIDUAL_CONTRIBUTOR", label: "Individual Contributor", sub: "Hands-on, craft-focused", emoji: "🎯" },
   { key: "TEAM_LEADER_MANAGER", label: "Team Leader / Manager", sub: "Leads people and delivery", emoji: "🧑‍🤝‍🧑" },
   { key: "SENIOR_LEADER_EXECUTIVE", label: "Senior Leader / Executive", sub: "Owns strategy and outcomes", emoji: "👑" },

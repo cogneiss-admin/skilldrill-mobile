@@ -5,7 +5,7 @@ import ToastNotification from './ToastNotification';
 import { useResponsive } from '../utils/responsive';
 
 interface ToastContainerProps {
-  toasts: Array<{
+  toasts: {
     id: string;
     type: 'success' | 'error' | 'warning' | 'info';
     title?: string;
@@ -15,7 +15,7 @@ interface ToastContainerProps {
     actionText?: string;
     showIcon?: boolean;
     position?: 'top' | 'bottom';
-  }>;
+  }[];
   onDismiss: (id: string) => void;
 }
 

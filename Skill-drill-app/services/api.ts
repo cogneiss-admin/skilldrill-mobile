@@ -2,31 +2,32 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+import SessionManager from '../utils/sessionManager';
 
 // Environment variables with platform detection
 const getApiBaseUrl = () => {
-  // Force use of the correct IP address for development
-  if (__DEV__) {
-    return 'http://192.168.1.40:3000/api';
-  }
-  
-  // If environment variable is set, use it
+  // Use environment variable first, then fallback to localhost
   if (Constants.expoConfig?.extra?.API_BASE_URL) {
     return Constants.expoConfig.extra.API_BASE_URL;
   }
   
-  // Otherwise, use platform-specific defaults
+  // Fallback for development
+  if (__DEV__) {
+    return 'http://localhost:3000/api';
+  }
+  
+  // Platform-specific fallbacks
   if (Platform.OS === 'android') {
-    return 'http://192.168.1.40:3000/api'; // Use your actual IP for Android
+    return 'http://localhost:3000/api';
   } else if (Platform.OS === 'ios') {
-    return 'http://192.168.1.40:3000/api'; // Use your actual IP for iOS
+    return 'http://localhost:3000/api';
   } else {
-    return 'http://192.168.1.40:3000/api'; // Use your actual IP for other platforms
+    return 'http://localhost:3000/api';
   }
 };
 
 const API_BASE_URL = getApiBaseUrl();
-const API_TIMEOUT = Constants.expoConfig?.extra?.API_TIMEOUT || 30000; // Increased timeout for assessment creation
+const API_TIMEOUT = Constants.expoConfig?.extra?.API_TIMEOUT || 60000; // Increased timeout for assessment creation (60 seconds)
 const ACCESS_TOKEN_KEY = Constants.expoConfig?.extra?.ACCESS_TOKEN_KEY || 'skilldrill_access_token';
 const REFRESH_TOKEN_KEY = Constants.expoConfig?.extra?.REFRESH_TOKEN_KEY || 'skilldrill_refresh_token';
 
@@ -83,10 +84,10 @@ export class ApiError extends Error {
 class ApiService {
   private api: AxiosInstance;
   private isRefreshing = false;
-  private failedQueue: Array<{
+  private failedQueue: {
     resolve: (value?: any) => void;
     reject: (error?: any) => void;
-  }> = [];
+  }[] = [];
 
   constructor() {
     console.log('🚀 Initializing API Service with baseURL:', API_BASE_URL);
@@ -188,6 +189,10 @@ class ApiService {
           } catch (refreshError) {
             this.processQueue(refreshError, null);
             await this.clearTokens();
+            
+            // Handle session expiration
+            await SessionManager.handleTokenRefreshFailure();
+            
             throw refreshError;
           } finally {
             this.isRefreshing = false;
@@ -315,6 +320,17 @@ class ApiService {
     if (error.response) {
       const { status, data } = error.response;
       
+      // Handle 401 Unauthorized errors
+      if (status === 401) {
+        // Don't handle session expiration for login/signup endpoints
+        const url = error.config?.url || '';
+        const isAuthEndpoint = url.includes('/login') || url.includes('/signup') || url.includes('/otp');
+        
+        if (!isAuthEndpoint) {
+          SessionManager.handleUnauthorized();
+        }
+      }
+      
       // Handle specific error codes
       let message = data?.message || 'An error occurred';
       
@@ -345,6 +361,18 @@ class ApiService {
           break;
         case 'INVALID_REFRESH_TOKEN':
           message = 'Session expired. Please login again.';
+          // Handle session expiration
+          SessionManager.handleTokenRefreshFailure();
+          break;
+        case 'INVALID_TOKEN':
+          message = 'Invalid session token. Please login again.';
+          // Handle invalid token
+          SessionManager.handleInvalidToken();
+          break;
+        case 'UNAUTHORIZED':
+          message = 'Unauthorized access. Please login again.';
+          // Handle unauthorized access
+          SessionManager.handleUnauthorized();
           break;
       }
       
@@ -378,4 +406,5 @@ class ApiService {
 // Create and export singleton instance
 export const apiService = new ApiService();
 export default apiService;
+
 

@@ -12,14 +12,14 @@ import LinkedInIcon from "../../components/LinkedInIcon";
 import { StatusBar } from "expo-status-bar";
 import { useToast } from "../../hooks/useToast";
 import { parseApiError, formatErrorMessage } from "../../utils/errorHandler";
+import { detectInputType, isValidEmail, isValidPhone, validationMessageFor } from "../../components/validators";
+import { useSocialAuth } from "../../hooks/useSocialAuth";
+import { useResponsive } from "../../utils/responsive";
 
 const logoSrc = require("../../assets/images/logo.png");
 
 const BRAND = "#0A66C2";
 const COUNTRY_CODE = "+91";
-import { detectInputType, isValidEmail, isValidPhone, validationMessageFor } from "../../components/validators";
-import { useSocialAuth } from "../../hooks/useSocialAuth";
-import { useResponsive } from "../../utils/responsive";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -229,7 +229,7 @@ export default function LoginScreen() {
             color: "#1a1a1a",
             marginBottom: responsive.spacing(8),
           }}>
-            Welcome Back!
+            Sign In
           </Text>
           <Text style={{
             fontSize: responsive.typography.body1,

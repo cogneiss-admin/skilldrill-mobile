@@ -4,9 +4,7 @@ import { View, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
-import { useAuth } from "../hooks/useAuth";
 import { apiService } from "../services/api";
-import { useToast } from "../hooks/useToast";
 import { MotiView } from "moti";
 import { AntDesign } from '@expo/vector-icons';
 
@@ -14,8 +12,6 @@ const BRAND = "#0A66C2";
 
 export default function SessionLoadingScreen() {
   const router = useRouter();
-  const { user } = useAuth();
-  const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("Checking your session...");
 
@@ -177,7 +173,7 @@ export default function SessionLoadingScreen() {
             textAlign: 'center',
             marginBottom: 12
           }}>
-            Welcome back, {user?.name || 'User'}!
+            Loading...
           </Text>
           
           <Text style={{

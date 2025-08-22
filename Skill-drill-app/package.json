@@ -3,6 +3,8 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
+    "lint:unused": "ts-prune -p tsconfig.json | grep -v 'index' || true",
+    "lint:imports": "eslint --ext .ts,.tsx --rule 'no-unused-vars: error' --rule 'no-unused-expressions: off' --rule 'no-console: off' . | cat",
     "start": "expo start --port 3001",
     "android": "expo start --android --port 3001",
     "ios": "expo start --ios --port 3001",

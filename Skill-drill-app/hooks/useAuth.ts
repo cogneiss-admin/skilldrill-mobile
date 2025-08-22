@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { User } from '../services/api';
 import authService from '../services/authService';
+import SessionManager from '../utils/sessionManager';
 
 export interface AuthState {
   isAuthenticated: boolean;
@@ -66,8 +67,8 @@ export const useAuth = () => {
           });
           return;
         } else {
-          // Token is invalid, clear auth data
-          await authService.clearAuthData();
+          // Token is invalid, handle session expiration
+          await SessionManager.handleInvalidToken();
           if (!isMountedRef.current) return;
           
           setAuthState({
@@ -96,6 +97,12 @@ export const useAuth = () => {
       if (error.name === 'AbortError') return;
       
       console.error('🔐 useAuth: Error during auth check:', error);
+      
+      // Check if it's an authentication error that should trigger session expiration
+      if (error.status === 401 || error.code === 'INVALID_TOKEN' || error.code === 'INVALID_REFRESH_TOKEN') {
+        await SessionManager.handleInvalidToken();
+      }
+      
       setAuthState({
         isAuthenticated: false,
         user: null,

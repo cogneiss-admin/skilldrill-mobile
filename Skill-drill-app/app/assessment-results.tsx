@@ -3,16 +3,14 @@ import React, { useState, useEffect } from "react";
 import { View, Text, ScrollView, Image, BackHandler } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { Button, Surface, Card, ProgressBar } from "react-native-paper";
+import { Button, Surface } from "react-native-paper";
 import { LinearGradient } from "expo-linear-gradient";
 import { MotiView } from "moti";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { useResponsive } from "../utils/responsive";
-import { useAuth } from "../hooks/useAuth";
 import { apiService } from "../services/api";
-import { useToast } from "../hooks/useToast";
-import Constants from "expo-constants";
 import { AntDesign } from '@expo/vector-icons';
+import HeroHeader from "./components/HeroHeader";
+import StickyFooterButton from "./components/StickyFooterButton";
 
 const BRAND = "#0A66C2";
 const APP_NAME = "Skill Drill";
@@ -21,9 +19,6 @@ const logoSrc = require("../assets/images/logo.png");
 export default function AssessmentResultsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const responsive = useResponsive();
-  const { user } = useAuth();
-  const { showToast } = useToast();
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -208,20 +203,12 @@ export default function AssessmentResultsScreen() {
           </View>
         )}
 
-        {/* Hero header */}
-        <View style={{ minHeight: 200, position: "relative" }}>
-          <LinearGradient colors={["#0A66C2", "#0E75D1", "#1285E0"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: "absolute", inset: 0 }} />
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "flex-start", paddingHorizontal: 18, paddingTop: 10 }}>
-            <Image source={logoSrc} style={{ width: 56, height: 56, shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 10 }} resizeMode="contain" />
-            <Text style={{ marginLeft: 12, color: "#ffffff", fontSize: 22, fontWeight: "900", letterSpacing: 0.8, textShadowColor: 'rgba(0,0,0,0.35)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6 }}>{APP_NAME}</Text>
-          </View>
-          <View style={{ flex: 1, justifyContent: "center", paddingHorizontal: 18, paddingBottom: 20 }}>
-            <MotiView from={{ opacity: 0, translateY: 6 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: "timing", duration: 480 }}>
-              <Text style={{ fontSize: 24, fontWeight: "900", color: "#ffffff" }}>Assessment Complete!</Text>
-              <Text style={{ marginTop: 8, color: "#E6F2FF", fontSize: 15 }}>🎉 {results.skillName} Results</Text>
-            </MotiView>
-          </View>
-        </View>
+        <HeroHeader
+          brand={BRAND}
+          appName={APP_NAME}
+          title="Assessment Complete!"
+          subtitle={`🎉 ${results.skillName} Results`}
+        />
 
         {/* Content card */}
         <View style={{ flex: 1, marginTop: -24 }}>
@@ -448,44 +435,11 @@ export default function AssessmentResultsScreen() {
 
             </ScrollView>
 
-            {/* Sticky footer CTA */}
-            <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 18, paddingTop: 12, paddingBottom: 34, zIndex: 1000, backgroundColor: "#ffffff" }}>
-              <LinearGradient colors={["#0A66C2", "#0E75D1", "#1285E0"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: "absolute", inset: 0, opacity: 0.1 }} />
-              <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
-                <Button
-                  mode="outlined"
-                  onPress={handleBackToAssessment}
-                  style={{
-                    flex: 1,
-                    borderRadius: 12,
-                    borderColor: BRAND,
-                    borderWidth: 2
-                  }}
-                  contentStyle={{ height: 48 }}
-                  labelStyle={{ color: BRAND, fontWeight: "600" }}
-                >
-                  Back to Assessment
-                </Button>
-
-                <Button
-                  mode="contained"
-                  onPress={handleBackToDashboard}
-                  style={{
-                    flex: 1,
-                    backgroundColor: BRAND,
-                    borderRadius: 12,
-                    shadowColor: BRAND,
-                    shadowOpacity: 0.3,
-                    shadowRadius: 8,
-                    elevation: 4
-                  }}
-                  contentStyle={{ height: 48 }}
-                  labelStyle={{ color: "#ffffff", fontWeight: "600" }}
-                >
-                  Dashboard
-                </Button>
-              </View>
-            </View>
+            <StickyFooterButton
+              brand={BRAND}
+              label="Back to Dashboard"
+              onPress={handleBackToDashboard}
+            />
           </View>
         </View>
       </SafeAreaView>

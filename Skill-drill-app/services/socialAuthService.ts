@@ -2,9 +2,8 @@ import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import * as Crypto from 'expo-crypto';
 import { Platform } from 'react-native';
-import authService from './authService';
+import authService, { AuthSuccessResponse } from './authService';
 import { ApiResponse } from './api';
-import { AuthSuccessResponse } from './authService';
 
 // Complete the auth session
 WebBrowser.maybeCompleteAuthSession();

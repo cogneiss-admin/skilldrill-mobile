@@ -1,5 +1,6 @@
 import apiService, { ApiResponse, AuthTokens, User, ApiError } from './api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import SessionManager from '../utils/sessionManager';
 
 // Types for auth requests
 export interface PhoneSignupRequest {
@@ -154,11 +155,7 @@ class AuthService {
 
   public async clearAuthData(): Promise<void> {
     try {
-      await AsyncStorage.multiRemove([
-        'skilldrill_access_token',
-        'skilldrill_refresh_token',
-        this.USER_DATA_KEY
-      ]);
+      await SessionManager.clearAuthData();
     } catch (error) {
       console.error('Error clearing auth data:', error);
     }
@@ -360,10 +357,18 @@ class AuthService {
       if (response.success && response.data) {
         return { isValid: true, user: response.data };
       } else {
+        // Token is invalid, handle session expiration
+        await SessionManager.handleInvalidToken();
         return { isValid: false, user: null };
       }
     } catch (error) {
       console.error('Token validation error:', error);
+      
+      // Check if it's an authentication error
+      if (error instanceof ApiError && (error.status === 401 || error.code === 'INVALID_TOKEN')) {
+        await SessionManager.handleInvalidToken();
+      }
+      
       return { isValid: false, user: null };
     }
   }

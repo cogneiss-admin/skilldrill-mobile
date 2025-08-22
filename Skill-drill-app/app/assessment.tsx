@@ -1,18 +1,16 @@
 // @ts-nocheck
 import React, { useState, useEffect } from "react";
-import { View, Text, ScrollView, TextInput, Alert, Modal, Pressable, Image, BackHandler } from "react-native";
+import { View, Text, ScrollView, TextInput, Alert, Modal, Image, BackHandler } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { Button, Surface, ProgressBar, Portal, Dialog, Chip, Badge } from "react-native-paper";
+import { Button, Surface, Portal } from "react-native-paper";
 import { LinearGradient } from "expo-linear-gradient";
 import { MotiView } from "moti";
 import * as Haptics from "expo-haptics";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { useResponsive } from "../utils/responsive";
 import { useAuth } from "../hooks/useAuth";
 import { apiService } from "../services/api";
 import { useToast } from "../hooks/useToast";
-import Constants from "expo-constants";
 import { AntDesign } from '@expo/vector-icons';
 
 const BRAND = "#0A66C2";
@@ -258,8 +256,7 @@ export default function AssessmentScreen() {
               setCurrentAssessment(currentAssessmentResponse.data.assessment);
               setCurrentView('scenario');
               
-              // Show resume message
-              showToast('info', 'Session Resumed', 'Welcome back! Your assessment has been resumed.');
+              // Session resumed silently
             } else if (currentAssessmentResponse.success && currentAssessmentResponse.data.completed) {
               console.log('✅ All assessments completed');
               setError('All assessments have been completed. Great job!');
@@ -348,8 +345,7 @@ export default function AssessmentScreen() {
             setCurrentAssessment(resumeResponse.data.currentAssessment);
             setCurrentView('scenario');
             
-            // Show resume message
-            showToast('info', 'Session Resumed', 'Welcome back! Your assessment has been resumed.');
+            // Session resumed silently
             return;
           }
         } else {
@@ -576,8 +572,8 @@ export default function AssessmentScreen() {
         console.error('❌ Backend connection test failed:', testError);
       }
       
-      // Submit responses to backend
-      const response = await apiService.post('/assessment/response/bulk', requestData);
+      // Submit responses to backend with extended timeout
+      const response = await apiService.post('/assessment/response/bulk', requestData, { timeout: 60000 });
 
       if (response.success) {
         console.log('✅ Skill assessment completed:', response.data);

@@ -8,14 +8,18 @@ import {
   Image,
   StatusBar,
   SafeAreaView,
-  AppState
-} from 'react-native';
+  AppState,
+  RefreshControl
+, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
 import { apiService } from '../services/api';
-import { Alert } from 'react-native';
-// Define constants inline like other files
+import { MotiView } from 'moti';
+import { LinearGradient } from 'expo-linear-gradient';
+import { AntDesign, MaterialIcons, Ionicons } from '@expo/vector-icons';
+
+// Define constants
 const BRAND = "#0A66C2";
 const BRAND_LIGHT = "#E6F2FF";
 const WHITE = "#FFFFFF";
@@ -25,9 +29,6 @@ const SUCCESS = "#22C55E";
 const WARNING = "#F59E0B";
 const ERROR = "#EF4444";
 const APP_NAME = "Skill Drill";
-import { MotiView } from 'moti';
-import { LinearGradient } from 'expo-linear-gradient';
-import { AntDesign } from '@expo/vector-icons';
 
 // Import logo
 const logoSrc = require('../assets/images/logo.png');
@@ -41,7 +42,8 @@ interface UserSkill {
     icon?: string;
   };
   assessment_status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
-  progress_percentage?: number;
+  current_score?: number;
+  last_assessed_at?: string;
 }
 
 interface AssessmentSession {
@@ -55,7 +57,17 @@ interface AssessmentSession {
   };
 }
 
-export default function Dashboard() {
+interface DashboardStats {
+  totalSkills: number;
+  completedSkills: number;
+  inProgressSkills: number;
+  notStartedSkills: number;
+  completionRate: number;
+  averageScore: number;
+  totalAssessments: number;
+}
+
+export default function DashboardImproved() {
   const router = useRouter();
   const { user, isLoading: authLoading, logout } = useAuth();
   const { showToast } = useToast();
@@ -64,7 +76,7 @@ export default function Dashboard() {
   const [activeSession, setActiveSession] = useState<AssessmentSession | null>(null);
   const [loadingSkills, setLoadingSkills] = useState(true);
   const [loadingSession, setLoadingSession] = useState(true);
-
+  const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'home' | 'profile'>('home');
 
   // Get greeting based on time
@@ -75,22 +87,54 @@ export default function Dashboard() {
     return 'Good evening';
   };
 
-  // Calculate stats
-  const stats = useMemo(() => {
+  // Check if assessment is completed (session or skills)
+  const isAssessmentCompleted = () => {
+    // Check if all user skills are completed (regardless of session status)
+    const allSkillsCompleted = userSkills.length > 0 && 
+                              userSkills.every(skill => skill.assessment_status === 'COMPLETED');
+    
+    // If no active session, only check skills completion
+    if (!activeSession) {
+      return allSkillsCompleted;
+    }
+    
+    // If active session exists, check both session and skills completion
+    const sessionCompleted = activeSession.completed || 
+                           (activeSession.progress && activeSession.progress.status === 'COMPLETED');
+    
+    return sessionCompleted || allSkillsCompleted;
+  };
+
+
+
+  // Calculate enhanced stats
+  const stats = useMemo((): DashboardStats => {
     const totalSkills = userSkills.length;
     const completedSkills = userSkills.filter(skill => skill.assessment_status === 'COMPLETED').length;
     const inProgressSkills = userSkills.filter(skill => skill.assessment_status === 'IN_PROGRESS').length;
+    const notStartedSkills = userSkills.filter(skill => skill.assessment_status === 'NOT_STARTED').length;
     const completionRate = totalSkills > 0 ? Math.round((completedSkills / totalSkills) * 100) : 0;
+    
+    // Calculate average score from completed skills
+    const completedSkillsWithScores = userSkills.filter(skill => 
+      skill.assessment_status === 'COMPLETED' && skill.current_score !== null && skill.current_score !== undefined
+    );
+    const averageScore = completedSkillsWithScores.length > 0 
+      ? completedSkillsWithScores.reduce((sum, skill) => sum + (skill.current_score || 0), 0) / completedSkillsWithScores.length
+      : 0;
     
     return {
       totalSkills,
       completedSkills,
       inProgressSkills,
-      completionRate
+      notStartedSkills,
+      completionRate,
+      averageScore: Math.round(averageScore * 10) / 10, // Round to 1 decimal
+      totalAssessments: completedSkills + inProgressSkills
     };
   }, [userSkills]);
 
-  // Load user skills
+  // Load user skills with better error handling
   const loadUserSkills = async () => {
     try {
       console.log('🔍 Dashboard: Loading user skills...');
@@ -98,6 +142,10 @@ export default function Dashboard() {
       
       if (response.success) {
         console.log('✅ Dashboard: User skills loaded:', response.data.length);
+        // Log each skill's status for debugging
+        response.data.forEach((skill: UserSkill) => {
+          console.log(`📊 Skill: ${skill.skill.skill_name} - Status: ${skill.assessment_status} - Score: ${skill.current_score}`);
+        });
         setUserSkills(response.data);
       } else {
         console.log('ℹ️ Dashboard: No skills found or error:', response.message);
@@ -117,10 +165,12 @@ export default function Dashboard() {
       console.log('🔍 Dashboard: Loading active session...');
       const response = await apiService.get('/assessment/session/status');
       
-      console.log('📊 Session response:', response);
-      
       if (response.success && response.data && response.data.hasActiveSession) {
-        console.log('✅ Dashboard: Active session found:', response.data.sessionId);
+        console.log('✅ Dashboard: Active session found:', response.data);
+        console.log('📊 Session ID:', response.data.sessionId);
+        console.log('📊 Session data structure:', Object.keys(response.data));
+        console.log('📊 Completed field:', response.data.completed);
+        console.log('📊 Progress status:', response.data.progress?.status);
         setActiveSession(response.data);
       } else {
         console.log('ℹ️ Dashboard: No active session found');
@@ -134,22 +184,27 @@ export default function Dashboard() {
     }
   };
 
-
+  // Refresh data
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([loadUserSkills(), loadActiveSession()]);
+    setRefreshing(false);
+  };
 
   // Handle start assessment
   const handleStartAssessment = async () => {
     try {
-      console.log('🚀 Dashboard: Starting assessment...');
-      
       if (userSkills.length === 0) {
         showToast('error', 'No Skills Selected', 'Please select skills first');
         router.push('/auth/skills');
         return;
       }
 
-      // Check if we have an active session
-      if (activeSession) {
-        console.log('📋 Dashboard: Resuming existing session');
+      const completed = isAssessmentCompleted();
+      
+      if (activeSession && activeSession.sessionId && !completed) {
+        // Resume existing assessment session (only if not completed)
+        console.log('🔄 Resuming existing session:', activeSession.sessionId);
         router.push({
           pathname: '/assessment',
           params: { 
@@ -157,13 +212,18 @@ export default function Dashboard() {
             resume: 'true'
           }
         });
-      } else {
-        console.log('🆕 Dashboard: Creating new assessment session');
-        // Navigate to skills selection with assessment mode
+      } else if (completed) {
+        // Assessment completed - user has used their free assessments
+        console.log('📊 Assessment completed - redirecting to add more skills');
+        showToast('info', 'Free Assessments Used', 'You have completed your free assessments. Add more skills to continue.');
         router.push({
           pathname: '/auth/skills',
-          params: { mode: 'assessment' }
+          params: { mode: 'assessment', fromCompleted: 'true' }
         });
+      } else {
+        // Start new assessment - go to assessment intro
+        console.log('🆕 Starting new assessment session');
+        router.push('/assessment-intro');
       }
     } catch (error) {
       console.error('❌ Dashboard: Error starting assessment:', error);
@@ -173,21 +233,21 @@ export default function Dashboard() {
 
   // Handle add more skills
   const handleAddMoreSkills = () => {
-    router.push({
-      pathname: '/auth/skills',
-      params: { mode: 'add-to-assessment' }
-    });
-  };
-
-  // Handle resume assessment
-  const handleResumeAssessment = () => {
-    if (activeSession) {
+    const completed = isAssessmentCompleted();
+    
+    if (completed) {
+      // If assessment is completed, add skills for new assessment
+      console.log('📊 Assessment completed - adding skills for new assessment');
       router.push({
-        pathname: '/assessment',
-        params: { 
-          sessionId: activeSession.sessionId,
-          resume: 'true'
-        }
+        pathname: '/auth/skills',
+        params: { mode: 'assessment', fromCompleted: 'true' }
+      });
+    } else {
+      // If assessment is in progress, add skills to existing session
+      console.log('📊 Assessment in progress - adding skills to existing session');
+      router.push({
+        pathname: '/auth/skills',
+        params: { mode: 'add-to-assessment' }
       });
     }
   };
@@ -195,7 +255,6 @@ export default function Dashboard() {
   // Get user initials
   const getUserInitials = () => {
     if (!user?.name) return 'U';
-    
     const nameParts = user.name.trim().split(' ');
     if (nameParts.length >= 2) {
       return (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase();
@@ -211,10 +270,7 @@ export default function Dashboard() {
       'Logout',
       'Are you sure you want to logout?',
       [
-        {
-          text: 'Cancel',
-          style: 'cancel'
-        },
+        { text: 'Cancel', style: 'cancel' },
         {
           text: 'Logout',
           style: 'destructive',
@@ -286,8 +342,11 @@ export default function Dashboard() {
       style={{ flex: 1, backgroundColor: '#F8FAFC' }}
       contentContainerStyle={{ paddingBottom: 100, paddingTop: 10 }}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
     >
-      {/* Header */}
+      {/* Enhanced Header */}
       <LinearGradient
         colors={[BRAND, '#1E40AF', '#3B82F6']}
         style={{
@@ -332,7 +391,7 @@ export default function Dashboard() {
           </TouchableOpacity>
         </View>
 
-        {/* Greeting Section */}
+        {/* Enhanced Greeting Section */}
         <View style={{ marginTop: 25 }}>
           <Text style={{
             color: WHITE,
@@ -360,12 +419,10 @@ export default function Dashboard() {
         </View>
       </LinearGradient>
 
-
-
-      {/* Beautiful Cards Section */}
+      {/* Enhanced Cards Section */}
       <View style={{ paddingHorizontal: 20, marginTop: 30 }}>
         
-        {/* Progress Card */}
+        {/* Enhanced Progress Card */}
         <View style={{
           backgroundColor: WHITE,
           borderRadius: 16,
@@ -389,7 +446,7 @@ export default function Dashboard() {
               alignItems: 'center',
               marginRight: 12
             }}>
-              <AntDesign name="barschart" size={24} color={SUCCESS} />
+              <MaterialIcons name="trending-up" size={24} color={SUCCESS} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{
@@ -409,7 +466,7 @@ export default function Dashboard() {
             </View>
           </View>
           
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
             <View style={{ alignItems: 'center', flex: 1 }}>
               <Text style={{
                 fontSize: 28,
@@ -424,7 +481,7 @@ export default function Dashboard() {
                 marginTop: 4,
                 fontWeight: '600'
               }}>
-                Skills
+                Total Skills
               </Text>
             </View>
             <View style={{ alignItems: 'center', flex: 1 }}>
@@ -462,9 +519,101 @@ export default function Dashboard() {
               </Text>
             </View>
           </View>
+
+          {/* Progress Breakdown */}
+          <View style={{ 
+            backgroundColor: '#F8FAFC', 
+            borderRadius: 12, 
+            padding: 16,
+            borderWidth: 1,
+            borderColor: '#E2E8F0'
+          }}>
+            <Text style={{
+              fontSize: 14,
+              fontWeight: '600',
+              color: DARK_GRAY,
+              marginBottom: 12
+            }}>
+              Progress Breakdown
+            </Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{
+                  width: 12,
+                  height: 12,
+                  borderRadius: 6,
+                  backgroundColor: SUCCESS,
+                  marginRight: 8
+                }} />
+                <Text style={{ fontSize: 12, color: DARK_GRAY }}>Completed</Text>
+              </View>
+              <Text style={{ fontSize: 12, fontWeight: '600', color: SUCCESS }}>
+                {stats.completedSkills}
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{
+                  width: 12,
+                  height: 12,
+                  borderRadius: 6,
+                  backgroundColor: WARNING,
+                  marginRight: 8
+                }} />
+                <Text style={{ fontSize: 12, color: DARK_GRAY }}>In Progress</Text>
+              </View>
+              <Text style={{ fontSize: 12, fontWeight: '600', color: WARNING }}>
+                {stats.inProgressSkills}
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{
+                  width: 12,
+                  height: 12,
+                  borderRadius: 6,
+                  backgroundColor: GRAY,
+                  marginRight: 8
+                }} />
+                <Text style={{ fontSize: 12, color: DARK_GRAY }}>Not Started</Text>
+              </View>
+              <Text style={{ fontSize: 12, fontWeight: '600', color: GRAY }}>
+                {stats.notStartedSkills}
+              </Text>
+            </View>
+          </View>
+
+          {/* Average Score Display */}
+          {stats.averageScore > 0 && (
+            <View style={{ 
+              marginTop: 16,
+              backgroundColor: '#F0F9FF', 
+              borderRadius: 12, 
+              padding: 16,
+              borderWidth: 1,
+              borderColor: '#BAE6FD'
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={{
+                  fontSize: 14,
+                  fontWeight: '600',
+                  color: '#0369A1'
+                }}>
+                  Average Score
+                </Text>
+                <Text style={{
+                  fontSize: 20,
+                  fontWeight: '700',
+                  color: '#0369A1'
+                }}>
+                  {stats.averageScore}/10
+                </Text>
+              </View>
+            </View>
+          )}
         </View>
 
-        {/* Quick Actions Card */}
+        {/* Enhanced Quick Actions Card */}
         <View style={{
           backgroundColor: WHITE,
           borderRadius: 16,
@@ -488,7 +637,7 @@ export default function Dashboard() {
               alignItems: 'center',
               marginRight: 12
             }}>
-              <AntDesign name="rocket1" size={24} color="#F59E0B" />
+              <Ionicons name="rocket" size={24} color="#F59E0B" />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{
@@ -508,53 +657,129 @@ export default function Dashboard() {
             </View>
           </View>
 
-          {activeSession ? (
-            <View style={{ gap: 12 }}>
-              <TouchableOpacity
-                onPress={handleResumeAssessment}
-                style={{
-                  backgroundColor: BRAND,
-                  paddingVertical: 16,
-                  borderRadius: 12,
-                  alignItems: 'center',
-                  shadowColor: BRAND,
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.2,
-                  shadowRadius: 8,
-                  elevation: 4
-                }}
-              >
-                <Text style={{
-                  color: WHITE,
-                  fontSize: 16,
-                  fontWeight: '700'
-                }}>
-                  Resume Assessment
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                onPress={handleAddMoreSkills}
-                style={{
-                  backgroundColor: 'transparent',
-                  paddingVertical: 16,
-                  borderRadius: 12,
-                  borderWidth: 2,
-                  borderColor: BRAND,
-                  alignItems: 'center'
-                }}
-              >
-                <Text style={{
-                  color: BRAND,
-                  fontSize: 16,
-                  fontWeight: '600'
-                }}>
-                  Add More Skills
-                </Text>
-              </TouchableOpacity>
-            </View>
-          ) : userSkills.length > 0 ? (
-            <View style={{ gap: 12 }}>
+          {(() => {
+            const completed = isAssessmentCompleted();
+            const hasActiveSession = activeSession && !completed;
+            
+            console.log('🔍 Button rendering logic:');
+            console.log('  - Assessment completed:', completed);
+            console.log('  - Has active session:', hasActiveSession);
+            console.log('  - User skills length:', userSkills.length);
+            
+            // Case 1: Assessment completed - show only "Start Assessment" button
+            if (completed) {
+              return (
+                <TouchableOpacity
+                  onPress={handleAddMoreSkills}
+                  style={{
+                    backgroundColor: BRAND,
+                    paddingVertical: 16,
+                    borderRadius: 12,
+                    alignItems: 'center',
+                    shadowColor: BRAND,
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.2,
+                    shadowRadius: 8,
+                    elevation: 4
+                  }}
+                >
+                  <Text style={{
+                    color: WHITE,
+                    fontSize: 16,
+                    fontWeight: '700'
+                  }}>
+                    Start Assessment
+                  </Text>
+                </TouchableOpacity>
+              );
+            }
+            
+            // Case 2: Active session (assessment in progress) - show "Resume Assessment" + "Add More Skills"
+            if (hasActiveSession) {
+              return (
+                <View style={{ gap: 12 }}>
+                  <TouchableOpacity
+                    onPress={() => router.push({
+                      pathname: '/assessment',
+                      params: { 
+                        sessionId: activeSession.sessionId,
+                        resume: 'true'
+                      }
+                    })}
+                    style={{
+                      backgroundColor: BRAND,
+                      paddingVertical: 16,
+                      borderRadius: 12,
+                      alignItems: 'center',
+                      shadowColor: BRAND,
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.2,
+                      shadowRadius: 8,
+                      elevation: 4
+                    }}
+                  >
+                    <Text style={{
+                      color: WHITE,
+                      fontSize: 16,
+                      fontWeight: '700'
+                    }}>
+                      Resume Assessment
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    onPress={handleAddMoreSkills}
+                    style={{
+                      backgroundColor: 'transparent',
+                      paddingVertical: 16,
+                      borderRadius: 12,
+                      borderWidth: 2,
+                      borderColor: BRAND,
+                      alignItems: 'center'
+                    }}
+                  >
+                    <Text style={{
+                      color: BRAND,
+                      fontSize: 16,
+                      fontWeight: '600'
+                    }}>
+                      Add More Skills
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            }
+            
+            // Case 3: No active session, no completed assessments - show "Start Assessment"
+            if (userSkills.length > 0) {
+              return (
+                <TouchableOpacity
+                  onPress={handleStartAssessment}
+                  style={{
+                    backgroundColor: BRAND,
+                    paddingVertical: 16,
+                    borderRadius: 12,
+                    alignItems: 'center',
+                    shadowColor: BRAND,
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.2,
+                    shadowRadius: 8,
+                    elevation: 4
+                  }}
+                >
+                  <Text style={{
+                    color: WHITE,
+                    fontSize: 16,
+                    fontWeight: '700'
+                  }}>
+                    Start Assessment
+                  </Text>
+                </TouchableOpacity>
+              );
+            }
+            
+            // Case 4: No skills selected - show "Select Skills"
+            return (
               <TouchableOpacity
                 onPress={handleStartAssessment}
                 style={{
@@ -574,57 +799,14 @@ export default function Dashboard() {
                   fontSize: 16,
                   fontWeight: '700'
                 }}>
-                  Start Assessment
+                  Select Skills
                 </Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity
-                onPress={handleAddMoreSkills}
-                style={{
-                  backgroundColor: 'transparent',
-                  paddingVertical: 16,
-                  borderRadius: 12,
-                  borderWidth: 2,
-                  borderColor: BRAND,
-                  alignItems: 'center'
-                }}
-              >
-                <Text style={{
-                  color: BRAND,
-                  fontSize: 16,
-                  fontWeight: '600'
-                }}>
-                  Add More Skills
-                </Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity
-              onPress={handleStartAssessment}
-              style={{
-                backgroundColor: BRAND,
-                paddingVertical: 16,
-                borderRadius: 12,
-                alignItems: 'center',
-                shadowColor: BRAND,
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.2,
-                shadowRadius: 8,
-                elevation: 4
-              }}
-            >
-              <Text style={{
-                color: WHITE,
-                fontSize: 16,
-                fontWeight: '700'
-              }}>
-                Select Skills
-              </Text>
-            </TouchableOpacity>
-          )}
+            );
+          })()}
         </View>
 
-        {/* Skills Overview Card */}
+        {/* Enhanced Skills Overview Card */}
         {userSkills.length > 0 && (
           <View style={{
             backgroundColor: WHITE,
@@ -649,7 +831,7 @@ export default function Dashboard() {
                 alignItems: 'center',
                 marginRight: 12
               }}>
-                <AntDesign name="star" size={24} color={BRAND} />
+                <MaterialIcons name="star" size={24} color={BRAND} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{
@@ -716,426 +898,12 @@ export default function Dashboard() {
     </ScrollView>
   );
 
-  // Profile content
-  const renderProfileContent = () => (
-    <ScrollView 
-      style={{ flex: 1, backgroundColor: '#F8FAFC' }}
-      contentContainerStyle={{ paddingBottom: 100, paddingTop: 10 }}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Header */}
-      <LinearGradient
-        colors={[BRAND, '#1E40AF', '#3B82F6']}
-        style={{
-          paddingTop: 20,
-          paddingBottom: 30,
-          paddingHorizontal: 20,
-          borderBottomLeftRadius: 25,
-          borderBottomRightRadius: 25
-        }}
-      >
-        <View style={{ alignItems: 'center', marginTop: 20 }}>
-          {/* Profile Avatar */}
-          <View style={{
-            width: 100,
-            height: 100,
-            borderRadius: 50,
-            backgroundColor: 'rgba(255, 255, 255, 0.2)',
-            justifyContent: 'center',
-            alignItems: 'center',
-            borderWidth: 3,
-            borderColor: 'rgba(255, 255, 255, 0.3)',
-            marginBottom: 16
-          }}>
-            <Text style={{
-              color: WHITE,
-              fontSize: 36,
-              fontWeight: '700',
-              letterSpacing: 1
-            }}>
-              {getUserInitials()}
-            </Text>
-          </View>
-
-          {/* User Name */}
-          <Text style={{
-            color: WHITE,
-            fontSize: 24,
-            fontWeight: '700',
-            marginBottom: 4
-          }}>
-            {user?.name || 'User'}
-          </Text>
-
-          {/* User Email */}
-          <Text style={{
-            color: WHITE,
-            fontSize: 14,
-            opacity: 0.9,
-            marginBottom: 8
-          }}>
-            {user?.email || 'user@example.com'}
-          </Text>
-
-          {/* Member Since */}
-          <View style={{
-            backgroundColor: 'rgba(255, 255, 255, 0.15)',
-            paddingHorizontal: 12,
-            paddingVertical: 6,
-            borderRadius: 12,
-            borderWidth: 1,
-            borderColor: 'rgba(255, 255, 255, 0.2)'
-          }}>
-            <Text style={{
-              color: WHITE,
-              fontSize: 12,
-              fontWeight: '500'
-            }}>
-              Member since {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'Recently'}
-            </Text>
-          </View>
-        </View>
-      </LinearGradient>
-
-      {/* Profile Stats */}
-      <View style={{
-        margin: 20,
-        marginTop: -15,
-        backgroundColor: WHITE,
-        borderRadius: 12,
-        padding: 20,
-        shadowColor: BRAND,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-        elevation: 3,
-        borderWidth: 1,
-        borderColor: '#E6F2FF'
-      }}>
-        <Text style={{
-          fontSize: 18,
-          fontWeight: '700',
-          color: DARK_GRAY,
-          marginBottom: 16
-        }}>
-          Your Progress
-        </Text>
-
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-          <View style={{ alignItems: 'center', flex: 1 }}>
-            <Text style={{
-              fontSize: 24,
-              fontWeight: '700',
-              color: BRAND
-            }}>
-              {stats.totalSkills}
-            </Text>
-            <Text style={{
-              fontSize: 12,
-              color: DARK_GRAY,
-              marginTop: 2
-            }}>
-              Skills Selected
-            </Text>
-          </View>
-          <View style={{ alignItems: 'center', flex: 1 }}>
-            <Text style={{
-              fontSize: 24,
-              fontWeight: '700',
-              color: SUCCESS
-            }}>
-              {stats.completedSkills}
-            </Text>
-            <Text style={{
-              fontSize: 12,
-              color: DARK_GRAY,
-              marginTop: 2
-            }}>
-              Completed
-            </Text>
-          </View>
-          <View style={{ alignItems: 'center', flex: 1 }}>
-            <Text style={{
-              fontSize: 24,
-              fontWeight: '700',
-              color: WARNING
-            }}>
-              {stats.completionRate}%
-            </Text>
-            <Text style={{
-              fontSize: 12,
-              color: DARK_GRAY,
-              marginTop: 2
-            }}>
-              Success Rate
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Personal Information */}
-      <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
-        <Text style={{
-          fontSize: 20,
-          fontWeight: '700',
-          color: DARK_GRAY,
-          marginBottom: 15
-        }}>
-          Personal Information
-        </Text>
-
-        <View style={{
-          backgroundColor: WHITE,
-          borderRadius: 12,
-          padding: 20,
-          shadowColor: BRAND,
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.08,
-          shadowRadius: 8,
-          elevation: 3,
-          borderWidth: 1,
-          borderColor: '#E6F2FF'
-        }}>
-          {/* Career Stage */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-            <View style={{
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              backgroundColor: BRAND_LIGHT,
-              justifyContent: 'center',
-              alignItems: 'center',
-              marginRight: 12
-            }}>
-              <AntDesign name="rocket1" size={20} color={BRAND} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{
-                fontSize: 12,
-                color: GRAY,
-                marginBottom: 2
-              }}>
-                Career Stage
-              </Text>
-              <Text style={{
-                fontSize: 16,
-                fontWeight: '600',
-                color: DARK_GRAY
-              }}>
-                {user?.career_stage || 'Not specified'}
-              </Text>
-            </View>
-          </View>
-
-          {/* Role Type */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-            <View style={{
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              backgroundColor: '#FEF3C7',
-              justifyContent: 'center',
-              alignItems: 'center',
-              marginRight: 12
-            }}>
-              <AntDesign name="team" size={20} color="#F59E0B" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{
-                fontSize: 12,
-                color: GRAY,
-                marginBottom: 2
-              }}>
-                Role Type
-              </Text>
-              <Text style={{
-                fontSize: 16,
-                fontWeight: '600',
-                color: DARK_GRAY
-              }}>
-                {user?.role_type || 'Not specified'}
-              </Text>
-            </View>
-          </View>
-
-          {/* Email */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-            <View style={{
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              backgroundColor: '#E0F2FE',
-              justifyContent: 'center',
-              alignItems: 'center',
-              marginRight: 12
-            }}>
-              <AntDesign name="mail" size={20} color="#0288D1" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{
-                fontSize: 12,
-                color: GRAY,
-                marginBottom: 2
-              }}>
-                Email Address
-              </Text>
-              <Text style={{
-                fontSize: 16,
-                fontWeight: '600',
-                color: DARK_GRAY
-              }}>
-                {user?.email || 'Not specified'}
-              </Text>
-            </View>
-          </View>
-
-          {/* Account Status */}
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <View style={{
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              backgroundColor: '#E8F5E8',
-              justifyContent: 'center',
-              alignItems: 'center',
-              marginRight: 12
-            }}>
-              <AntDesign name="checkcircle" size={20} color={SUCCESS} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{
-                fontSize: 12,
-                color: GRAY,
-                marginBottom: 2
-              }}>
-                Account Status
-              </Text>
-              <Text style={{
-                fontSize: 16,
-                fontWeight: '600',
-                color: SUCCESS
-              }}>
-                Active
-              </Text>
-            </View>
-          </View>
-        </View>
-      </View>
-
-      {/* Simple Logout Button */}
-      <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
-        <TouchableOpacity 
-          onPress={handleLogout}
-          style={{
-            backgroundColor: '#F8FAFC',
-            borderRadius: 12,
-            paddingVertical: 14,
-            paddingHorizontal: 20,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderWidth: 1,
-            borderColor: '#E2E8F0'
-          }}
-        >
-          <AntDesign name="logout" size={18} color={ERROR} style={{ marginRight: 8 }} />
-          <Text style={{
-            color: ERROR,
-            fontSize: 15,
-            fontWeight: '600'
-          }}>
-            Sign Out
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* App Information */}
-      <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
-        <View style={{
-          backgroundColor: WHITE,
-          borderRadius: 12,
-          padding: 20,
-          shadowColor: BRAND,
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.08,
-          shadowRadius: 8,
-          elevation: 3,
-          borderWidth: 1,
-          borderColor: '#E6F2FF'
-        }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-            <Image source={logoSrc} style={{ width: 32, height: 32 }} resizeMode="contain" />
-            <Text style={{
-              marginLeft: 12,
-              fontSize: 18,
-              fontWeight: '700',
-              color: DARK_GRAY
-            }}>
-              {APP_NAME}
-            </Text>
-          </View>
-
-          <View style={{ marginBottom: 12 }}>
-            <Text style={{
-              fontSize: 12,
-              color: GRAY,
-              marginBottom: 2
-            }}>
-              Version
-            </Text>
-            <Text style={{
-              fontSize: 14,
-              fontWeight: '600',
-              color: DARK_GRAY
-            }}>
-              1.0.0
-            </Text>
-          </View>
-
-          <View style={{ marginBottom: 12 }}>
-            <Text style={{
-              fontSize: 12,
-              color: GRAY,
-              marginBottom: 2
-            }}>
-              Build Date
-            </Text>
-            <Text style={{
-              fontSize: 14,
-              fontWeight: '600',
-              color: DARK_GRAY
-            }}>
-              {new Date().toLocaleDateString()}
-            </Text>
-          </View>
-
-          <View>
-            <Text style={{
-              fontSize: 12,
-              color: GRAY,
-              marginBottom: 2
-            }}>
-              Support
-            </Text>
-            <Text style={{
-              fontSize: 14,
-              fontWeight: '600',
-              color: BRAND
-            }}>
-              support@skilldrill.com
-            </Text>
-          </View>
-        </View>
-      </View>
-    </ScrollView>
-  );
-
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
       <StatusBar style="dark" />
       
       {/* Main Content */}
-      {activeTab === 'home' ? renderHomeContent() : renderProfileContent()}
+      {renderHomeContent()}
 
       {/* Bottom Navigation */}
       <View style={{
@@ -1172,33 +940,8 @@ export default function Dashboard() {
               Home
             </Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity
-            onPress={() => setActiveTab('profile')}
-            style={{
-              flex: 1,
-              alignItems: 'center',
-              paddingVertical: 8
-            }}
-          >
-            <AntDesign 
-              name="user" 
-              size={24} 
-              color={activeTab === 'profile' ? BRAND : GRAY} 
-            />
-            <Text style={{
-              fontSize: 12,
-              color: activeTab === 'profile' ? BRAND : GRAY,
-              marginTop: 4,
-              fontWeight: activeTab === 'profile' ? '600' : '400'
-            }}>
-              Profile
-            </Text>
-          </TouchableOpacity>
         </View>
       </View>
     </SafeAreaView>
   );
 }
-
-

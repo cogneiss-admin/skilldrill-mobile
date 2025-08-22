@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
-import { Dimensions, Text, View, StyleSheet, Animated as RNAnimated, ActivityIndicator } from "react-native";
+import { Dimensions, Text, View, StyleSheet, Animated as RNAnimated } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import SplashOverlay from "./components/SplashOverlay";
@@ -10,7 +10,6 @@ import Svg, { Defs, RadialGradient as SvgRadialGradient, Rect, Stop } from "reac
 import { Button } from "react-native-paper";
 import { MotiView } from "moti";
 import { StatusBar } from "expo-status-bar";
-import * as Haptics from "expo-haptics";
 import { useAuth } from "../hooks/useAuth";
 import "./home"; // pre-load home route to avoid router spinner during navigation
 
