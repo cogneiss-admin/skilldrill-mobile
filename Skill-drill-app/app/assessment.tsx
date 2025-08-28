@@ -11,7 +11,9 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { useAuth } from "../hooks/useAuth";
 import { apiService } from "../services/api";
 import { useToast } from "../hooks/useToast";
+import { useResponsive } from "../utils/responsive";
 import { AntDesign } from '@expo/vector-icons';
+import AIGenerationLoader from './components/AIGenerationLoader';
 
 const BRAND = "#0A66C2";
 const APP_NAME = "Skill Drill";
@@ -43,6 +45,12 @@ export default function AssessmentScreen() {
   // Modal state
   const [showSkillCompleteModal, setShowSkillCompleteModal] = useState(false);
   const [completedSkillName, setCompletedSkillName] = useState("");
+  const [aiAnalysisFailed, setAiAnalysisFailed] = useState(false);
+  
+  // AI Generation Animation state
+  const [showAILoader, setShowAILoader] = useState(false);
+  const [aiProgress, setAiProgress] = useState(0);
+  const [creatingAssessment, setCreatingAssessment] = useState(false);
   
   // Prevent infinite initialization loop
   const [hasInitialized, setHasInitialized] = useState(false);
@@ -195,10 +203,22 @@ export default function AssessmentScreen() {
     };
   }, [loading, selectedSkills, sessionId, params.resume, hasInitialized, authLoading]);
 
-  // Initialize assessment session
+  // Initialize assessment session with AI animation
   const initializeAssessment = async () => {
     try {
-      setLoading(true);
+      setShowAILoader(true);
+      setAiProgress(0);
+      
+      // Simulate AI progress steps
+      const progressSteps = [0.15, 0.4, 0.7, 0.9, 1.0];
+      let currentStepIndex = 0;
+      
+      const progressInterval = setInterval(() => {
+        if (currentStepIndex < progressSteps.length) {
+          setAiProgress(progressSteps[currentStepIndex]);
+          currentStepIndex++;
+        }
+      }, 1000); // Update progress every 1 second
       
       // Add timeout for assessment creation
       const timeoutPromise = new Promise((_, reject) => {
@@ -208,8 +228,21 @@ export default function AssessmentScreen() {
       const assessmentPromise = performAssessmentInitialization();
       
       await Promise.race([assessmentPromise, timeoutPromise]);
+      
+      // Clear progress simulation
+      clearInterval(progressInterval);
+      setAiProgress(1.0);
+      
+      // Wait for animation to complete
+      setTimeout(() => {
+        setShowAILoader(false);
+        setCreatingAssessment(false);
+      }, 1000);
+      
     } catch (error) {
       console.error('❌ Assessment initialization error:', error);
+      setShowAILoader(false);
+      setCreatingAssessment(false);
       if (error.message === 'Assessment creation timeout') {
         setError('Assessment creation is taking too long. Please try again.');
       } else {
@@ -217,8 +250,6 @@ export default function AssessmentScreen() {
       }
       // Reset initialization flag on error so user can retry
       setHasInitialized(false);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -249,15 +280,28 @@ export default function AssessmentScreen() {
           // Load current assessment using the specific endpoint
           try {
             console.log('🔍 Loading current assessment for session:', sessionStatusResponse.data.sessionId);
-            const currentAssessmentResponse = await apiService.get(`/assessment/session/${sessionStatusResponse.data.sessionId}/current`);
-            
-            if (currentAssessmentResponse.success && currentAssessmentResponse.data.assessment) {
+            // Add retries with backoff and extended timeout
+            let currentAssessmentResponse: any = null;
+            const maxAttempts = 3;
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+              try {
+                currentAssessmentResponse = await apiService.get(`/assessment/session/${sessionStatusResponse.data.sessionId}/current`, { timeout: 150000 });
+                break;
+              } catch (err) {
+                console.log(`⏳ Current assessment load attempt ${attempt} failed`);
+                if (attempt === maxAttempts) throw err;
+                await new Promise(r => setTimeout(r, attempt * 2000));
+              }
+            }
+
+            if (currentAssessmentResponse?.success && currentAssessmentResponse.data.assessment) {
               console.log('✅ Current assessment loaded:', currentAssessmentResponse.data.assessment);
               setCurrentAssessment(currentAssessmentResponse.data.assessment);
               setCurrentView('scenario');
+              setCreatingAssessment(false);
               
               // Session resumed silently
-            } else if (currentAssessmentResponse.success && currentAssessmentResponse.data.completed) {
+            } else if (currentAssessmentResponse?.success && currentAssessmentResponse.data.completed) {
               console.log('✅ All assessments completed');
               setError('All assessments have been completed. Great job!');
             } else {
@@ -344,6 +388,7 @@ export default function AssessmentScreen() {
             setTotalSkills(resumeResponse.data.totalSkills);
             setCurrentAssessment(resumeResponse.data.currentAssessment);
             setCurrentView('scenario');
+            setCreatingAssessment(false);
             
             // Session resumed silently
             return;
@@ -363,45 +408,82 @@ export default function AssessmentScreen() {
     setLoading(false);
   };
 
+  // Retry initialization handler
+  const handleRetryInitialization = () => {
+    setError('');
+    setCreatingAssessment(true);
+    setShowAILoader(true);
+    setAiProgress(0);
+    initializeAssessment();
+  };
+
   // Handle start assessment
   const handleStartAssessment = () => {
     if (selectedSkills && selectedSkills.length > 0) {
+      setCreatingAssessment(true);
       initializeAssessment();
     } else {
       setError('No skills selected');
     }
   };
 
-  // Handle create assessment
+  // Handle create assessment with AI animation
   const handleCreateAssessment = async () => {
     try {
-      setLoading(true);
+      setCreatingAssessment(true);
       setError('');
+      setShowAILoader(true);
+      setAiProgress(0);
       
       console.log('🔄 Creating new assessment for skills:', selectedSkills);
+      
+      // Simulate AI progress steps
+      const progressSteps = [0.1, 0.3, 0.6, 0.8, 0.95, 1.0];
+      let currentStepIndex = 0;
+      
+      const progressInterval = setInterval(() => {
+        if (currentStepIndex < progressSteps.length) {
+          setAiProgress(progressSteps[currentStepIndex]);
+          currentStepIndex++;
+        }
+      }, 1200); // Update progress every 1.2 seconds
       
       // Create assessment session with the selected skills
       const response = await apiService.post('/assessment/session/start', {
         skillIds: selectedSkills
       });
 
+      // Clear progress simulation
+      clearInterval(progressInterval);
+      
       if (response.success) {
         console.log('✅ Assessment created successfully:', response.data);
-        setSessionId(response.data.sessionId);
-        setCurrentSkillIndex(response.data.currentSkillIndex);
-        setTotalSkills(response.data.totalSkills);
-        setCurrentAssessment(response.data.currentAssessment);
-        setCurrentView('scenario');
-        showToast('success', 'Assessment Created', 'Your personalized assessment is ready!');
+        
+        // Complete the progress
+        setAiProgress(1.0);
+        
+        // Wait for animation to complete
+        setTimeout(() => {
+          setShowAILoader(false);
+          setSessionId(response.data.sessionId);
+          setCurrentSkillIndex(response.data.currentSkillIndex);
+          setTotalSkills(response.data.totalSkills);
+          setCurrentAssessment(response.data.currentAssessment);
+          setCurrentView('scenario');
+          setCreatingAssessment(false);
+          showToast('success', 'Assessment Created', 'Your personalized assessment is ready!');
+        }, 1500);
       } else {
         console.error('❌ Failed to create assessment:', response.message);
+        setShowAILoader(false);
+        setCreatingAssessment(false);
         setError('Failed to create assessment: ' + response.message);
       }
     } catch (error) {
       console.error('❌ Error creating assessment:', error);
+      setShowAILoader(false);
+      setCreatingAssessment(false);
       setError('Failed to create assessment. Please try again.');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -552,12 +634,57 @@ export default function AssessmentScreen() {
       console.log('📤 Current assessment ID:', currentAssessment.id);
       console.log('📤 Prompts:', prompts);
       
+      // Validate assessment ID
+      if (!currentAssessment.id) {
+        console.error('❌ Assessment ID is missing');
+        Alert.alert("Error", "Assessment ID is missing. Please refresh and try again.");
+        return;
+      }
+
+      // Validate prompts
+      if (!prompts || prompts.length === 0) {
+        console.error('❌ No prompts found for assessment');
+        Alert.alert("Error", "No prompts found for assessment. Please refresh and try again.");
+        return;
+      }
+
+      // Validate responses
+      const responseEntries = Object.entries(allResponses);
+      if (responseEntries.length === 0) {
+        console.error('❌ No responses to submit');
+        Alert.alert("Error", "No responses to submit. Please provide responses for all scenarios.");
+        return;
+      }
+
       const requestData = {
         assessmentId: currentAssessment.id,
-        responses: Object.entries(allResponses).map(([index, response]) => ({
-          promptId: prompts[parseInt(index)].id,
-          response: response
-        }))
+        responses: responseEntries.map(([index, response]) => {
+          const promptIndex = parseInt(index);
+          const prompt = prompts[promptIndex];
+          
+          if (!prompt || !prompt.id) {
+            console.error(`❌ Invalid prompt at index ${index}`);
+            throw new Error(`Invalid prompt at index ${index}`);
+          }
+          
+          // Validate response text
+          if (!response || typeof response !== 'string' || response.trim().length === 0) {
+            console.error(`❌ Invalid response at index ${index}:`, response);
+            throw new Error(`Invalid response at index ${index}`);
+          }
+          
+          // Trim and validate response length
+          const trimmedResponse = response.trim();
+          if (trimmedResponse.length > 10000) { // 10KB limit
+            console.error(`❌ Response too long at index ${index}: ${trimmedResponse.length} characters`);
+            throw new Error(`Response too long at index ${index} (${trimmedResponse.length} characters, max 10000)`);
+          }
+          
+          return {
+            promptId: prompt.id,
+            response: trimmedResponse
+          };
+        })
       };
       
       console.log('📤 Request data:', JSON.stringify(requestData, null, 2));
@@ -568,42 +695,207 @@ export default function AssessmentScreen() {
         console.log('🔍 Testing connection to backend...');
         const testResponse = await apiService.get('/auth/health');
         console.log('✅ Backend connection test successful:', testResponse);
+        
+        // Also test a simple GET request to verify API is working
+        console.log('🔍 Testing API functionality...');
+        const sessionStatusResponse = await apiService.get('/assessment/session/status');
+        console.log('✅ Session status test successful:', sessionStatusResponse);
+        
       } catch (testError) {
         console.error('❌ Backend connection test failed:', testError);
+        console.error('❌ Test error details:', {
+          message: testError.message,
+          status: testError.response?.status,
+          data: testError.response?.data,
+          code: testError.code
+        });
+        
+        // Show specific error message for connection issues
+        if (testError.message.includes('Network Error') || testError.code === 'ECONNREFUSED') {
+          Alert.alert(
+            "Connection Error", 
+            "Cannot connect to the server. Please check your internet connection and try again."
+          );
+          return;
+        } else if (testError.response?.status === 401) {
+          Alert.alert(
+            "Authentication Error", 
+            "Your session has expired. Please log in again."
+          );
+          return;
+        }
       }
       
       // Submit responses to backend with extended timeout
-      const response = await apiService.post('/assessment/response/bulk', requestData, { timeout: 60000 });
+      console.log('📤 Making API call to /assessment/response/bulk...');
+      console.log('📤 Request data size:', JSON.stringify(requestData).length, 'characters');
+      console.log('📤 Request data preview:', JSON.stringify(requestData).substring(0, 500) + '...');
+      
+      // Log request headers for debugging
+      console.log('📤 API Service base URL:', apiService.api?.defaults?.baseURL);
+      console.log('📤 Request timeout:', 60000);
+      
+      try {
+        const response = await apiService.post('/assessment/response/bulk', requestData, { 
+          timeout: 60000,
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+        });
+        console.log('📤 API call completed');
+        console.log('📤 Response received:', response);
 
-      if (response.success) {
+              if (response.success) {
         console.log('✅ Skill assessment completed:', response.data);
+        console.log('✅ Assessment completion response:', response);
+        console.log('✅ Current assessment ID after completion:', currentAssessment.id);
         
         // Show skill completion modal
         setCompletedSkillName(currentAssessment.skill?.skill_name || "Skill");
         setShowSkillCompleteModal(true);
       } else {
-        throw new Error(response.message || 'Failed to submit assessment');
+        console.log('❌ API returned success: false');
+        console.log('❌ Error message:', response.message);
+        console.log('❌ Full response:', response);
+        
+        // Check if this is an AI analysis failure
+        if (response.message && (
+          response.message.includes('Failed to generate result analysis') ||
+          response.message.includes('Failed to submit responses') ||
+          response.message.includes('AI analysis failed')
+        )) {
+          setAiAnalysisFailed(true);
+          throw new Error('AI analysis failed. Please try again.');
+        } else {
+          throw new Error(response.message || 'Failed to submit assessment');
+        }
+      }
+      } catch (apiError) {
+        console.error('❌ API call failed:', apiError);
+        console.error('❌ Error type:', typeof apiError);
+        console.error('❌ Error message:', apiError.message);
+        console.error('❌ Error response:', apiError.response);
+        console.error('❌ Error status:', apiError.response?.status);
+        console.error('❌ Error data:', apiError.response?.data);
+        console.error('❌ Full error object:', JSON.stringify(apiError, null, 2));
+        
+        // Log the full request data for debugging
+        console.error('❌ Full request data that failed:', JSON.stringify(requestData, null, 2));
+        
+        // Check if this is an AI analysis failure
+        const errorMessage = apiError.message || '';
+        const responseData = apiError.response?.data;
+        const responseMessage = responseData?.message || '';
+        
+        if (errorMessage.includes('Failed to generate result analysis') ||
+            errorMessage.includes('Failed to submit responses') ||
+            errorMessage.includes('AI analysis failed') ||
+            responseMessage.includes('Failed to generate result analysis') ||
+            responseMessage.includes('Failed to submit responses') ||
+            responseMessage.includes('AI analysis failed')) {
+          
+          console.log('🤖 AI analysis failure detected, showing AI error screen');
+          setAiAnalysisFailed(true);
+          return; // Don't show alert, let the AI error screen handle it
+        }
+        
+        // Provide more specific error messages for other errors
+        let alertMessage = 'Failed to submit assessment. Please try again.';
+        
+        if (apiError.response?.status === 404) {
+          alertMessage = 'Assessment not found. Please refresh and try again.';
+        } else if (apiError.response?.status === 401) {
+          alertMessage = 'Authentication expired. Please log in again.';
+        } else if (apiError.response?.status === 500) {
+          alertMessage = 'Server error. Please try again later.';
+        } else if (apiError.response?.status === 400) {
+          alertMessage = `Validation error: ${apiError.response?.data?.message || 'Invalid request format'}`;
+        } else if (apiError.message) {
+          alertMessage = `Submission failed: ${apiError.message}`;
+        }
+        
+        // Show detailed error in development
+        if (__DEV__) {
+          console.error('❌ Detailed error for development:', {
+            status: apiError.response?.status,
+            statusText: apiError.response?.statusText,
+            data: apiError.response?.data,
+            headers: apiError.response?.headers,
+            config: apiError.config
+          });
+        }
+        
+        Alert.alert("Submission Error", alertMessage);
+        throw apiError; // Re-throw to be caught by outer catch
       }
       
     } catch (error) {
       console.error('❌ Submit assessment error:', error);
-      Alert.alert("Error", "Failed to submit assessment. Please try again.");
+      // Only show error if AI analysis failure wasn't detected
+      if (!aiAnalysisFailed) {
+        Alert.alert("Error", "Failed to submit assessment. Please try again.");
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
+  // Handle retry assessment submission
+  const handleRetrySubmission = () => {
+    setAiAnalysisFailed(false);
+    setSubmitting(false);
+    // This will trigger the submission again when the component re-renders
+  };
+
+  // Handle navigation to home
+  const handleGoHome = () => {
+    setAiAnalysisFailed(false);
+    router.replace('/dashboard');
+  };
+
   // Handle see results now
-  const handleSeeResults = () => {
+  const handleSeeResults = async () => {
+    console.log('🎯 See Results clicked!');
+    console.log('🎯 Current assessment:', currentAssessment);
+    console.log('🎯 Assessment ID:', currentAssessment?.id);
+    console.log('🎯 Skill name:', currentAssessment?.skill?.skill_name);
+    
+    if (!currentAssessment?.id) {
+      console.error('❌ No assessment ID available!');
+      Alert.alert("Error", "Assessment ID not found. Please try again.");
+      return;
+    }
+    
     setShowSkillCompleteModal(false);
+    
+    // Add a small delay to ensure backend processing is complete
+    console.log('⏳ Waiting for backend processing...');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
     // Navigate to results screen
-    router.push({
+    console.log('🚀 Navigating to assessment results...');
+    console.log('🚀 Navigation params:', {
       pathname: '/assessment-results',
       params: { 
         assessmentId: currentAssessment.id,
         skillName: currentAssessment.skill?.skill_name
       }
     });
+    
+    try {
+      await router.push({
+        pathname: '/assessment-results',
+        params: { 
+          assessmentId: currentAssessment.id,
+          skillName: currentAssessment.skill?.skill_name
+        }
+      });
+      console.log('✅ Navigation completed successfully');
+    } catch (navError) {
+      console.error('❌ Navigation error:', navError);
+      Alert.alert("Navigation Error", "Failed to navigate to results. Please try again.");
+    }
   };
 
   // Handle continue to next skill
@@ -660,6 +952,55 @@ export default function AssessmentScreen() {
     );
   }
 
+  // Show AI analysis failure error state
+  if (aiAnalysisFailed) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#ffffff" }}>
+        <StatusBar style="dark" />
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 20 }}>
+          <View style={{ alignItems: "center", marginBottom: 32 }}>
+            <Text style={{ fontSize: 48, marginBottom: 16 }}>🤖</Text>
+            <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a", textAlign: "center", marginBottom: 8 }}>
+              AI Analysis Failed
+            </Text>
+            <Text style={{ fontSize: 16, color: "#64748b", textAlign: "center", lineHeight: 24 }}>
+              We couldn't analyze your assessment responses due to a temporary issue with our AI service.
+            </Text>
+          </View>
+          
+          <View style={{ width: "100%", gap: 12 }}>
+            <Button
+              mode="contained"
+              onPress={handleRetrySubmission}
+              style={{ 
+                backgroundColor: BRAND,
+                height: 48
+              }}
+              contentStyle={{ height: 48 }}
+              labelStyle={{ fontWeight: "600", fontSize: 16 }}
+            >
+              Retry Assessment
+            </Button>
+            
+            <Button
+              mode="outlined"
+              onPress={handleGoHome}
+              style={{ 
+                borderColor: BRAND,
+                borderWidth: 2,
+                height: 48
+              }}
+              contentStyle={{ height: 48 }}
+              labelStyle={{ color: BRAND, fontWeight: "600", fontSize: 16 }}
+            >
+              Go to Dashboard
+            </Button>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   // Show error state
   if (error) {
     // Check if this is a "no assessment" error that should show create button
@@ -681,13 +1022,21 @@ export default function AssessmentScreen() {
             <Button
               mode="contained"
               onPress={handleCreateAssessment}
-              loading={loading}
-              disabled={loading}
-              style={{ backgroundColor: BRAND, marginBottom: 16 }}
+              loading={creatingAssessment}
+              disabled={creatingAssessment}
+              style={{ 
+                backgroundColor: creatingAssessment ? BRAND : BRAND,
+                marginBottom: 16,
+                opacity: creatingAssessment ? 0.8 : 1
+              }}
               contentStyle={{ height: 48 }}
-              labelStyle={{ fontWeight: "600", fontSize: 16 }}
+              labelStyle={{ 
+                fontWeight: "600", 
+                fontSize: 16,
+                color: "#ffffff"
+              }}
             >
-              Create Assessment
+              {creatingAssessment ? "Generating Assessment..." : "Create Assessment"}
             </Button>
             <Button
               mode="outlined"
@@ -713,13 +1062,23 @@ export default function AssessmentScreen() {
           <Text style={{ fontSize: 14, color: "#64748b", textAlign: "center", marginBottom: 24 }}>
             {error}
           </Text>
-          <Button
-            mode="contained"
-            onPress={handleBackToDashboard}
-            style={{ backgroundColor: BRAND }}
-          >
-            Back to Dashboard
-          </Button>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <Button
+              mode="contained"
+              onPress={handleRetryInitialization}
+              style={{ backgroundColor: BRAND }}
+            >
+              Retry
+            </Button>
+            <Button
+              mode="outlined"
+              onPress={handleBackToDashboard}
+              style={{ borderColor: BRAND }}
+              labelStyle={{ color: BRAND }}
+            >
+              Back to Dashboard
+            </Button>
+          </View>
         </View>
       </SafeAreaView>
     );
@@ -805,20 +1164,24 @@ export default function AssessmentScreen() {
             <Button
               mode="contained"
               onPress={handleStartAssessment}
-              loading={loading}
-                disabled={loading}
+              loading={creatingAssessment}
+                disabled={creatingAssessment}
                 contentStyle={{ height: 56 }}
                 style={{
                   borderRadius: 28,
                   backgroundColor: BRAND,
-                  opacity: 1,
+                  opacity: creatingAssessment ? 0.8 : 1,
                   shadowColor: BRAND,
-                  shadowOpacity: 0.35,
+                  shadowOpacity: creatingAssessment ? 0.2 : 0.35,
                   shadowRadius: 14
                 }}
-                labelStyle={{ fontWeight: "800", letterSpacing: 0.3 }}
+                labelStyle={{ 
+                  fontWeight: "800", 
+                  letterSpacing: 0.3,
+                  color: "#ffffff"
+                }}
               >
-                {loading ? "Starting Assessment..." : "Begin Assessment"}
+                {creatingAssessment ? "Generating Assessment..." : "Begin Assessment"}
             </Button>
             </View>
           </View>
@@ -1453,6 +1816,13 @@ export default function AssessmentScreen() {
             </View>
           </Modal>
         </Portal>
+
+        {/* AI Generation Loader */}
+        <AIGenerationLoader
+          visible={showAILoader}
+          progress={aiProgress}
+          onComplete={() => setShowAILoader(false)}
+        />
       </SafeAreaView>
     );
   }
@@ -1564,6 +1934,13 @@ export default function AssessmentScreen() {
             </View>
           </View>
         </View>
+
+        {/* AI Generation Loader for completion screen */}
+        <AIGenerationLoader
+          visible={showAILoader}
+          progress={aiProgress}
+          onComplete={() => setShowAILoader(false)}
+        />
       </SafeAreaView>
     );
   }
@@ -1583,6 +1960,13 @@ export default function AssessmentScreen() {
         >
           Back to Dashboard
         </Button>
+
+        {/* AI Generation Loader for default fallback */}
+        <AIGenerationLoader
+          visible={showAILoader}
+          progress={aiProgress}
+          onComplete={() => setShowAILoader(false)}
+        />
       </View>
     </SafeAreaView>
   );

@@ -11,6 +11,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { useToast } from "../hooks/useToast";
 import { apiService } from "../services/api";
 import { AntDesign, MaterialIcons, Ionicons } from '@expo/vector-icons';
+import AIGenerationLoader from './components/AIGenerationLoader';
 
 const BRAND = "#0A66C2";
 const BRAND_LIGHT = "#E6F2FF";
@@ -35,6 +36,9 @@ export default function AssessmentIntroScreen() {
   const [userSkills, setUserSkills] = useState([]);
   const [loadingSkills, setLoadingSkills] = useState(true);
   const [creatingAssessment, setCreatingAssessment] = useState(false);
+  const [showAILoader, setShowAILoader] = useState(false);
+  const [aiProgress, setAiProgress] = useState(0);
+  const [error, setError] = useState("");
   
   // Back button double-tap state
   const [backButtonPressed, setBackButtonPressed] = useState(false);
@@ -141,6 +145,17 @@ export default function AssessmentIntroScreen() {
   const handleCreateAssessment = async () => {
     try {
       setCreatingAssessment(true);
+      setShowAILoader(true);
+      setAiProgress(0);
+      // Simulate progress while waiting for backend
+      const steps = [0.1, 0.25, 0.4, 0.55, 0.7, 0.85, 0.95];
+      let idx = 0;
+      const progressInterval = setInterval(() => {
+        if (idx < steps.length) {
+          setAiProgress(steps[idx]);
+          idx += 1;
+        }
+      }, 1200);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
       
       console.log('🚀 Creating assessment with skills:', selectedSkills);
@@ -164,12 +179,16 @@ export default function AssessmentIntroScreen() {
       // Create assessment session with extended timeout for AI generation
       const response = await apiService.post('/assessment/session/start', {
         skillIds: validSkillIds
-      }, { timeout: 90000 }); // 90 seconds timeout for AI generation
+      }, { timeout: 150000 }); // 150s timeout for AI generation
       
       if (response.success && response.data.sessionId) {
         console.log('✅ Assessment created successfully:', response.data);
         showToast('success', 'Assessment Created', 'Your assessment is ready!');
         
+        // Complete progress and navigate
+        setAiProgress(1.0);
+        clearInterval(progressInterval);
+        setShowAILoader(false);
         // Navigate to assessment screen with session ID
         router.replace({
           pathname: '/assessment',
@@ -188,14 +207,24 @@ export default function AssessmentIntroScreen() {
       let errorMessage = 'Failed to create assessment. Please try again.';
       if (error.message) {
         errorMessage = error.message;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
       } else if (error.data && error.data.message) {
         errorMessage = error.data.message;
       }
       
+      // Set error state for UI display
+      setError(errorMessage);
       showToast('error', 'Error', errorMessage);
     } finally {
       setCreatingAssessment(false);
+      setShowAILoader(false);
     }
+  };
+
+  const handleRetry = () => {
+    setError("");
+    handleCreateAssessment();
   };
 
   const handleBackToDashboard = () => {
@@ -256,6 +285,55 @@ export default function AssessmentIntroScreen() {
               Loading your skills...
             </Text>
           </MotiView>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: WHITE }}>
+        <StatusBar style="dark" />
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 20 }}>
+          <View style={{ alignItems: "center", marginBottom: 32 }}>
+            <Text style={{ fontSize: 48, marginBottom: 16 }}>⚠️</Text>
+            <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a", textAlign: "center", marginBottom: 8 }}>
+              Assessment Creation Failed
+            </Text>
+            <Text style={{ fontSize: 16, color: "#64748b", textAlign: "center", lineHeight: 24 }}>
+              {error}
+            </Text>
+          </View>
+          
+          <View style={{ width: "100%", gap: 12 }}>
+            <Button
+              mode="contained"
+              onPress={handleRetry}
+              style={{ 
+                backgroundColor: BRAND,
+                height: 48
+              }}
+              contentStyle={{ height: 48 }}
+              labelStyle={{ fontWeight: "600", fontSize: 16 }}
+            >
+              Retry Assessment Creation
+            </Button>
+            
+            <Button
+              mode="outlined"
+              onPress={handleBackToDashboard}
+              style={{ 
+                borderColor: BRAND,
+                borderWidth: 2,
+                height: 48
+              }}
+              contentStyle={{ height: 48 }}
+              labelStyle={{ color: BRAND, fontWeight: "600", fontSize: 16 }}
+            >
+              Back to Dashboard
+            </Button>
+          </View>
         </View>
       </SafeAreaView>
     );
@@ -415,6 +493,7 @@ export default function AssessmentIntroScreen() {
                   {selectedSkills.length} skill{selectedSkills.length !== 1 ? 's' : ''} ready for assessment
                 </Text>
               </View>
+
             </View>
             
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -677,6 +756,8 @@ export default function AssessmentIntroScreen() {
           </TouchableOpacity>
         </MotiView>
       </ScrollView>
+      {/* AI Generation Loader Overlay */}
+      <AIGenerationLoader visible={showAILoader} progress={aiProgress} onComplete={() => setShowAILoader(false)} />
     </SafeAreaView>
   );
 }

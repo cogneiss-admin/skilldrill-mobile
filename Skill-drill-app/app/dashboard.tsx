@@ -16,6 +16,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
 import { apiService } from '../services/api';
 import { MotiView } from 'moti';
+import DashboardSkeleton from './components/DashboardSkeleton';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AntDesign, MaterialIcons, Ionicons } from '@expo/vector-icons';
 
@@ -67,6 +68,16 @@ interface DashboardStats {
   totalAssessments: number;
 }
 
+type CompletedAssessment = {
+  id: string;
+  skillId: string;
+  skillName: string;
+  finalScore: number;
+  scoreLabel?: string;
+  stars?: number;
+  completedAt?: string;
+};
+
 export default function DashboardImproved() {
   const router = useRouter();
   const { user, isLoading: authLoading, logout } = useAuth();
@@ -78,6 +89,8 @@ export default function DashboardImproved() {
   const [loadingSession, setLoadingSession] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'home' | 'profile'>('home');
+  const [recentResults, setRecentResults] = useState<CompletedAssessment[]>([]);
+  const [completedSkillIdsFromResults, setCompletedSkillIdsFromResults] = useState<Set<string>>(new Set());
 
   // Get greeting based on time
   const getGreeting = () => {
@@ -109,18 +122,31 @@ export default function DashboardImproved() {
 
   // Calculate enhanced stats
   const stats = useMemo((): DashboardStats => {
-    const totalSkills = userSkills.length;
-    const completedSkills = userSkills.filter(skill => skill.assessment_status === 'COMPLETED').length;
-    const inProgressSkills = userSkills.filter(skill => skill.assessment_status === 'IN_PROGRESS').length;
-    const notStartedSkills = userSkills.filter(skill => skill.assessment_status === 'NOT_STARTED').length;
+    // Use union of selected skills and any skills that have completed assessments
+    const selectedSkillIds = new Set(userSkills.map(s => s.skill.id));
+    const completedFromResults = new Set(completedSkillIdsFromResults);
+    const unionSkillIds = new Set<string>([...Array.from(selectedSkillIds), ...Array.from(completedFromResults)]);
+
+    const totalSkills = unionSkillIds.size;
+    const completedSkills = new Set<string>([
+      ...userSkills.filter(s => s.assessment_status === 'COMPLETED').map(s => s.skill.id),
+      ...Array.from(completedFromResults)
+    ]).size;
+
+    const inProgressFromUser = userSkills.filter(skill => skill.assessment_status === 'IN_PROGRESS').length;
+    const sessionInProgress = activeSession && activeSession.hasActiveSession && !activeSession.completed ? 1 : 0;
+    const inProgressSkills = Math.max(inProgressFromUser, sessionInProgress);
+    const notStartedSkills = Math.max(0, totalSkills - completedSkills - inProgressSkills);
     const completionRate = totalSkills > 0 ? Math.round((completedSkills / totalSkills) * 100) : 0;
     
-    // Calculate average score from completed skills
-    const completedSkillsWithScores = userSkills.filter(skill => 
-      skill.assessment_status === 'COMPLETED' && skill.current_score !== null && skill.current_score !== undefined
-    );
-    const averageScore = completedSkillsWithScores.length > 0 
-      ? completedSkillsWithScores.reduce((sum, skill) => sum + (skill.current_score || 0), 0) / completedSkillsWithScores.length
+    // Average score: prefer userSkills scores; fall back to recentResults scores
+    const completedSkillScores = userSkills
+      .filter(s => s.assessment_status === 'COMPLETED' && s.current_score !== null && s.current_score !== undefined)
+      .map(s => s.current_score as number);
+    const resultScores = recentResults.map(r => r.finalScore).filter(s => typeof s === 'number') as number[];
+    const scorePool = completedSkillScores.length > 0 ? completedSkillScores : resultScores;
+    const averageScore = scorePool.length > 0
+      ? scorePool.reduce((sum, v) => sum + v, 0) / scorePool.length
       : 0;
     
     return {
@@ -132,7 +158,54 @@ export default function DashboardImproved() {
       averageScore: Math.round(averageScore * 10) / 10, // Round to 1 decimal
       totalAssessments: completedSkills + inProgressSkills
     };
-  }, [userSkills]);
+  }, [userSkills, completedSkillIdsFromResults, activeSession]);
+
+  // Detailed breakdown logs for Not Started/In Progress/Completed
+  useEffect(() => {
+    try {
+      const selectedSkillIds = new Set(userSkills.map(s => s.skill.id));
+      const completedFromResults = new Set(Array.from(completedSkillIdsFromResults.values()));
+      const unionSkillIds = new Set<string>([...Array.from(selectedSkillIds), ...Array.from(completedFromResults)]);
+      const completedFromUser = new Set(userSkills.filter(s => s.assessment_status === 'COMPLETED').map(s => s.skill.id));
+      const inProgressFromUser = new Set(userSkills.filter(s => s.assessment_status === 'IN_PROGRESS').map(s => s.skill.id));
+      const pendingFromUser = new Set(userSkills.filter(s => s.assessment_status === 'PENDING' || s.assessment_status === 'NOT_STARTED').map(s => s.skill.id));
+      const sessionInProgress = Boolean(activeSession && activeSession.hasActiveSession && !activeSession.completed);
+
+      console.log('🔎 DASHBOARD BREAKDOWN');
+      console.log('  selectedSkillIds:', Array.from(selectedSkillIds));
+      console.log('  completedFromResults:', Array.from(completedFromResults));
+      console.log('  unionSkillIds (totalSkills):', Array.from(unionSkillIds));
+      console.log('  completedFromUser:', Array.from(completedFromUser));
+      console.log('  inProgressFromUser:', Array.from(inProgressFromUser));
+      console.log('  pending/NOT_STARTED from user:', Array.from(pendingFromUser));
+      console.log('  sessionInProgress:', sessionInProgress);
+      console.log('  computed stats ->', stats);
+    } catch (e) {
+      // no-op
+    }
+  }, [userSkills, completedSkillIdsFromResults, activeSession, stats]);
+
+  // Debug: log inputs and computed stats so we can correlate with UI
+  useEffect(() => {
+    try {
+      console.log('📊 DASHBOARD DEBUG → userSkills:', userSkills.map(s => ({
+        skillId: s.skill.id,
+        name: s.skill.skill_name,
+        status: s.assessment_status,
+        score: s.current_score
+      })));
+      console.log('📊 DASHBOARD DEBUG → recentResults:', recentResults.map(r => ({
+        assessmentId: r.id,
+        skillId: r.skillId,
+        skillName: r.skillName,
+        finalScore: r.finalScore
+      })));
+      console.log('📊 DASHBOARD DEBUG → completedSkillIdsFromResults:', Array.from(completedSkillIdsFromResults.values()));
+      console.log('📊 DASHBOARD DEBUG → computed stats:', stats);
+    } catch (e) {
+      // no-op
+    }
+  }, [userSkills, recentResults, completedSkillIdsFromResults, stats]);
 
   // Load user skills with better error handling
   const loadUserSkills = async () => {
@@ -184,10 +257,32 @@ export default function DashboardImproved() {
     }
   };
 
+  // Load completed assessments for recent results
+  const loadCompletedAssessments = async () => {
+    try {
+      console.log('🔍 Dashboard: Loading completed assessments...');
+      const response = await apiService.get('/assessment/results');
+      if (response.success) {
+        const list: CompletedAssessment[] = response.data || [];
+        console.log('✅ Dashboard: Completed assessments loaded:', list.length);
+        list.forEach((r) => console.log('  →', r.skillName, r.finalScore, r.id));
+        setRecentResults(list.slice(0, 5));
+        setCompletedSkillIdsFromResults(new Set(list.map(r => r.skillId)));
+      } else {
+        setRecentResults([]);
+        setCompletedSkillIdsFromResults(new Set());
+      }
+    } catch (error) {
+      console.error('❌ Dashboard: Error loading completed assessments:', error);
+      setRecentResults([]);
+      setCompletedSkillIdsFromResults(new Set());
+    }
+  };
+
   // Refresh data
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([loadUserSkills(), loadActiveSession()]);
+    await Promise.all([loadUserSkills(), loadActiveSession(), loadCompletedAssessments()]);
     setRefreshing(false);
   };
 
@@ -294,6 +389,7 @@ export default function DashboardImproved() {
     if (!authLoading) {
       loadUserSkills();
       loadActiveSession();
+      loadCompletedAssessments();
     }
   }, [authLoading]);
 
@@ -310,28 +406,12 @@ export default function DashboardImproved() {
     return () => subscription?.remove();
   }, []);
 
-  // Loading state
+  // Loading state: render shimmer skeleton (non-blocking)
   if (authLoading || loadingSkills || loadingSession) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: BRAND }}>
-        <StatusBar style="light" />
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <MotiView
-            from={{ opacity: 0, scale: 0.5 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ type: 'timing', duration: 1000 }}
-          >
-            <Image source={logoSrc} style={{ width: 80, height: 80 }} resizeMode="contain" />
-          </MotiView>
-          <Text style={{ 
-            marginTop: 20, 
-            fontSize: 16, 
-            color: WHITE, 
-            fontWeight: '600' 
-          }}>
-            Loading your dashboard...
-          </Text>
-        </View>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+        <StatusBar style="dark" />
+        <DashboardSkeleton />
       </SafeAreaView>
     );
   }
@@ -894,6 +974,76 @@ export default function DashboardImproved() {
             </View>
           </View>
         )}
+
+        {/* Recent Results */}
+        {recentResults.length > 0 && (
+          <View style={{
+            backgroundColor: WHITE,
+            borderRadius: 16,
+            padding: 20,
+            marginBottom: 16,
+            shadowColor: BRAND,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.1,
+            shadowRadius: 12,
+            elevation: 5,
+            borderWidth: 1,
+            borderColor: '#E6F2FF'
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+              <View style={{
+                width: 48,
+                height: 48,
+                borderRadius: 12,
+                backgroundColor: '#EEF2FF',
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginRight: 12
+              }}>
+                <Ionicons name="ribbon-outline" size={24} color={BRAND} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{
+                  fontSize: 18,
+                  fontWeight: '700',
+                  color: DARK_GRAY
+                }}>
+                  Recent Results
+                </Text>
+                <Text style={{
+                  fontSize: 14,
+                  color: GRAY,
+                  marginTop: 2
+                }}>
+                  Your latest completed assessments
+                </Text>
+              </View>
+            </View>
+
+            {recentResults.map((r) => (
+              <View key={r.id} style={{
+                paddingVertical: 12,
+                borderTopWidth: 1,
+                borderTopColor: '#E5E7EB'
+              }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View style={{ flex: 1, paddingRight: 12 }}>
+                    <Text style={{ fontSize: 16, fontWeight: '600', color: DARK_GRAY }}>{r.skillName}</Text>
+                    <Text style={{ fontSize: 12, color: GRAY, marginTop: 2 }}>{r.scoreLabel || 'Result'}</Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ fontSize: 16, fontWeight: '700', color: BRAND }}>{Math.round(r.finalScore)}%</Text>
+                    {r.completedAt && (
+                      <Text style={{ fontSize: 11, color: GRAY, marginTop: 2 }}>
+                        {new Date(r.completedAt).toLocaleDateString()}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
       </View>
     </ScrollView>
   );
@@ -904,6 +1054,8 @@ export default function DashboardImproved() {
       
       {/* Main Content */}
       {renderHomeContent()}
+
+
 
       {/* Bottom Navigation */}
       <View style={{
@@ -938,6 +1090,36 @@ export default function DashboardImproved() {
               fontWeight: activeTab === 'home' ? '600' : '400'
             }}>
               Home
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => { 
+              console.log('🎯 Navigating to My Activity...');
+              console.log('🎯 Current route:', router.getCurrentPath?.() || 'unknown');
+              
+              // Simple direct navigation
+              router.push('/activity');
+              console.log('✅ Navigation attempted');
+            }}
+            style={{
+              flex: 1,
+              alignItems: 'center',
+              paddingVertical: 8
+            }}
+          >
+            <Ionicons 
+              name="time-outline" 
+              size={24} 
+              color={activeTab === 'activity' ? BRAND : GRAY} 
+            />
+            <Text style={{
+              fontSize: 12,
+              color: GRAY,
+              marginTop: 4,
+              fontWeight: '400'
+            }}>
+              My Activity
             </Text>
           </TouchableOpacity>
         </View>

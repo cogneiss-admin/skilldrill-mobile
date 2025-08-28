@@ -147,6 +147,20 @@ const AuthMiddleware = React.memo(({ children }: { children: React.ReactNode }) 
       return;
     }
 
+    // Don't redirect if we're on the assessment-results screen
+    const isAssessmentResultsScreen = segments[0] === 'assessment-results';
+    if (isAssessmentResultsScreen) {
+      console.log('📊 AuthMiddleware: On assessment-results screen, not redirecting');
+      return;
+    }
+
+    // Don't redirect if we're on the activity screen
+    const isActivityScreen = segments[0] === 'activity';
+    if (isActivityScreen) {
+      console.log('📊 AuthMiddleware: On activity screen, not redirecting');
+      return;
+    }
+
     if (isAuthenticated) {
       const onboardingComplete = isOnboardingComplete();
       const nextStep = getOnboardingNextStep();

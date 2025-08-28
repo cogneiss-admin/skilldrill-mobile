@@ -13,8 +13,8 @@ import { useAuth } from "../../hooks/useAuth";
 import { apiService } from "../../services/api";
 import { useToast } from "../../hooks/useToast";
 import TierSection from "../components/TierSection";
-import { getSkillsCtaLabel } from "../components/ctaLabel";
 import { useSkillsData } from "../../hooks/useSkillsData";
+import SkillsSkeleton from "../components/SkillsSkeleton";
 // Temporarily disabled Redux hook to fix import error
 // import { useSkillsRedux } from "../../hooks/useSkillsRedux";
 
@@ -36,6 +36,7 @@ export default function SkillsScreen() {
   const { updateOnboardingStep } = useAuth();
   const { showToast } = useToast();
   const [busy, setBusy] = useState(false);
+  const [skillsWithAssessments, setSkillsWithAssessments] = useState(new Set());
 
   const {
     skillsData,
@@ -101,10 +102,43 @@ export default function SkillsScreen() {
     }
   }, [selected]);
 
+  // Check for skills with existing assessments
+  useEffect(() => {
+    checkSkillsWithAssessments();
+  }, [checkSkillsWithAssessments]);
+
   const handleToggleSkill = useCallback(async (skillId) => {
+    // Check if skill already has an assessment
+    const skill = skillsData.find(s => s.id === skillId);
+    if (skill && skillsWithAssessments.has(skill.mongo_id)) {
+      showToast('info', 'Assessment Exists', 'You already have an assessment for this skill. Please select a different skill.');
+      return;
+    }
+    
     try { await Haptics.selectionAsync(); } catch {}
     toggleSkill(skillId);
-  }, [toggleSkill]);
+  }, [toggleSkill, skillsData, skillsWithAssessments, showToast]);
+
+  // Check which skills already have assessments
+  const checkSkillsWithAssessments = useCallback(async () => {
+    try {
+      // Use unified results endpoint used elsewhere in the app
+      const response = await apiService.get('/assessment/results');
+      if (response.success && Array.isArray(response.data)) {
+        const ids = new Set(
+          response.data
+            .map((r) => r?.skillId)
+            .filter((id) => typeof id === 'string' && id.length > 0)
+        );
+        setSkillsWithAssessments(ids);
+        console.log('📊 Skills with existing assessments:', Array.from(ids));
+      } else {
+        setSkillsWithAssessments(new Set());
+      }
+    } catch (error) {
+      console.log('ℹ️ Could not fetch assessments:', error.message);
+    }
+  }, []);
 
   const handleContinue = async () => {
     if (!canContinue || busy) return;
@@ -242,9 +276,7 @@ export default function SkillsScreen() {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: BRAND }}>
         <StatusBar style="light" />
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-          <Text style={{ color: "#ffffff", fontSize: 16 }}>Loading Skills...</Text>
-        </View>
+        <SkillsSkeleton />
       </SafeAreaView>
     );
   }
@@ -305,42 +337,13 @@ export default function SkillsScreen() {
                     selectedIds={selected}
                     onToggle={handleToggleSkill}
                     brand={BRAND}
+                    skillsWithAssessments={skillsWithAssessments}
                   />
                 );
               });
             })()}
         
-                {/* Skills Summary */}
-        {selected.length > 0 && (
-              <View style={{ 
-                marginTop: 20, 
-                marginBottom: 16,
-                alignItems: 'center'
-              }}>
-            <Text style={{ 
-              textAlign: "center",
-                  color: "#374151", 
-                  fontSize: 16,
-                  fontWeight: "600",
-                  marginBottom: 4
-            }}>
-              {isAddToAssessmentMode 
-                ? `${selected.length} skill${selected.length !== 1 ? 's' : ''} will be added`
-                : isFromCompleted
-                ? `${selected.length} skill${selected.length !== 1 ? 's' : ''} for new assessment`
-                : `${selected.length} of ${skillsData.length} skills selected`
-              }
-            </Text>
-                <Text style={{ 
-                  textAlign: "center",
-                  color: "#6B7280", 
-                  fontSize: 14
-                }}>
-                  {isAddToAssessmentMode ? "Ready to add to assessment" : 
-                   isFromCompleted ? "Ready to start new assessment" : "Ready to continue"}
-                </Text>
-              </View>
-            )}
+                {/* Skills Summary removed per UX update */}
 
             {/* Error Display */}
         {error && (
@@ -376,13 +379,7 @@ export default function SkillsScreen() {
               style={{ borderRadius: 28, backgroundColor: BRAND, opacity: canContinue ? 1 : 0.7, shadowColor: BRAND, shadowOpacity: 0.35, shadowRadius: 14 }}
               labelStyle={{ fontWeight: "800", letterSpacing: 0.3 }}
             >
-              {getSkillsCtaLabel({
-                busy,
-                isAddToAssessmentMode,
-                isAssessmentMode,
-                isFromCompleted,
-                selectedCount: selected.length,
-              })}
+              Continue
             </Button>
           </View>
         </View>

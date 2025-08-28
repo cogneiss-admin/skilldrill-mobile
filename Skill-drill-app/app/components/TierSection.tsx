@@ -12,6 +12,7 @@ export function TierSection({
   selectedIds,
   onToggle,
   brand = "#0A66C2",
+  skillsWithAssessments = new Set(),
 }: {
   tierKey: string;
   title: string;
@@ -20,6 +21,7 @@ export function TierSection({
   selectedIds: Array<string | number>;
   onToggle: (id: string | number) => void;
   brand?: string;
+  skillsWithAssessments?: Set<string>;
 }) {
   return (
     <View key={tierKey} style={{ marginBottom: 32 }}>
@@ -52,6 +54,7 @@ export function TierSection({
               brand={brand}
               onPress={() => onToggle(skill.id)}
               index={index}
+              hasAssessment={skillsWithAssessments.has(skill.mongo_id)}
             />
           </MotiView>
         ))}

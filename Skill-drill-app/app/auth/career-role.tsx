@@ -10,6 +10,7 @@ import { StatusBar } from "expo-status-bar";
 import { AntDesign } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "../../hooks/useAuth";
+import CareerSkeleton from "../components/CareerSkeleton";
 
 const BRAND = "#0A66C2";
 const APP_NAME = "Skill Drill";
@@ -160,9 +161,7 @@ export default function CareerRoleScreen() {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: BRAND }}>
         <StatusBar style="light" />
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-          <Text style={{ color: "#ffffff", fontSize: 16 }}>Loading...</Text>
-        </View>
+        <CareerSkeleton />
       </SafeAreaView>
     );
   }

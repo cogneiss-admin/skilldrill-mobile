@@ -63,11 +63,10 @@ export default function SessionLoadingScreen() {
 
       setStatus("Checking assessment completion...");
       
-      // Check if user has completed assessments
-      const assessmentsResponse = await apiService.get('/user/assessments');
-      const hasCompletedAssessments = assessmentsResponse.success && 
-                                    assessmentsResponse.data && 
-                                    assessmentsResponse.data.length > 0;
+      // Compute completion from user skills (no separate endpoint required)
+      const hasCompletedAssessments = Array.isArray(skillsData) && skillsData.length > 0
+        ? skillsData.every((s: any) => s.assessment_status === 'COMPLETED')
+        : false;
       
       // User has skills but no active session - go to dashboard
       setStatus("Loading dashboard...");
@@ -85,13 +84,30 @@ export default function SessionLoadingScreen() {
 
     } catch (error) {
       console.error('Session loading error:', error);
-      setStatus("Error loading session...");
-      setTimeout(() => {
-        router.replace({
-          pathname: '/dashboard',
-          params: { error: 'true' }
-        });
-      }, 2000);
+      
+      // Check if this is an authentication error (401 or specific error codes)
+      const isAuthError = error?.status === 401 || 
+                         error?.code === 'INVALID_TOKEN' ||
+                         error?.code === 'INVALID_REFRESH_TOKEN' ||
+                         error?.code === 'UNAUTHORIZED' ||
+                         error?.message?.includes('Unauthorized') ||
+                         error?.message?.includes('session expired') ||
+                         error?.message?.includes('login again');
+      
+      if (isAuthError) {
+        setStatus("Session expired. Redirecting to login...");
+        setTimeout(() => {
+          router.replace('/auth/login');
+        }, 1000);
+      } else {
+        setStatus("Error loading session...");
+        setTimeout(() => {
+          router.replace({
+            pathname: '/dashboard',
+            params: { error: 'true' }
+          });
+        }, 2000);
+      }
     } finally {
       setLoading(false);
     }

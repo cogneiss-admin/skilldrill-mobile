@@ -322,11 +322,16 @@ class ApiService {
       
       // Handle 401 Unauthorized errors
       if (status === 401) {
-        // Don't handle session expiration for login/signup endpoints
+        // Don't handle session expiration for auth-related endpoints
         const url = error.config?.url || '';
-        const isAuthEndpoint = url.includes('/login') || url.includes('/signup') || url.includes('/otp');
-        
-        if (!isAuthEndpoint) {
+        const isAuthEndpoint =
+          url.includes('/login') ||
+          url.includes('/signup') ||
+          url.includes('/otp') ||
+          url.includes('/multi-auth/logout');
+
+        // Only trigger session-expired flow if user is on a protected route.
+        if (!isAuthEndpoint && SessionManager.isOnProtectedRoute()) {
           SessionManager.handleUnauthorized();
         }
       }
@@ -371,8 +376,10 @@ class ApiService {
           break;
         case 'UNAUTHORIZED':
           message = 'Unauthorized access. Please login again.';
-          // Handle unauthorized access
-          SessionManager.handleUnauthorized();
+          // Handle unauthorized access only on protected routes
+          if (SessionManager.isOnProtectedRoute()) {
+            SessionManager.handleUnauthorized();
+          }
           break;
       }
       
