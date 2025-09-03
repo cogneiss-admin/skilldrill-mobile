@@ -35,6 +35,12 @@ interface UserSkill {
   assessment_count?: number;
   progression_layer?: string;
   self_rating?: number;
+  progress?: {
+    percentage: number;
+    completed: number;
+    total: number;
+    hasResponses: boolean;
+  };
 }
 
 interface CompletedAssessment {
@@ -46,6 +52,7 @@ interface CompletedAssessment {
   stars?: number;
   completedAt?: string;
   identifiedStyle?: string;
+  feedback?: string; // Added feedback field
 }
 
 export default function MyActivity() {
@@ -147,18 +154,18 @@ export default function MyActivity() {
   };
 
   const getScoreColor = (score: number) => {
-    if (score >= 90) return '#10B981';
-    if (score >= 80) return '#059669';
-    if (score >= 70) return '#0D9488';
-    if (score >= 60) return '#DC2626';
-    return '#991B1B';
+    if (score >= 9) return '#10B981';
+    if (score >= 8) return '#059669';
+    if (score >= 7) return '#0D9488';
+    if (score >= 6) return '#F59E0B';
+    return '#DC2626';
   };
 
   const getLevelLabel = (score: number) => {
-    if (score >= 90) return 'Expert';
-    if (score >= 80) return 'Advanced';
-    if (score >= 70) return 'Intermediate';
-    if (score >= 60) return 'Beginner';
+    if (score >= 9) return 'Expert';
+    if (score >= 8) return 'Advanced';
+    if (score >= 7) return 'Proficient';
+    if (score >= 6) return 'Competent';
     return 'Needs Improvement';
   };
 
@@ -195,28 +202,51 @@ export default function MyActivity() {
     if (skillName.includes('adaptability')) return 'Flexible';
     if (skillName.includes('emotional')) return 'Empathetic';
     
-    return 'Skill Enthusiast';
+    // Default tags based on status
+    if (skill.assessment_status === 'COMPLETED') return 'Proficient';
+    if (skill.assessment_status === 'IN_PROGRESS') return 'Developing';
+    if (skill.assessment_status === 'PENDING') return 'Ready to Start';
+    return 'Not Started';
   };
 
   const filteredSkills = userSkills.filter(skill => {
+    // Determine effective status for filtering
+    const effectiveStatus = (skill.assessment_status === 'PENDING' && skill.progress?.hasResponses) 
+      ? 'IN_PROGRESS' 
+      : skill.assessment_status;
+    
     if (activeFilter === 'all') return true;
-    if (activeFilter === 'completed') return skill.assessment_status === 'COMPLETED';
-    if (activeFilter === 'in-progress') return skill.assessment_status === 'IN_PROGRESS';
-    if (activeFilter === 'not-started') return skill.assessment_status === 'NOT_STARTED' || skill.assessment_status === 'PENDING';
+    if (activeFilter === 'completed') return effectiveStatus === 'COMPLETED';
+    if (activeFilter === 'in-progress') return effectiveStatus === 'IN_PROGRESS';
+    if (activeFilter === 'not-started') return effectiveStatus === 'NOT_STARTED' || effectiveStatus === 'PENDING';
     return true;
   });
 
 
   const renderSkillCard = (skill: UserSkill, index: number) => {
-    const statusColor = getStatusColor(skill.assessment_status);
-    const statusIcon = getStatusIcon(skill.assessment_status);
-    const statusLabel = getStatusLabel(skill.assessment_status);
+    // Determine effective status based on progress
+    const effectiveStatus = (skill.assessment_status === 'PENDING' && skill.progress?.hasResponses) 
+      ? 'IN_PROGRESS' 
+      : skill.assessment_status;
+    
+    const statusColor = getStatusColor(effectiveStatus);
+    const statusIcon = getStatusIcon(effectiveStatus);
+    const statusLabel = getStatusLabel(effectiveStatus);
     const skillIcon = getSkillIcon(skill.skill.skill_name);
     const completedAssessment = completedAssessments.find(a => a.skillId === skill.skill.id);
     const aiTag = getAITag(skill, completedAssessment);
     const score = skill.current_score || completedAssessment?.finalScore;
     const scoreColor = score ? getScoreColor(score) : '#6B7280';
     const levelLabel = score ? getLevelLabel(score) : 'Not Assessed';
+
+    // Use progress data from backend if available, otherwise fallback to old logic
+    const progress = skill.progress?.percentage || 
+      (skill.assessment_status === 'IN_PROGRESS' ? 
+        Math.round((skill.current_score || 0) * 10) : 
+        skill.assessment_status === 'PENDING' ? 40 : 0);
+    
+    // Check if assessment has responses to determine if it's actually in progress
+    const hasResponses = skill.progress?.hasResponses || (skill.assessment_count && skill.assessment_count > 0);
 
     return (
       <MotiView
@@ -343,17 +373,18 @@ export default function MyActivity() {
               </View>
             </View>
 
-            {/* Score and Progress */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              {score ? (
-                <>
+            {/* Content based on status */}
+            {skill.assessment_status === 'COMPLETED' && score ? (
+              // Completed assessment - show score and feedback
+              <View style={{ marginBottom: 16 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                   <View style={{ flex: 1 }}>
                     <Text style={{
                       fontSize: 12,
                       color: '#6B7280',
                       marginBottom: 4
                     }}>
-                      Current Score
+                      Final Score
                     </Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={{
@@ -362,7 +393,7 @@ export default function MyActivity() {
                         color: scoreColor,
                         marginRight: 8
                       }}>
-                        {Math.round(score)}%
+                        {Math.round(score)}/10
                       </Text>
                       <View style={{
                         backgroundColor: scoreColor + '20',
@@ -400,9 +431,9 @@ export default function MyActivity() {
                       borderWidth: 4,
                       borderColor: 'transparent',
                       borderTopColor: scoreColor,
-                      borderRightColor: score >= 25 ? scoreColor : 'transparent',
-                      borderBottomColor: score >= 50 ? scoreColor : 'transparent',
-                      borderLeftColor: score >= 75 ? scoreColor : 'transparent',
+                      borderRightColor: score >= 2.5 ? scoreColor : 'transparent',
+                      borderBottomColor: score >= 5 ? scoreColor : 'transparent',
+                      borderLeftColor: score >= 7.5 ? scoreColor : 'transparent',
                       transform: [{ rotate: '-90deg' }]
                     }} />
                     <Text style={{
@@ -410,28 +441,222 @@ export default function MyActivity() {
                       fontWeight: '700',
                       color: scoreColor
                     }}>
-                      {Math.round(score)}%
+                      {Math.round(score)}
                     </Text>
                   </View>
-                </>
-              ) : (
-                <View style={{ flex: 1, alignItems: 'center' }}>
-                  <Text style={{
-                    fontSize: 16,
-                    color: '#6B7280',
-                    fontStyle: 'italic'
+                </View>
+
+                {/* Feedback section */}
+                {completedAssessment?.feedback && (
+                  <View style={{
+                    backgroundColor: '#F9FAFB',
+                    padding: 12,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: '#E5E7EB'
                   }}>
-                    No assessment completed yet
+                    <Text style={{
+                      fontSize: 12,
+                      color: '#6B7280',
+                      marginBottom: 4,
+                      fontWeight: '600'
+                    }}>
+                      AI Feedback
+                    </Text>
+                    <Text style={{
+                      fontSize: 13,
+                      color: '#374151',
+                      lineHeight: 18
+                    }} numberOfLines={3}>
+                      {completedAssessment.feedback}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            ) : skill.assessment_status === 'IN_PROGRESS' || skill.assessment_status === 'PENDING' ? (
+              // In progress or pending - show progress bar
+              <View style={{ marginBottom: 16 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <Text style={{
+                    fontSize: 12,
+                    color: '#6B7280'
+                  }}>
+                    Progress
+                  </Text>
+                  <Text style={{
+                    fontSize: 14,
+                    fontWeight: '600',
+                    color: '#374151'
+                  }}>
+                    {progress}%
+                    {skill.progress && (
+                      <Text style={{ fontSize: 12, color: '#6B7280', marginLeft: 8 }}>
+                        ({skill.progress.completed}/{skill.progress.total} questions)
+                      </Text>
+                    )}
                   </Text>
                 </View>
+                
+                {/* Progress Bar */}
+                <View style={{
+                  height: 8,
+                  backgroundColor: '#E5E7EB',
+                  borderRadius: 4,
+                  overflow: 'hidden'
+                }}>
+                  <View style={{
+                    height: '100%',
+                    backgroundColor: statusColor,
+                    width: `${progress}%`,
+                    borderRadius: 4
+                  }} />
+                </View>
+                
+                <Text style={{
+                  fontSize: 12,
+                  color: '#6B7280',
+                  marginTop: 4,
+                  fontStyle: 'italic'
+                }}>
+                  {(skill.assessment_status === 'IN_PROGRESS' || (skill.progress?.hasResponses || hasResponses)) 
+                    ? 'Continue your assessment' 
+                    : 'Assessment ready to start'}
+                </Text>
+              </View>
+            ) : (
+              // Not started - show empty state
+              <View style={{ 
+                marginBottom: 16, 
+                alignItems: 'center',
+                paddingVertical: 20
+              }}>
+                <View style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 24,
+                  backgroundColor: '#F3F4F6',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginBottom: 12
+                }}>
+                  <AntDesign name="play-circle" size={24} color="#9CA3AF" />
+                </View>
+                <Text style={{
+                  fontSize: 14,
+                  color: '#6B7280',
+                  textAlign: 'center'
+                }}>
+                  Ready to start your assessment
+                </Text>
+              </View>
+            )}
+
+            {/* Action Buttons */}
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              {skill.assessment_status === 'COMPLETED' ? (
+                <TouchableOpacity
+                  onPress={() => {
+                    const assessment = completedAssessments.find(a => a.skillId === skill.skill.id);
+                    if (assessment) {
+                      router.push({
+                        pathname: '/assessment-results',
+                        params: { assessmentId: assessment.id }
+                      });
+                    }
+                  }}
+                  style={{
+                    flex: 1,
+                    backgroundColor: '#F3F4F6',
+                    paddingVertical: 12,
+                    paddingHorizontal: 16,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: '#E5E7EB',
+                    alignItems: 'center'
+                  }}
+                >
+                  <Text style={{
+                    fontSize: 14,
+                    fontWeight: '600',
+                    color: '#374151'
+                  }}>
+                    View Details
+                  </Text>
+                </TouchableOpacity>
+              ) : (skill.assessment_status === 'IN_PROGRESS' || (skill.progress?.hasResponses || hasResponses)) ? (
+                <TouchableOpacity
+                  onPress={async () => {
+                    try {
+                      // Get the current assessment for this skill to resume
+                      const response = await apiService.get(`/assessment/skill/${skill.skill.id}/current`);
+                      
+                      if (response.success && response.data.sessionId) {
+                        // Navigate directly to assessment screen with session ID
+                        router.push({
+                          pathname: '/assessment',
+                          params: { 
+                            sessionId: response.data.sessionId,
+                            resume: 'true'
+                          }
+                        });
+                      } else {
+                        showToast('error', 'Error', 'Failed to resume assessment. Please try again.');
+                      }
+                    } catch (error) {
+                      console.error('Error resuming assessment:', error);
+                      showToast('error', 'Error', 'Failed to resume assessment. Please try again.');
+                    }
+                  }}
+                  style={{
+                    flex: 1,
+                    backgroundColor: BRAND,
+                    paddingVertical: 12,
+                    paddingHorizontal: 16,
+                    borderRadius: 12,
+                    alignItems: 'center'
+                  }}
+                >
+                  <Text style={{
+                    fontSize: 14,
+                    fontWeight: '600',
+                    color: '#FFFFFF'
+                  }}>
+                    Resume Assessment
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  onPress={() => {
+                    router.push({
+                      pathname: '/assessment-intro',
+                      params: { skillId: skill.skill.id }
+                    });
+                  }}
+                  style={{
+                    flex: 1,
+                    backgroundColor: BRAND,
+                    paddingVertical: 12,
+                    paddingHorizontal: 16,
+                    borderRadius: 12,
+                    alignItems: 'center'
+                  }}
+                >
+                  <Text style={{
+                    fontSize: 14,
+                    fontWeight: '600',
+                    color: '#FFFFFF'
+                  }}>
+                    Start Assessment
+                  </Text>
+                </TouchableOpacity>
               )}
             </View>
 
             {/* Assessment Count */}
             {skill.assessment_count && skill.assessment_count > 0 && (
               <View style={{
-                marginTop: 12,
-                paddingTop: 12,
+                marginTop: 16,
+                paddingTop: 16,
                 borderTopWidth: 1,
                 borderTopColor: '#E5E7EB',
                 flexDirection: 'row',
@@ -673,16 +898,41 @@ export default function MyActivity() {
                 </View>
                 <View style={{ alignItems: 'center' }}>
                   <Text style={{ fontSize: 24, fontWeight: '700', color: '#F59E0B' }}>
-                    {userSkills.filter(s => s.assessment_status === 'IN_PROGRESS').length}
+                    {userSkills.filter(s => s.assessment_status === 'IN_PROGRESS' || (s.assessment_status === 'PENDING' && s.progress?.hasResponses)).length}
                   </Text>
                   <Text style={{ fontSize: 12, color: '#6B7280' }}>In Progress</Text>
                 </View>
                 <View style={{ alignItems: 'center' }}>
                   <Text style={{ fontSize: 24, fontWeight: '700', color: '#6B7280' }}>
-                    {userSkills.filter(s => s.assessment_status === 'NOT_STARTED' || s.assessment_status === 'PENDING').length}
+                    {userSkills.filter(s => s.assessment_status === 'NOT_STARTED' || (s.assessment_status === 'PENDING' && !s.progress?.hasResponses)).length}
                   </Text>
                   <Text style={{ fontSize: 12, color: '#6B7280' }}>Pending</Text>
                 </View>
+              
+                {/* Average Score for Completed Assessments */}
+                {userSkills.filter(s => s.assessment_status === 'COMPLETED').length > 0 && (
+                  <View style={{
+                    marginTop: 16,
+                    paddingTop: 16,
+                    borderTopWidth: 1,
+                    borderTopColor: '#E5E7EB',
+                    alignItems: 'center'
+                  }}>
+                    <Text style={{ fontSize: 12, color: '#6B7280', marginBottom: 4 }}>
+                      Average Score (0-10 scale)
+                    </Text>
+                    <Text style={{ fontSize: 20, fontWeight: '700', color: BRAND }}>
+                      {(() => {
+                        const completedSkills = userSkills.filter(s => s.assessment_status === 'COMPLETED');
+                        const totalScore = completedSkills.reduce((sum, skill) => {
+                          const score = skill.current_score || 0;
+                          return sum + score;
+                        }, 0);
+                        return (totalScore / completedSkills.length).toFixed(1);
+                      })()}
+                    </Text>
+                  </View>
+                )}
               </View>
             </MotiView>
 

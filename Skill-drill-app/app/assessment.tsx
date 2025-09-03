@@ -19,6 +19,154 @@ const BRAND = "#0A66C2";
 const APP_NAME = "Skill Drill";
 const logoSrc = require("../assets/images/logo.png");
 
+// Shimmer loading component for questions layout
+const ShimmerLoader = () => {
+  const shimmerAnimation = {
+    from: { opacity: 0.3 },
+    animate: { opacity: 0.7 },
+    transition: { type: 'timing', duration: 1000, loop: true }
+  };
+
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: BRAND }}>
+      <StatusBar style="light" />
+      
+      {/* Blue Header with Shimmer */}
+      <View style={{ 
+        paddingHorizontal: 16, 
+        paddingTop: 8, 
+        paddingBottom: 16,
+        backgroundColor: BRAND
+      }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <MotiView {...shimmerAnimation}>
+              <View style={{ width: 32, height: 32, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 8 }} />
+            </MotiView>
+            <MotiView {...shimmerAnimation}>
+              <View style={{ marginLeft: 10, width: 80, height: 16, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 4 }} />
+            </MotiView>
+          </View>
+          
+          {/* Progress indicator shimmer */}
+          <MotiView {...shimmerAnimation}>
+            <View style={{
+              backgroundColor: "rgba(255, 255, 255, 0.2)",
+              paddingHorizontal: 10,
+              paddingVertical: 6,
+              borderRadius: 12,
+              width: 60,
+              height: 24
+            }} />
+          </MotiView>
+        </View>
+        
+        {/* Assessment title shimmer */}
+        <MotiView {...shimmerAnimation}>
+          <View style={{ 
+            width: 200, 
+            height: 20, 
+            backgroundColor: 'rgba(255,255,255,0.3)', 
+            borderRadius: 4,
+            marginTop: 12
+          }} />
+        </MotiView>
+        
+        {/* Progress text shimmer */}
+        <MotiView {...shimmerAnimation}>
+          <View style={{ 
+            width: 150, 
+            height: 14, 
+            backgroundColor: 'rgba(255,255,255,0.3)', 
+            borderRadius: 4,
+            marginTop: 4
+          }} />
+        </MotiView>
+      </View>
+      
+      {/* Content shimmer */}
+      <View style={{ flex: 1, backgroundColor: "#ffffff" }}>
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 20, paddingBottom: 100 }}>
+          
+          {/* Scenario card shimmer */}
+          <MotiView {...shimmerAnimation}>
+            <View style={{
+              backgroundColor: "#ffffff",
+              padding: 20,
+              borderRadius: 16,
+              marginBottom: 20,
+              shadowColor: "#000",
+              shadowOpacity: 0.06,
+              shadowRadius: 8,
+              elevation: 2,
+              borderWidth: 1,
+              borderColor: "#f1f5f9"
+            }}>
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 16 }}>
+                <View style={{ width: 20, height: 20, backgroundColor: '#e5e7eb', borderRadius: 10 }} />
+                <View style={{ marginLeft: 8, width: 100, height: 16, backgroundColor: '#e5e7eb', borderRadius: 4 }} />
+              </View>
+              
+              {/* Scenario text shimmer lines */}
+              <View style={{ marginBottom: 12 }}>
+                <View style={{ width: '100%', height: 12, backgroundColor: '#e5e7eb', borderRadius: 4, marginBottom: 8 }} />
+                <View style={{ width: '90%', height: 12, backgroundColor: '#e5e7eb', borderRadius: 4, marginBottom: 8 }} />
+                <View style={{ width: '95%', height: 12, backgroundColor: '#e5e7eb', borderRadius: 4, marginBottom: 8 }} />
+                <View style={{ width: '85%', height: 12, backgroundColor: '#e5e7eb', borderRadius: 4, marginBottom: 8 }} />
+                <View style={{ width: '70%', height: 12, backgroundColor: '#e5e7eb', borderRadius: 4 }} />
+              </View>
+            </View>
+          </MotiView>
+          
+          {/* Response card shimmer */}
+          <MotiView {...shimmerAnimation}>
+            <View style={{
+              backgroundColor: "#ffffff",
+              padding: 20,
+              borderRadius: 16,
+              marginBottom: 20,
+              shadowColor: "#000",
+              shadowOpacity: 0.06,
+              shadowRadius: 8,
+              elevation: 2,
+              borderWidth: 1,
+              borderColor: "#f1f5f9"
+            }}>
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 16 }}>
+                <View style={{ width: 20, height: 20, backgroundColor: '#e5e7eb', borderRadius: 10 }} />
+                <View style={{ marginLeft: 8, width: 120, height: 16, backgroundColor: '#e5e7eb', borderRadius: 4 }} />
+                <View style={{ marginLeft: 'auto', width: 80, height: 16, backgroundColor: '#e5e7eb', borderRadius: 4 }} />
+              </View>
+              
+              {/* Response input shimmer */}
+              <View style={{
+                backgroundColor: "#f9fafb",
+                borderWidth: 1,
+                borderColor: "#e5e7eb",
+                borderRadius: 12,
+                padding: 16,
+                minHeight: 120,
+                marginBottom: 16
+              }}>
+                <View style={{ width: '100%', height: 12, backgroundColor: '#e5e7eb', borderRadius: 4, marginBottom: 8 }} />
+                <View style={{ width: '90%', height: 12, backgroundColor: '#e5e7eb', borderRadius: 4, marginBottom: 8 }} />
+                <View style={{ width: '80%', height: 12, backgroundColor: '#e5e7eb', borderRadius: 4, marginBottom: 8 }} />
+                <View style={{ width: '60%', height: 12, backgroundColor: '#e5e7eb', borderRadius: 4 }} />
+              </View>
+              
+              {/* Word count shimmer */}
+              <View style={{ alignItems: 'flex-end' }}>
+                <View style={{ width: 60, height: 12, backgroundColor: '#e5e7eb', borderRadius: 4 }} />
+              </View>
+            </View>
+          </MotiView>
+          
+        </ScrollView>
+      </View>
+    </SafeAreaView>
+  );
+};
+
 export default function AssessmentScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -34,7 +182,14 @@ export default function AssessmentScreen() {
   const [currentAssessment, setCurrentAssessment] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [currentView, setCurrentView] = useState('start'); // 'start', 'scenario', 'skill-complete', 'complete'
+  const [currentView, setCurrentView] = useState(() => {
+    // If resuming, start with 'scenario' view instead of 'start' view
+    if (params.resume === 'true' && (params.skillId || params.sessionId)) {
+      console.log('🔄 Resume mode detected - initializing with scenario view');
+      return 'scenario';
+    }
+    return 'start';
+  }); // 'start', 'scenario', 'skill-complete', 'complete'
   
   // Scenario state management
   const [currentScenarioIndex, setCurrentScenarioIndex] = useState(0);
@@ -64,6 +219,9 @@ export default function AssessmentScreen() {
   // Double-tap to exit functionality
   const [showExitWarning, setShowExitWarning] = useState(false);
   const [lastBackPress, setLastBackPress] = useState(0);
+  
+  // Shimmer loading state for resume cases
+  const [showShimmer, setShowShimmer] = useState(false);
 
   // Hardware back button handler
   useEffect(() => {
@@ -77,18 +235,25 @@ export default function AssessmentScreen() {
     return () => backHandler.remove();
   }, [backButtonPressed, showBackWarning]);
 
+
+
   // Parse skills or session data safely
   useEffect(() => {
     try {
-      console.log('🎯 Assessment screen initializing...');
-      console.log('📊 Raw params:', params);
-      
       // Check if this is a resume session
       if (params.resume === 'true' && params.sessionId) {
-        console.log('🔄 Resuming existing session:', params.sessionId);
-        console.log('📊 Resume params:', { resume: params.resume, sessionId: params.sessionId });
         setSessionId(params.sessionId);
         // Don't set skills here - we'll get them from the session
+        setLoading(false);
+        return;
+      }
+
+      // Handle resume for specific skill (from activity card)
+      if (params.resume === 'true' && params.skillId) {
+        setSelectedSkills([params.skillId]);
+        setTotalSkills(1);
+        // Show shimmer while loading assessment data
+        setShowShimmer(true);
         setLoading(false);
         return;
       }
@@ -150,10 +315,18 @@ export default function AssessmentScreen() {
       setSelectedSkills([]);
       setTotalSkills(0);
       setError('Invalid skills data format');
+      
+      // Hide shimmer on error
+      setShowShimmer(false);
     } finally {
       setLoading(false);
+      
+      // Hide shimmer if not resuming
+      if (!(params.resume === 'true' && (params.skillId || params.sessionId))) {
+        setShowShimmer(false);
+      }
     }
-  }, [params.selectedSkills, params.resume, params.sessionId]);
+  }, [params.selectedSkills, params.resume, params.sessionId, params.skillId]);
 
   // Auto-initialize assessment when component is ready
   useEffect(() => {
@@ -161,41 +334,21 @@ export default function AssessmentScreen() {
     
     // Wait for authentication to be ready before initializing
     if (authLoading) {
-      console.log('⏳ Waiting for authentication to be ready...');
       return;
     }
-    
-    console.log('🔍 Checking initialization conditions...');
-    console.log('📊 Loading:', loading);
-    console.log('📊 Has initialized:', hasInitialized);
-    console.log('📊 Selected skills length:', selectedSkills?.length || 0);
-    console.log('📊 Session ID:', sessionId);
-    console.log('📊 Params resume:', params.resume);
-    console.log('📊 Params selectedSkills:', params.selectedSkills);
     
     // Initialize if we have skills, or if we're resuming a session
     const shouldInitialize = !loading && !hasInitialized && (
       (selectedSkills && selectedSkills.length > 0) || 
-      (sessionId && params.resume === 'true')
+      (sessionId && params.resume === 'true') ||
+      (params.skillId && params.resume === 'true')
     );
     
-    console.log('🔍 Initialization check:', {
-      loading,
-      hasInitialized,
-      selectedSkillsLength: selectedSkills?.length || 0,
-      sessionId,
-      resumeParam: params.resume,
-      shouldInitialize
-    });
-    
     if (shouldInitialize) {
-      console.log('🚀 Initializing assessment...');
       setHasInitialized(true);
       if (isMounted) {
         initializeAssessment();
       }
-    } else {
-      console.log('⏸️ Not initializing yet - conditions not met');
     }
     
     return () => {
@@ -205,6 +358,25 @@ export default function AssessmentScreen() {
 
   // Initialize assessment session with AI animation
   const initializeAssessment = async () => {
+    // Check if this is a resume operation - if so, skip AI loader
+    if (params.resume === 'true' && (params.skillId || params.sessionId)) {
+      try {
+        await performAssessmentInitialization();
+        // For resume, we don't need to show/hide AI loader
+        setCreatingAssessment(false);
+      } catch (error) {
+        setCreatingAssessment(false);
+        
+        // Hide shimmer on error
+        setShowShimmer(false);
+        
+        setError(error.message || 'Failed to resume assessment');
+        setHasInitialized(false);
+      }
+      return;
+    }
+
+    // Original AI loader logic for new assessments
     try {
       setShowAILoader(true);
       setAiProgress(0);
@@ -240,9 +412,12 @@ export default function AssessmentScreen() {
       }, 1000);
       
     } catch (error) {
-      console.error('❌ Assessment initialization error:', error);
       setShowAILoader(false);
       setCreatingAssessment(false);
+      
+      // Hide shimmer on error
+      setShowShimmer(false);
+      
       if (error.message === 'Assessment creation timeout') {
         setError('Assessment creation is taking too long. Please try again.');
       } else {
@@ -300,6 +475,13 @@ export default function AssessmentScreen() {
               setCurrentView('scenario');
               setCreatingAssessment(false);
               
+              // Ensure AI loader is hidden for resume cases
+              setShowAILoader(false);
+              setAiProgress(0);
+              
+              // Hide shimmer and show actual content
+              setShowShimmer(false);
+              
               // Session resumed silently
             } else if (currentAssessmentResponse?.success && currentAssessmentResponse.data.completed) {
               console.log('✅ All assessments completed');
@@ -315,6 +497,9 @@ export default function AssessmentScreen() {
               status: assessmentError.status,
               data: assessmentError.data
             });
+            
+            // Hide shimmer on error
+            setShowShimmer(false);
             
             // Check if it's a 404 (assessment not found) - show create button
             if (assessmentError.status === 404) {
@@ -332,7 +517,65 @@ export default function AssessmentScreen() {
         }
       } catch (sessionError) {
         console.log('ℹ️ No existing session found or error checking session:', sessionError.message);
+        // Hide shimmer on error
+        setShowShimmer(false);
         // Continue with starting new session - don't set error
+      }
+    }
+
+    // Handle resume for specific skill (from activity card)
+    if (params.skillId && params.resume === 'true') {
+      try {
+        // Get the current assessment for this specific skill
+        const skillAssessmentResponse = await apiService.get(`/assessment/skill/${params.skillId}/current`);
+        
+        if (skillAssessmentResponse.success && skillAssessmentResponse.data.assessment) {
+          // Set all the necessary state
+          setSessionId(skillAssessmentResponse.data.sessionId);
+          setCurrentSkillIndex(0);
+          setTotalSkills(1);
+          setSelectedSkills([params.skillId]);
+          setCurrentAssessment(skillAssessmentResponse.data.assessment);
+          setCurrentView('scenario');
+          setCreatingAssessment(false);
+          
+          // Ensure AI loader is hidden for resume cases
+          setShowAILoader(false);
+          setAiProgress(0);
+          
+          // Load existing responses and find next unanswered question
+          try {
+            await fetchRealProgress();
+            findNextUnansweredQuestion();
+          } catch (responseError) {
+            setCurrentScenarioIndex(0);
+            setCurrentResponse('');
+          }
+          
+          // Hide shimmer and show actual content
+          setShowShimmer(false);
+          return;
+        } else {
+          // Hide shimmer on error
+          setShowShimmer(false);
+          
+          // Redirect to intro screen to create new assessment
+          router.replace({
+            pathname: '/assessment-intro',
+            params: { skillId: params.skillId }
+          });
+          return;
+        }
+      } catch (skillError) {
+        // Hide shimmer on error
+        setShowShimmer(false);
+        
+        // Redirect to intro screen on error
+        router.replace({
+          pathname: '/assessment-intro',
+          params: { skillId: params.skillId }
+        });
+        return;
       }
     }
 
@@ -390,6 +633,9 @@ export default function AssessmentScreen() {
             setCurrentView('scenario');
             setCreatingAssessment(false);
             
+            // Hide shimmer and show actual content
+            setShowShimmer(false);
+            
             // Session resumed silently
             return;
           }
@@ -399,6 +645,8 @@ export default function AssessmentScreen() {
       }
     } catch (sessionError) {
       console.log('ℹ️ No existing session found or error checking session:', sessionError.message);
+      // Hide shimmer on error
+      setShowShimmer(false);
       // Continue with starting new session
     }
 
@@ -406,6 +654,9 @@ export default function AssessmentScreen() {
     console.log('🆕 New assessment flow - showing create button');
     setError('Failed to load assessment data. Please try again.');
     setLoading(false);
+    
+    // Hide shimmer for new assessment flow
+    setShowShimmer(false);
   };
 
   // Retry initialization handler
@@ -477,14 +728,22 @@ export default function AssessmentScreen() {
         console.error('❌ Failed to create assessment:', response.message);
         setShowAILoader(false);
         setCreatingAssessment(false);
+        
+        // Hide shimmer on error
+        setShowShimmer(false);
+        
         setError('Failed to create assessment: ' + response.message);
       }
-    } catch (error) {
-      console.error('❌ Error creating assessment:', error);
-      setShowAILoader(false);
-      setCreatingAssessment(false);
-      setError('Failed to create assessment. Please try again.');
-    }
+          } catch (error) {
+        console.error('❌ Error creating assessment:', error);
+        setShowAILoader(false);
+        setCreatingAssessment(false);
+        
+        // Hide shimmer on error
+        setShowShimmer(false);
+        
+        setError('Failed to create assessment. Please try again.');
+      }
   };
 
   // Handle back to dashboard
@@ -531,35 +790,82 @@ export default function AssessmentScreen() {
   };
 
   // Handle next scenario
-  const handleNextScenario = () => {
+  const handleNextScenario = async () => {
     const prompts = currentAssessment?.template?.prompts || [];
     
-    // Save current response
+    // Save current response to local state
     if (currentResponse.trim()) {
       setUserResponses(prev => ({
         ...prev,
         [currentScenarioIndex]: currentResponse.trim()
       }));
     }
+
+          // Store current response in database for progress tracking (but don't complete assessment)
+      if (currentResponse.trim() && currentAssessment?.id && prompts[currentScenarioIndex]?.id) {
+        try {
+          const currentPrompt = prompts[currentScenarioIndex];
+          await apiService.post('/assessment/response', {
+            assessmentId: currentAssessment.id,
+            promptId: currentPrompt.id,
+            response: {
+              text_content: currentResponse.trim(),
+              time_taken_seconds: 0
+            },
+            completeAssessment: false // Don't complete assessment, just store for progress
+          });
+          
+          // Update progress after storing response
+          await updateAssessmentStatus();
+          console.log('✅ Response stored in database for progress tracking');
+        } catch (error) {
+          console.error('❌ Failed to store response for progress tracking:', error);
+          // Continue anyway, but log the error
+        }
+      }
 
     if (currentScenarioIndex < prompts.length - 1) {
       // Move to next scenario
       setCurrentScenarioIndex(prev => prev + 1);
       setCurrentResponse(userResponses[currentScenarioIndex + 1] || "");
     } else {
-      // Complete current skill assessment
-      handleCompleteSkillAssessment();
+      // Last scenario - show submit button instead of auto-completing
+      // User must click "Submit Assessment" to submit all responses
+      console.log('ℹ️ Last scenario reached. User must click Submit Assessment to complete.');
     }
   };
 
   // Handle previous scenario
-  const handlePreviousScenario = () => {
-    // Save current response
+  const handlePreviousScenario = async () => {
+    // Save current response to local state
     if (currentResponse.trim()) {
       setUserResponses(prev => ({
         ...prev,
         [currentScenarioIndex]: currentResponse.trim()
       }));
+    }
+
+    // Store current response in database for progress tracking (but don't complete assessment)
+    if (currentResponse.trim() && currentAssessment?.id && currentAssessment?.template?.prompts[currentScenarioIndex]?.id) {
+      try {
+        const currentPrompt = currentAssessment.template.prompts[currentScenarioIndex];
+        await apiService.post('/assessment/response', {
+          assessmentId: currentAssessment.id,
+          promptId: currentPrompt.id,
+          response: {
+            text_content: currentResponse.trim(),
+            time_taken_seconds: 0
+          },
+          completeAssessment: false // Don't complete assessment, just store for progress
+        });
+        
+        // Update progress after storing response
+        await updateAssessmentStatus();
+        console.log('✅ Response stored in database for progress tracking');
+      } catch (error) {
+        console.error('❌ Failed to store response for progress tracking:', error);
+        // Continue anyway, but log the error
+      }
     }
 
     if (currentScenarioIndex > 0) {
@@ -573,44 +879,136 @@ export default function AssessmentScreen() {
     try {
       if (currentAssessment?.id) {
         const response = await apiService.get('/assessment/session/status');
+        
         if (response.success && response.data.progress) {
           const progressData = response.data.progress;
+          
           const progressPercentage = progressData.totalPrompts > 0 
             ? (progressData.completedResponses / progressData.totalPrompts) * 100 
             : 0;
           
-          setRealProgress({
+          const progressObject = {
             totalPrompts: progressData.totalPrompts,
             completedResponses: progressData.completedResponses,
             percentage: progressPercentage,
             status: progressData.status
-          });
+          };
+          
+          setRealProgress(progressObject);
         }
       }
     } catch (error) {
-      console.log('⚠️ Could not fetch real progress:', error);
+      // Silent error handling
     }
   };
+
+  // Find the next unanswered question when resuming assessment
+  const findNextUnansweredQuestion = async () => {
+    try {
+      if (!currentAssessment?.id) {
+        return;
+      }
+
+      // Get all responses for this assessment
+      const response = await apiService.get(`/assessment/response/${currentAssessment.id}`);
+      
+      if (response.success && response.data) {
+        const answeredPromptIds = new Set(response.data.responses.map(r => r.prompt_id));
+        const prompts = currentAssessment.template?.prompts || [];
+        
+        // Load existing responses into local state
+        const existingResponses = {};
+        response.data.responses.forEach(r => {
+          const promptIndex = prompts.findIndex(p => p.id === r.prompt_id);
+          if (promptIndex !== -1) {
+            existingResponses[promptIndex] = r.text_content || '';
+          }
+        });
+        
+        setUserResponses(existingResponses);
+        
+        // Find the first unanswered question
+        for (let i = 0; i < prompts.length; i++) {
+          const isAnswered = answeredPromptIds.has(prompts[i].id);
+          
+          if (!isAnswered) {
+            setCurrentScenarioIndex(i);
+            setCurrentResponse(existingResponses[i] || "");
+            break;
+          }
+        }
+      }
+    } catch (error) {
+      // Default to first question if the error
+      setCurrentScenarioIndex(0);
+      setCurrentResponse(userResponses[0] || "");
+    }
+  };
+
+  // Update assessment status when responses are submitted
+  const updateAssessmentStatus = async () => {
+    try {
+      if (!currentAssessment?.id) return;
+      
+      // Get current assessment responses to check count
+      const response = await apiService.get(`/assessment/response/${currentAssessment.id}`);
+      if (response.success && response.data) {
+        const totalPrompts = response.data.totalPrompts || 3;
+        const completedResponses = response.data.completedResponses;
+        
+        // Update local progress state
+        setRealProgress(prev => ({
+          ...prev,
+          totalPrompts,
+          completedResponses,
+          percentage: (completedResponses / totalPrompts) * 100,
+          status: completedResponses >= totalPrompts ? 'COMPLETED' : 'IN_PROGRESS'
+        }));
+      }
+    } catch (error) {
+      console.log('⚠️ Could not update assessment status:', error);
+    }
+  };
+
+
 
   // Fetch progress when assessment loads
   useEffect(() => {
     if (currentAssessment && currentAssessment.id) {
       fetchRealProgress();
+      // If this is a resume, find the next unanswered question
+      if (params.resume === 'true') {
+        findNextUnansweredQuestion();
+      }
     }
   }, [currentAssessment]);
+
+
 
   // Handle complete skill assessment
   const handleCompleteSkillAssessment = async () => {
     try {
       setSubmitting(true);
       
-      // Save final response
+      // Check if assessment is already completed
+      if (currentAssessment?.status === 'COMPLETED') {
+        console.log('ℹ️ Assessment already completed, showing completion modal');
+        setCompletedSkillName(currentAssessment.skill?.skill_name || "Skill");
+        setShowSkillCompleteModal(true);
+        setSubmitting(false);
+        return;
+      }
+      
+      // Save final response to local state
       if (currentResponse.trim()) {
         setUserResponses(prev => ({
           ...prev,
           [currentScenarioIndex]: currentResponse.trim()
         }));
       }
+
+      // Now submit ALL responses at once using bulk endpoint
+      console.log('📤 Submitting all assessment responses at once...');
 
       // Check if all scenarios have responses
       const prompts = currentAssessment?.template?.prompts || [];
@@ -726,6 +1124,15 @@ export default function AssessmentScreen() {
         }
       }
       
+      // Check if assessment is already completed before bulk submission
+      if (currentAssessment?.status === 'COMPLETED') {
+        console.log('ℹ️ Assessment already completed, skipping bulk submission');
+        setCompletedSkillName(currentAssessment.skill?.skill_name || "Skill");
+        setShowSkillCompleteModal(true);
+        setSubmitting(false);
+        return;
+      }
+      
       // Submit responses to backend with extended timeout
       console.log('📤 Making API call to /assessment/response/bulk...');
       console.log('📤 Request data size:', JSON.stringify(requestData).length, 'characters');
@@ -736,7 +1143,13 @@ export default function AssessmentScreen() {
       console.log('📤 Request timeout:', 60000);
       
       try {
-        const response = await apiService.post('/assessment/response/bulk', requestData, { 
+        // Add completeAssessment flag to bulk request
+        const bulkRequestData = {
+          ...requestData,
+          completeAssessment: true // This will complete and score the assessment
+        };
+        
+        const response = await apiService.post('/assessment/response/bulk', bulkRequestData, { 
           timeout: 60000,
           headers: {
             'Content-Type': 'application/json',
@@ -1084,8 +1497,8 @@ export default function AssessmentScreen() {
     );
   }
 
-  // Show start screen
-  if (currentView === 'start') {
+  // Show start screen (but skip for resume cases)
+  if (currentView === 'start' && !(params.resume === 'true' && (params.skillId || params.sessionId))) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: BRAND }}>
         <StatusBar style="light" />
@@ -1190,13 +1603,19 @@ export default function AssessmentScreen() {
     );
   }
 
+  // Show shimmer loading for resume cases
+  if (showShimmer) {
+    return <ShimmerLoader />;
+  }
+
   // Show scenario screen
   if (currentView === 'scenario') {
     const prompts = currentAssessment?.template?.prompts || [];
     const currentPrompt = prompts[currentScenarioIndex];
     const totalScenarios = prompts ? prompts.length : 3; // Default to 3 if undefined
+    
     // Use real progress from backend if available, otherwise fallback to scenario-based progress
-    const progress = realProgress ? realProgress.percentage / 100 : (currentScenarioIndex + 1) / totalScenarios;
+    const progress = realProgress ? realProgress.percentage / 100 : (realProgress?.completedResponses || 0) / (realProgress?.totalPrompts || 3);
     const hasResponse = currentResponse ? currentResponse.trim().length >= 50 : false;
     const wordCount = currentResponse ? currentResponse.trim().split(/\s+/).filter(word => word.length > 0).length : 0;
     const isWithinLimit = wordCount <= 100;
@@ -1268,7 +1687,7 @@ export default function AssessmentScreen() {
                 color: "#ffffff",
                 fontWeight: "700"
               }}>
-                {currentScenarioIndex + 1} of {totalScenarios}
+                {realProgress ? `${realProgress.completedResponses + 1} of ${realProgress.totalPrompts}` : `${currentScenarioIndex + 1} of ${totalScenarios}`}
               </Text>
             </View>
           </View>
@@ -1290,7 +1709,7 @@ export default function AssessmentScreen() {
             marginTop: 4,
             opacity: 0.9
           }}>
-            Skill {currentSkillIndex + 1} of {totalSkills} • {realProgress ? `${realProgress.completedResponses} of ${realProgress.totalPrompts} questions answered` : `${Math.round(progress * 100)}% Complete`}
+            {realProgress ? `${realProgress.completedResponses} of ${realProgress.totalPrompts} questions answered` : `${Math.round(progress * 100)}% Complete`}
           </Text>
         </View>
 
@@ -1642,7 +2061,7 @@ export default function AssessmentScreen() {
 
                     <Button
                       mode="contained"
-                      onPress={handleNextScenario}
+                      onPress={currentScenarioIndex < totalScenarios - 1 ? handleNextScenario : handleCompleteSkillAssessment}
                       loading={submitting}
                       disabled={!hasResponse || !isWithinLimit || submitting}
                       style={{
@@ -1669,7 +2088,7 @@ export default function AssessmentScreen() {
                       }
                     >
                       {submitting ? "Submitting..." :
-                       currentScenarioIndex < totalScenarios - 1 ? "Next Scenario" : "Complete Assessment"}
+                       currentScenarioIndex < totalScenarios - 1 ? "Next Scenario" : "Submit Assessment"}
                     </Button>
                   </View>
 

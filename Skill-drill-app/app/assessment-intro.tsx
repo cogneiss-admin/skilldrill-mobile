@@ -84,18 +84,17 @@ export default function AssessmentIntroScreen() {
       try {
         // First check if there's an active session
         const sessionResponse = await apiService.get('/assessment/session/status');
-        
+
         if (sessionResponse.success && sessionResponse.data && sessionResponse.data.hasActiveSession) {
           if (sessionResponse.data.completed) {
             console.log('✅ Found completed session, allowing new assessment creation');
             // Session is completed, allow creating new assessment
-            // Optionally, we could clear the completed session here
           } else {
             console.log('🔄 Found active session, redirecting to assessment:', sessionResponse.data.sessionId);
             // Redirect to assessment with existing session
             router.replace({
               pathname: '/assessment',
-              params: { 
+              params: {
                 sessionId: sessionResponse.data.sessionId,
                 resume: 'true'
               }
@@ -103,7 +102,15 @@ export default function AssessmentIntroScreen() {
             return;
           }
         }
-        
+
+        // Handle skillId parameter (from activity screen)
+        if (params.skillId) {
+          console.log('🎯 Specific skill selected:', params.skillId);
+          setSelectedSkills([params.skillId]);
+          setLoadingSkills(false);
+          return;
+        }
+
         // No active session, proceed with normal flow
         if (params.selectedSkills) {
           // Skills passed as params (from skills selection)
@@ -122,6 +129,13 @@ export default function AssessmentIntroScreen() {
         }
       } catch (error) {
         console.error('Error checking active session:', error);
+        // Handle skillId parameter even in error case
+        if (params.skillId) {
+          console.log('🎯 Specific skill selected (fallback):', params.skillId);
+          setSelectedSkills([params.skillId]);
+          setLoadingSkills(false);
+          return;
+        }
         // Fallback to normal flow
         if (params.selectedSkills) {
           try {
@@ -138,9 +152,9 @@ export default function AssessmentIntroScreen() {
         }
       }
     };
-    
+
     checkActiveSession();
-  }, [params.selectedSkills]);
+  }, [params.selectedSkills, params.skillId]);
 
   const handleCreateAssessment = async () => {
     try {
@@ -192,11 +206,13 @@ export default function AssessmentIntroScreen() {
         // Navigate to assessment screen with session ID
         router.replace({
           pathname: '/assessment',
-          params: { 
+          params: {
             sessionId: response.data.sessionId,
             resume: 'true'
           }
         });
+
+        // The activity screen will be refreshed when user navigates back
       } else {
         throw new Error(response.message || 'Failed to create assessment');
       }

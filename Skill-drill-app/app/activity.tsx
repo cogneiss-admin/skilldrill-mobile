@@ -54,6 +54,30 @@ interface CompletedAssessment {
   summary?: string;
 }
 
+interface AssessmentSession {
+  sessionId: string;
+  currentSkillIndex: number;
+  selectedSkills: string[];
+  isActive: boolean;
+  progress?: {
+    totalPrompts: number;
+    completedResponses: number;
+    status: string;
+  };
+  currentSkill?: {
+    id: string;
+    skill_name: string;
+  };
+}
+
+interface AssessmentTemplate {
+  skill_id: string;
+  template_id: string;
+  template_name: string;
+  total_questions: number;
+  created_at: string;
+}
+
 export default function MyActivity() {
   console.log('🎯 MyActivity component loaded!');
   console.log('🎯 Activity page rendering...');
@@ -62,8 +86,18 @@ export default function MyActivity() {
   
   const [userSkills, setUserSkills] = useState<UserSkill[]>([]);
   const [completedAssessments, setCompletedAssessments] = useState<CompletedAssessment[]>([]);
+  const [activeSession, setActiveSession] = useState<AssessmentSession | null>(null);
+  const [assessmentTemplates, setAssessmentTemplates] = useState<AssessmentTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Add refresh functionality
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadActivityData();
+    setRefreshing(false);
+  };
+  const [generatingAssessment, setGeneratingAssessment] = useState<string | null>(null); // skillId being generated
 
   useEffect(() => {
     loadActivityData();
@@ -74,18 +108,55 @@ export default function MyActivity() {
       setLoading(true);
       console.log('🔄 Loading activity data from backend...');
       
-      const [skillsResponse, assessmentsResponse] = await Promise.all([
+      // First sync assessment status to ensure consistency
+      try {
+        console.log('🔄 Syncing assessment status...');
+        await apiService.post('/user/skills/sync-status');
+        console.log('✅ Assessment status synced');
+      } catch (syncError) {
+        console.warn('⚠️ Assessment status sync failed:', syncError.message);
+      }
+      
+      const [skillsResponse, assessmentsResponse, sessionResponse] = await Promise.all([
         apiService.get('/user/skills'),
-        apiService.get('/assessment/results')
+        apiService.get('/assessment/results'),
+        apiService.get('/assessment/session/status') // Get current session status and progress
       ]);
       
       if (skillsResponse.success) {
         setUserSkills(skillsResponse.data);
         console.log('✅ User skills loaded:', skillsResponse.data.length);
+
+        // Log assessment statuses for debugging
+        skillsResponse.data.forEach(skill => {
+          console.log(`📊 Skill: ${skill.skill.skill_name}, Status: ${skill.assessment_status}, Progress: ${skill.progress?.percentage || 0}%`);
+        });
+
+        // Now check assessment templates for these skills
+        if (skillsResponse.data.length > 0) {
+          const skillIds = skillsResponse.data.map(skill => skill.skill.id);
+          await checkAssessmentTemplates(skillIds);
+        }
       }
       if (assessmentsResponse.success) {
         setCompletedAssessments(assessmentsResponse.data || []);
         console.log('✅ Completed assessments loaded:', assessmentsResponse.data?.length || 0);
+      }
+      if (sessionResponse.success && sessionResponse.data.hasActiveSession) {
+        setActiveSession(sessionResponse.data);
+        console.log('✅ Active session loaded:', sessionResponse.data);
+
+        // If there's an active session, refresh user skills to get updated assessment status
+        if (skillsResponse.success && skillsResponse.data.length > 0) {
+          const updatedSkillsResponse = await apiService.get('/user/skills');
+          if (updatedSkillsResponse.success) {
+            setUserSkills(updatedSkillsResponse.data);
+            console.log('✅ User skills refreshed with active session status');
+          }
+        }
+      } else {
+        setActiveSession(null);
+        console.log('ℹ️ No active session found');
       }
       
     } catch (error) {
@@ -94,6 +165,54 @@ export default function MyActivity() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Check which skills have assessment templates
+  const checkAssessmentTemplates = async (skillIds: string[]) => {
+    try {
+      const response = await apiService.post('/assessment/check-assessment-templates', { skillIds });
+      if (response.success) {
+        setAssessmentTemplates(response.data.skillsWithTemplates || []);
+        console.log('✅ Assessment templates checked:', response.data.skillsWithTemplates?.length || 0, 'templates found');
+      }
+    } catch (error) {
+      console.error('❌ Error checking assessment templates:', error);
+    }
+  };
+
+  // Generate assessment template for a skill
+  const generateAssessmentTemplate = async (skillId: string, skillName: string) => {
+    try {
+      setGeneratingAssessment(skillId);
+      showToast('info', 'Generating Assessment', `Creating AI-powered assessment for ${skillName}...`);
+      
+      const response = await apiService.post('/assessment/generate-assessment-template', { skillId });
+      
+      if (response.success) {
+        showToast('success', 'Assessment Generated', `${skillName} assessment is ready!`);
+        
+        // Refresh templates and skills data
+        await loadActivityData();
+        
+        // Navigate to assessment intro
+        router.push({
+          pathname: '/assessment-intro',
+          params: { skillId }
+        });
+      } else {
+        showToast('error', 'Generation Failed', response.message || 'Failed to generate assessment');
+      }
+    } catch (error) {
+      console.error('❌ Error generating assessment template:', error);
+      showToast('error', 'Generation Failed', 'Failed to generate assessment. Please try again.');
+    } finally {
+      setGeneratingAssessment(null);
+    }
+  };
+
+  // Check if a skill has an assessment template
+  const hasAssessmentTemplate = (skillId: string): boolean => {
+    return assessmentTemplates.some(template => template.skill_id === skillId);
   };
 
   // Backend-only: return identifiedStyle or empty
@@ -112,16 +231,35 @@ export default function MyActivity() {
     return typeof assessment?.finalScore === 'number' ? assessment.finalScore : undefined;
   };
 
+  // Get assessment progress for a specific skill
+  const getSkillProgress = (skillId: string) => {
+    // Check if this skill is part of the active session
+    if (activeSession && activeSession.selectedSkills.includes(skillId)) {
+      return activeSession.progress || { totalPrompts: 3, completedResponses: 0, status: 'PENDING' };
+    }
+    
+    // Default progress for skills not in active session
+    return { totalPrompts: 3, completedResponses: 0, status: 'PENDING' };
+  };
+
   const renderSkillCards = () => {
     return userSkills.map((skill, index) => {
-    const completedAssessment = completedAssessments.find(a => a.skillId === skill.skill.id);
-    const aiTag = getAITag(skill, completedAssessment);
+      const completedAssessment = completedAssessments.find(a => a.skillId === skill.skill.id);
+      const aiTag = getAITag(skill, completedAssessment);
       const aiInsights = getAIInsights(skill, completedAssessment);
       const score = getScore(completedAssessment);
+      
+      // Get assessment progress for this skill
+      const skillProgress = getSkillProgress(skill.skill.id);
+      const totalPrompts = skillProgress.totalPrompts;
+      const completedResponses = skillProgress.completedResponses;
 
-    return (
+      // Check if assessment template exists
+      const templateExists = hasAssessmentTemplate(skill.skill.id);
+
+      return (
         <ActivitySkillCard
-        key={skill.id}
+          key={skill.id}
           id={skill.id}
           skillName={skill.skill.skill_name}
           assessmentStatus={skill.assessment_status}
@@ -129,6 +267,17 @@ export default function MyActivity() {
           aiTag={aiTag}
           score={score}
           index={index}
+          skillId={skill.skill.id}
+          // Pass progress data directly
+          progressData={{
+            totalPrompts,
+            completedResponses,
+            status: skillProgress.status
+          }}
+          // Pass template existence and generation state
+          templateExists={templateExists}
+          isGenerating={generatingAssessment === skill.skill.id}
+          onGenerateAssessment={() => generateAssessmentTemplate(skill.skill.id, skill.skill.skill_name)}
         />
       );
     });
@@ -158,6 +307,23 @@ export default function MyActivity() {
           <Text style={{ color: '#FFFFFF', fontSize: 16, opacity: 0.9 }}>Your Activity 📊</Text>
           <Text style={{ color: '#FFFFFF', fontSize: 24, fontWeight: '700', marginTop: 5 }}>Skill Progress</Text>
           <Text style={{ color: '#FFFFFF', fontSize: 14, opacity: 0.8, marginTop: 5 }}>Track your assessment results and insights</Text>
+          
+          {/* Debug refresh button */}
+          <TouchableOpacity 
+            onPress={handleRefresh}
+            style={{
+              marginTop: 15,
+              backgroundColor: 'rgba(255, 255, 255, 0.2)',
+              paddingHorizontal: 16,
+              paddingVertical: 8,
+              borderRadius: 20,
+              alignSelf: 'flex-start'
+            }}
+          >
+            <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '600' }}>
+              🔄 Sync Status
+            </Text>
+          </TouchableOpacity>
         </View>
       </LinearGradient>
       
