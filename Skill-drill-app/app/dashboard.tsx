@@ -47,16 +47,7 @@ interface UserSkill {
   last_assessed_at?: string;
 }
 
-interface AssessmentSession {
-  session_id: string;
-  current_skill_index: number;
-  selected_skills: string[];
-  is_active: boolean;
-  progress?: {
-    totalPrompts: number;
-    completedResponses: number;
-  };
-}
+
 
 interface DashboardStats {
   totalSkills: number;
@@ -84,9 +75,7 @@ export default function DashboardImproved() {
   const { showToast } = useToast();
   
   const [userSkills, setUserSkills] = useState<UserSkill[]>([]);
-  const [activeSession, setActiveSession] = useState<AssessmentSession | null>(null);
   const [loadingSkills, setLoadingSkills] = useState(true);
-  const [loadingSession, setLoadingSession] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'home' | 'profile'>('home');
   const [recentResults, setRecentResults] = useState<CompletedAssessment[]>([]);
@@ -100,23 +89,7 @@ export default function DashboardImproved() {
     return 'Good evening';
   };
 
-  // Check if assessment is completed (session or skills)
-  const isAssessmentCompleted = () => {
-    // Check if all user skills are completed (regardless of session status)
-    const allSkillsCompleted = userSkills.length > 0 && 
-                              userSkills.every(skill => skill.assessment_status === 'COMPLETED');
-    
-    // If no active session, only check skills completion
-    if (!activeSession) {
-      return allSkillsCompleted;
-    }
-    
-    // If active session exists, check both session and skills completion
-    const sessionCompleted = activeSession.completed || 
-                           (activeSession.progress && activeSession.progress.status === 'COMPLETED');
-    
-    return sessionCompleted || allSkillsCompleted;
-  };
+
 
 
 
@@ -133,12 +106,10 @@ export default function DashboardImproved() {
       ...Array.from(completedFromResults)
     ]).size;
 
-    const inProgressFromUser = userSkills.filter(skill => skill.assessment_status === 'IN_PROGRESS').length;
-    const sessionInProgress = activeSession && activeSession.hasActiveSession && !activeSession.completed ? 1 : 0;
-    const inProgressSkills = Math.max(inProgressFromUser, sessionInProgress);
+    const inProgressSkills = userSkills.filter(skill => skill.assessment_status === 'IN_PROGRESS').length;
     const notStartedSkills = Math.max(0, totalSkills - completedSkills - inProgressSkills);
     const completionRate = totalSkills > 0 ? Math.round((completedSkills / totalSkills) * 100) : 0;
-    
+
     // Average score: prefer userSkills scores; fall back to recentResults scores
     const completedSkillScores = userSkills
       .filter(s => s.assessment_status === 'COMPLETED' && s.current_score !== null && s.current_score !== undefined)
@@ -148,7 +119,7 @@ export default function DashboardImproved() {
     const averageScore = scorePool.length > 0
       ? scorePool.reduce((sum, v) => sum + v, 0) / scorePool.length
       : 0;
-    
+
     return {
       totalSkills,
       completedSkills,
@@ -158,7 +129,7 @@ export default function DashboardImproved() {
       averageScore: Math.round(averageScore * 10) / 10, // Round to 1 decimal
       totalAssessments: completedSkills + inProgressSkills
     };
-  }, [userSkills, completedSkillIdsFromResults, activeSession]);
+  }, [userSkills, completedSkillIdsFromResults]);
 
   // Detailed breakdown logs for Not Started/In Progress/Completed
   useEffect(() => {
@@ -169,7 +140,6 @@ export default function DashboardImproved() {
       const completedFromUser = new Set(userSkills.filter(s => s.assessment_status === 'COMPLETED').map(s => s.skill.id));
       const inProgressFromUser = new Set(userSkills.filter(s => s.assessment_status === 'IN_PROGRESS').map(s => s.skill.id));
       const pendingFromUser = new Set(userSkills.filter(s => s.assessment_status === 'PENDING' || s.assessment_status === 'NOT_STARTED').map(s => s.skill.id));
-      const sessionInProgress = Boolean(activeSession && activeSession.hasActiveSession && !activeSession.completed);
 
       console.log('🔎 DASHBOARD BREAKDOWN');
       console.log('  selectedSkillIds:', Array.from(selectedSkillIds));
@@ -178,12 +148,11 @@ export default function DashboardImproved() {
       console.log('  completedFromUser:', Array.from(completedFromUser));
       console.log('  inProgressFromUser:', Array.from(inProgressFromUser));
       console.log('  pending/NOT_STARTED from user:', Array.from(pendingFromUser));
-      console.log('  sessionInProgress:', sessionInProgress);
       console.log('  computed stats ->', stats);
     } catch (e) {
       // no-op
     }
-  }, [userSkills, completedSkillIdsFromResults, activeSession, stats]);
+  }, [userSkills, completedSkillIdsFromResults, stats]);
 
   // Debug: log inputs and computed stats so we can correlate with UI
   useEffect(() => {
@@ -232,30 +201,7 @@ export default function DashboardImproved() {
     }
   };
 
-  // Load active session
-  const loadActiveSession = async () => {
-    try {
-      console.log('🔍 Dashboard: Loading active session...');
-      const response = await apiService.get('/assessment/session/status');
-      
-      if (response.success && response.data && response.data.hasActiveSession) {
-        console.log('✅ Dashboard: Active session found:', response.data);
-        console.log('📊 Session ID:', response.data.sessionId);
-        console.log('📊 Session data structure:', Object.keys(response.data));
-        console.log('📊 Completed field:', response.data.completed);
-        console.log('📊 Progress status:', response.data.progress?.status);
-        setActiveSession(response.data);
-      } else {
-        console.log('ℹ️ Dashboard: No active session found');
-        setActiveSession(null);
-      }
-    } catch (error) {
-      console.error('❌ Dashboard: Error loading session:', error);
-      setActiveSession(null);
-    } finally {
-      setLoadingSession(false);
-    }
-  };
+
 
   // Load completed assessments for recent results
   const loadCompletedAssessments = async () => {
@@ -282,70 +228,11 @@ export default function DashboardImproved() {
   // Refresh data
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([loadUserSkills(), loadActiveSession(), loadCompletedAssessments()]);
+    await Promise.all([loadUserSkills(), loadCompletedAssessments()]);
     setRefreshing(false);
   };
 
-  // Handle start assessment
-  const handleStartAssessment = async () => {
-    try {
-      if (userSkills.length === 0) {
-        showToast('error', 'No Skills Selected', 'Please select skills first');
-        router.push('/auth/skills');
-        return;
-      }
 
-      const completed = isAssessmentCompleted();
-      
-      if (activeSession && activeSession.sessionId && !completed) {
-        // Resume existing assessment session (only if not completed)
-        console.log('🔄 Resuming existing session:', activeSession.sessionId);
-        router.push({
-          pathname: '/assessment',
-          params: { 
-            sessionId: activeSession.sessionId,
-            resume: 'true'
-          }
-        });
-      } else if (completed) {
-        // Assessment completed - user has used their free assessments
-        console.log('📊 Assessment completed - redirecting to add more skills');
-        showToast('info', 'Free Assessments Used', 'You have completed your free assessments. Add more skills to continue.');
-        router.push({
-          pathname: '/auth/skills',
-          params: { mode: 'assessment', fromCompleted: 'true' }
-        });
-      } else {
-        // Start new assessment - go to assessment intro
-        console.log('🆕 Starting new assessment session');
-        router.push('/assessment-intro');
-      }
-    } catch (error) {
-      console.error('❌ Dashboard: Error starting assessment:', error);
-      showToast('error', 'Error', 'Failed to start assessment');
-    }
-  };
-
-  // Handle add more skills
-  const handleAddMoreSkills = () => {
-    const completed = isAssessmentCompleted();
-    
-    if (completed) {
-      // If assessment is completed, add skills for new assessment
-      console.log('📊 Assessment completed - adding skills for new assessment');
-      router.push({
-        pathname: '/auth/skills',
-        params: { mode: 'assessment', fromCompleted: 'true' }
-      });
-    } else {
-      // If assessment is in progress, add skills to existing session
-      console.log('📊 Assessment in progress - adding skills to existing session');
-      router.push({
-        pathname: '/auth/skills',
-        params: { mode: 'add-to-assessment' }
-      });
-    }
-  };
 
   // Get user initials
   const getUserInitials = () => {
@@ -388,7 +275,6 @@ export default function DashboardImproved() {
   useEffect(() => {
     if (!authLoading) {
       loadUserSkills();
-      loadActiveSession();
       loadCompletedAssessments();
     }
   }, [authLoading]);
@@ -398,7 +284,6 @@ export default function DashboardImproved() {
     const handleAppStateChange = (nextAppState: string) => {
       if (nextAppState === 'active') {
         loadUserSkills();
-        loadActiveSession();
       }
     };
 
@@ -407,7 +292,7 @@ export default function DashboardImproved() {
   }, []);
 
   // Loading state: render shimmer skeleton (non-blocking)
-  if (authLoading || loadingSkills || loadingSession) {
+  if (authLoading || loadingSkills) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
         <StatusBar style="dark" />
@@ -482,9 +367,9 @@ export default function DashboardImproved() {
           </Text>
           <Text style={{
             color: WHITE,
-            fontSize: 24,
+            fontSize: 20,
             fontWeight: '700',
-            marginTop: 5
+            marginTop: 4
           }}>
             Ready to grow?
           </Text>
@@ -530,7 +415,7 @@ export default function DashboardImproved() {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: '700',
                 color: DARK_GRAY
               }}>
@@ -549,7 +434,7 @@ export default function DashboardImproved() {
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
             <View style={{ alignItems: 'center', flex: 1 }}>
               <Text style={{
-                fontSize: 28,
+                fontSize: 24,
                 fontWeight: '800',
                 color: BRAND
               }}>
@@ -566,7 +451,7 @@ export default function DashboardImproved() {
             </View>
             <View style={{ alignItems: 'center', flex: 1 }}>
               <Text style={{
-                fontSize: 28,
+                fontSize: 24,
                 fontWeight: '800',
                 color: SUCCESS
               }}>
@@ -583,7 +468,7 @@ export default function DashboardImproved() {
             </View>
             <View style={{ alignItems: 'center', flex: 1 }}>
               <Text style={{
-                fontSize: 28,
+                fontSize: 24,
                 fontWeight: '800',
                 color: WARNING
               }}>
@@ -693,11 +578,11 @@ export default function DashboardImproved() {
           )}
         </View>
 
-        {/* Enhanced Quick Actions Card */}
+        {/* Quick Actions Card */}
         <View style={{
           backgroundColor: WHITE,
           borderRadius: 16,
-          padding: 20,
+          padding: 16,
           marginBottom: 16,
           shadowColor: BRAND,
           shadowOffset: { width: 0, height: 4 },
@@ -707,183 +592,102 @@ export default function DashboardImproved() {
           borderWidth: 1,
           borderColor: '#E6F2FF'
         }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
             <View style={{
-              width: 48,
-              height: 48,
-              borderRadius: 12,
+              width: 40,
+              height: 40,
+              borderRadius: 10,
               backgroundColor: '#FEF3C7',
               justifyContent: 'center',
               alignItems: 'center',
-              marginRight: 12
+              marginRight: 10
             }}>
-              <Ionicons name="rocket" size={24} color="#F59E0B" />
+              <Ionicons name="flash" size={20} color="#F59E0B" />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{
-                fontSize: 18,
-                fontWeight: '700',
+                fontSize: 16,
+                fontWeight: '600',
                 color: DARK_GRAY
               }}>
                 Quick Actions
               </Text>
               <Text style={{
-                fontSize: 14,
+                fontSize: 12,
                 color: GRAY,
-                marginTop: 2
+                marginTop: 1
               }}>
-                Continue your journey
+                Manage your skills and feedback
               </Text>
             </View>
           </View>
 
-          {(() => {
-            const completed = isAssessmentCompleted();
-            const hasActiveSession = activeSession && !completed;
-            
-            console.log('🔍 Button rendering logic:');
-            console.log('  - Assessment completed:', completed);
-            console.log('  - Has active session:', hasActiveSession);
-            console.log('  - User skills length:', userSkills.length);
-            
-            // Case 1: Assessment completed - show only "Start Assessment" button
-            if (completed) {
-              return (
-                <TouchableOpacity
-                  onPress={handleAddMoreSkills}
-                  style={{
-                    backgroundColor: BRAND,
-                    paddingVertical: 16,
-                    borderRadius: 12,
-                    alignItems: 'center',
-                    shadowColor: BRAND,
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.2,
-                    shadowRadius: 8,
-                    elevation: 4
-                  }}
-                >
-                  <Text style={{
-                    color: WHITE,
-                    fontSize: 16,
-                    fontWeight: '700'
-                  }}>
-                    Start Assessment
-                  </Text>
-                </TouchableOpacity>
-              );
-            }
-            
-            // Case 2: Active session (assessment in progress) - show "Resume Assessment" + "Add More Skills"
-            if (hasActiveSession) {
-              return (
-                <View style={{ gap: 12 }}>
-                  <TouchableOpacity
-                    onPress={() => router.push({
-                      pathname: '/assessment',
-                      params: { 
-                        sessionId: activeSession.sessionId,
-                        resume: 'true'
-                      }
-                    })}
-                    style={{
-                      backgroundColor: BRAND,
-                      paddingVertical: 16,
-                      borderRadius: 12,
-                      alignItems: 'center',
-                      shadowColor: BRAND,
-                      shadowOffset: { width: 0, height: 4 },
-                      shadowOpacity: 0.2,
-                      shadowRadius: 8,
-                      elevation: 4
-                    }}
-                  >
-                    <Text style={{
-                      color: WHITE,
-                      fontSize: 16,
-                      fontWeight: '700'
-                    }}>
-                      Resume Assessment
-                    </Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity
-                    onPress={handleAddMoreSkills}
-                    style={{
-                      backgroundColor: 'transparent',
-                      paddingVertical: 16,
-                      borderRadius: 12,
-                      borderWidth: 2,
-                      borderColor: BRAND,
-                      alignItems: 'center'
-                    }}
-                  >
-                    <Text style={{
-                      color: BRAND,
-                      fontSize: 16,
-                      fontWeight: '600'
-                    }}>
-                      Add More Skills
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              );
-            }
-            
-            // Case 3: No active session, no completed assessments - show "Start Assessment"
-            if (userSkills.length > 0) {
-              return (
-                <TouchableOpacity
-                  onPress={handleStartAssessment}
-                  style={{
-                    backgroundColor: BRAND,
-                    paddingVertical: 16,
-                    borderRadius: 12,
-                    alignItems: 'center',
-                    shadowColor: BRAND,
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.2,
-                    shadowRadius: 8,
-                    elevation: 4
-                  }}
-                >
-                  <Text style={{
-                    color: WHITE,
-                    fontSize: 16,
-                    fontWeight: '700'
-                  }}>
-                    Start Assessment
-                  </Text>
-                </TouchableOpacity>
-              );
-            }
-            
-            // Case 4: No skills selected - show "Select Skills"
-            return (
-              <TouchableOpacity
-                onPress={handleStartAssessment}
-                style={{
-                  backgroundColor: BRAND,
-                  paddingVertical: 16,
-                  borderRadius: 12,
-                  alignItems: 'center',
-                  shadowColor: BRAND,
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.2,
-                  shadowRadius: 8,
-                  elevation: 4
-                }}
-              >
+          {/* Two Button Layout */}
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            {/* Add Skills Button */}
+            <TouchableOpacity
+              onPress={() => {
+                console.log('🎯 Navigating to Add More Skills...');
+                router.push({
+                  pathname: '/auth/skills',
+                  params: { mode: 'add-more-skills' }
+                });
+              }}
+              style={{
+                flex: 1,
+                backgroundColor: 'transparent',
+                paddingVertical: 14,
+                borderRadius: 10,
+                borderWidth: 1.5,
+                borderColor: BRAND,
+                alignItems: 'center',
+                minHeight: 50,
+                justifyContent: 'center'
+              }}
+              activeOpacity={0.8}
+            >
+              <View style={{ alignItems: 'center' }}>
+                <Ionicons name="add-circle-outline" size={18} color={BRAND} style={{ marginBottom: 3 }} />
                 <Text style={{
-                  color: WHITE,
-                  fontSize: 16,
-                  fontWeight: '700'
+                  color: BRAND,
+                  fontSize: 12,
+                  fontWeight: '600',
+                  letterSpacing: 0.3
                 }}>
-                  Select Skills
+                  Add Skills
                 </Text>
-              </TouchableOpacity>
-            );
-          })()}
+              </View>
+            </TouchableOpacity>
+
+            {/* Recent Feedback Button */}
+            <TouchableOpacity
+              onPress={() => {
+                console.log('🎯 Navigating to Recent Feedback...');
+                router.push('/activity');
+              }}
+              style={{
+                flex: 1,
+                backgroundColor: 'transparent',
+                paddingVertical: 14,
+                borderRadius: 10,
+                borderWidth: 1.5,
+                borderColor: BRAND,
+                alignItems: 'center'
+              }}
+            >
+              <View style={{ alignItems: 'center' }}>
+                <MaterialIcons name="analytics" size={18} color={BRAND} style={{ marginBottom: 3 }} />
+                <Text style={{
+                  color: BRAND,
+                  fontSize: 12,
+                  fontWeight: '600',
+                  letterSpacing: 0.3
+                }}>
+                  Recent Feedback
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Enhanced Skills Overview Card */}
@@ -915,7 +719,7 @@ export default function DashboardImproved() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: '700',
                   color: DARK_GRAY
                 }}>
@@ -1004,7 +808,7 @@ export default function DashboardImproved() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: '700',
                   color: DARK_GRAY
                 }}>

@@ -553,7 +553,7 @@ export default function AssessmentResultsScreen() {
                 <Surface style={{ padding: 20, borderRadius: 16, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2, backgroundColor: '#FEF3C7' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
                     <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#F59E0B' + '20', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
-                      <AntDesign name="target" size={18} color="#F59E0B" />
+                      <AntDesign name="aim" size={18} color="#F59E0B" />
                     </View>
                     <Text style={{ fontSize: 18, fontWeight: '600', color: '#92400E' }}>Improvement Plan</Text>
                   </View>

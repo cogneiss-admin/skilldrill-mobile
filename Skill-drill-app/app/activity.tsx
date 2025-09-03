@@ -19,6 +19,7 @@ import { apiService } from "../services/api";
 import { useToast } from "../hooks/useToast";
 import ActivitySkillCard from "./components/ActivitySkillCard";
 import ActivitySkillCardSkeleton from "./components/ActivitySkillCardSkeleton";
+import FeedbackDisplay from "./components/FeedbackDisplay";
 
 const BRAND = "#0A66C2";
 const GRAY = "#6B7280";
@@ -90,6 +91,8 @@ export default function MyActivity() {
   const [assessmentTemplates, setAssessmentTemplates] = useState<AssessmentTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedFeedback, setSelectedFeedback] = useState<any>(null);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
 
   // Add refresh functionality
   const handleRefresh = async () => {
@@ -237,9 +240,37 @@ export default function MyActivity() {
     if (activeSession && activeSession.selectedSkills.includes(skillId)) {
       return activeSession.progress || { totalPrompts: 3, completedResponses: 0, status: 'PENDING' };
     }
-    
+
     // Default progress for skills not in active session
     return { totalPrompts: 3, completedResponses: 0, status: 'PENDING' };
+  };
+
+  // Handle viewing detailed feedback for an assessment
+  const handleViewFeedback = async (assessmentId: string) => {
+    try {
+      setFeedbackLoading(true);
+      console.log('🔍 Loading detailed feedback for assessment:', assessmentId);
+
+      const response = await apiService.get(`/assessment/results/${assessmentId}`);
+
+      if (response.success) {
+        console.log('✅ Feedback loaded successfully');
+        setSelectedFeedback(response.data);
+      } else {
+        console.error('❌ Failed to load feedback:', response.message);
+        showToast('error', 'Failed to load feedback', response.message || 'Unable to load detailed feedback');
+      }
+    } catch (error) {
+      console.error('❌ Error loading feedback:', error);
+      showToast('error', 'Error', 'Failed to load feedback details');
+    } finally {
+      setFeedbackLoading(false);
+    }
+  };
+
+  // Handle closing feedback view
+  const handleCloseFeedback = () => {
+    setSelectedFeedback(null);
   };
 
   const renderSkillCards = () => {
@@ -278,6 +309,7 @@ export default function MyActivity() {
           templateExists={templateExists}
           isGenerating={generatingAssessment === skill.skill.id}
           onGenerateAssessment={() => generateAssessmentTemplate(skill.skill.id, skill.skill.skill_name)}
+          onViewFeedback={completedAssessment ? () => handleViewFeedback(completedAssessment.id) : undefined}
         />
       );
     });
@@ -327,23 +359,34 @@ export default function MyActivity() {
         </View>
       </LinearGradient>
       
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 24, paddingBottom: 100 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadActivityData} />} showsVerticalScrollIndicator={false}>
-        {loading ? (
-          // Shimmer skeletons while data loads
-          <>
-            {Array.from({ length: 4 }).map((_, i) => (
-              <ActivitySkillCardSkeleton key={`skeleton-${i}`} index={i} />
-            ))}
-          </>
-        ) : userSkills.length === 0 ? (
-          <MotiView from={{ opacity: 0, translateY: 20 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'timing', duration: 600 }} style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 60, paddingHorizontal: 24 }}>
-            <Text style={{ fontSize: 28, fontWeight: '800', color: '#1F2937', marginBottom: 40, textAlign: 'center' }}>My Skills</Text>
-            {/* Empty-state illustration/CTA intentionally omitted here for brevity */}
-          </MotiView>
-        ) : (
-          renderSkillCards()
-        )}
-      </ScrollView>
+      {selectedFeedback ? (
+        // Show detailed feedback
+        <View style={{ flex: 1 }}>
+          <FeedbackDisplay
+            feedback={selectedFeedback}
+            onClose={handleCloseFeedback}
+            showCloseButton={true}
+          />
+        </View>
+      ) : (
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 24, paddingBottom: 100 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadActivityData} />} showsVerticalScrollIndicator={false}>
+          {loading ? (
+            // Shimmer skeletons while data loads
+            <>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <ActivitySkillCardSkeleton key={`skeleton-${i}`} index={i} />
+              ))}
+            </>
+          ) : userSkills.length === 0 ? (
+            <MotiView from={{ opacity: 0, translateY: 20 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'timing', duration: 600 }} style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 60, paddingHorizontal: 24 }}>
+              <Text style={{ fontSize: 28, fontWeight: '800', color: '#1F2937', marginBottom: 40, textAlign: 'center' }}>My Skills</Text>
+              {/* Empty-state illustration/CTA intentionally omitted here for brevity */}
+            </MotiView>
+          ) : (
+            renderSkillCards()
+          )}
+        </ScrollView>
+      )}
 
       <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#F8FAFC', borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingBottom: 20, paddingTop: 10 }}>
         <View style={{ flexDirection: 'row', paddingHorizontal: 20 }}>

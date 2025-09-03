@@ -27,6 +27,7 @@ interface ActivitySkillCardProps {
   templateExists?: boolean;
   isGenerating?: boolean;
   onGenerateAssessment?: () => void;
+  onViewFeedback?: () => void;
 }
 
 const getStatusColor = (status: string): string => {
@@ -94,7 +95,8 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
   progressData,
   templateExists = false,
   isGenerating = false,
-  onGenerateAssessment
+  onGenerateAssessment,
+  onViewFeedback
 }) => {
   const router = useRouter();
   
@@ -119,14 +121,23 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
 
   const handleCardPress = () => {
     if (assessmentStatus === 'COMPLETED') {
-      // Navigate to results if completed
+      // Show detailed feedback if available, otherwise navigate to results
+      if (onViewFeedback) {
+        onViewFeedback();
+      } else {
+        // Fallback to results screen if feedback handler not provided
+        router.push({
+          pathname: '/assessment-results',
+          params: { assessmentId: id }
+        });
+      }
     } else if (assessmentStatus === 'IN_PROGRESS') {
       // Resume assessment - go directly to assessment screen
       if (skillId) {
         // For resume, go directly to assessment screen with resume flag
         router.push({
           pathname: '/assessment',
-          params: { 
+          params: {
             skillId,
             resume: 'true'
           }
@@ -447,8 +458,16 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
             {assessmentStatus === 'COMPLETED' ? (
               <TouchableOpacity
                 onPress={() => {
-                  // Navigate to results
-                  console.log('Navigate to results for:', skillId);
+                  // Show detailed feedback if available
+                  if (onViewFeedback) {
+                    onViewFeedback();
+                  } else {
+                    // Fallback to results screen if feedback handler not provided
+                    router.push({
+                      pathname: '/assessment-results',
+                      params: { assessmentId: id }
+                    });
+                  }
                 }}
                 style={{
                   flex: 1,

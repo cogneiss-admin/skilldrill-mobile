@@ -29,8 +29,9 @@ export default function SkillsScreen() {
   const isAssessmentMode = params.mode === 'assessment' || params.assessment === 'true' || params.fromAssessment === 'true';
   const isAddToAssessmentMode = params.mode === 'add-to-assessment';
   const isFromCompleted = params.fromCompleted === 'true';
+  const isAddMoreSkillsMode = params.mode === 'add-more-skills';
 
-  console.log('🎯 Skills Screen - Assessment Mode:', isAssessmentMode, 'Add-to-Assessment Mode:', isAddToAssessmentMode, 'Params:', params);
+  console.log('🎯 Skills Screen - Assessment Mode:', isAssessmentMode, 'Add-to-Assessment Mode:', isAddToAssessmentMode, 'Add More Skills Mode:', isAddMoreSkillsMode, 'Params:', params);
   
   const router = useRouter();
   const { updateOnboardingStep } = useAuth();
@@ -64,7 +65,13 @@ export default function SkillsScreen() {
           console.log('➕ Add-to-assessment mode: Allowing user to add more skills');
           return;
         }
-        
+
+        // Don't redirect if we're in add-more-skills mode
+        if (isAddMoreSkillsMode) {
+          console.log('➕ Add-more-skills mode: Allowing user to add more skills');
+          return;
+        }
+
         // For assessment mode, if user already has skills, start assessment directly
         // But if they're coming from dashboard after completing assessments, allow them to add new skills
         if (isAssessmentMode && !isFromCompleted) {
@@ -73,15 +80,15 @@ export default function SkillsScreen() {
           router.replace('/assessment-intro');
           return;
         }
-        
+
         // If coming from completed assessment, allow adding new skills
         if (isFromCompleted) {
           console.log('✅ Coming from completed assessment - allowing to add new skills');
           return;
         }
-        
+
         const response = await apiService.get('/user/skills');
-        
+
         if (response.success && response.data && response.data.length > 0) {
           console.log('✅ Skills Screen: User already has skills, redirecting to dashboard');
           showToast('info', 'Skills Already Selected', 'You have already selected skills. Redirecting to dashboard.');
@@ -94,7 +101,7 @@ export default function SkillsScreen() {
     };
 
     checkExistingSkills();
-  }, [router, isAddToAssessmentMode]);
+  }, [router, isAddToAssessmentMode, isAddMoreSkillsMode]);
 
   useEffect(() => {
     if (selected) {
@@ -295,14 +302,16 @@ export default function SkillsScreen() {
         <View style={{ flex: 1, justifyContent: "center", paddingHorizontal: 18, paddingBottom: 20 }}>
           <MotiView from={{ opacity: 0, translateY: 6 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: "timing", duration: 480 }}>
             <Text style={{ fontSize: 24, fontWeight: "900", color: "#ffffff" }}>
-              {isAddToAssessmentMode ? 'Add More Skills' : 'Select Your Skills'}
+              {isAddToAssessmentMode ? 'Add More Skills' : isAddMoreSkillsMode ? 'Add More Skills' : 'Select Your Skills'}
             </Text>
             <Text style={{ marginTop: 8, color: "#E6F2FF", fontSize: 15 }}>
-              {isAddToAssessmentMode ? 'Choose additional skills to add to your current assessment' : 'Choose the skills you want to assess and improve'}
+              {isAddToAssessmentMode ? 'Choose additional skills to add to your current assessment' : isAddMoreSkillsMode ? 'Choose additional skills to add to your profile' : 'Choose the skills you want to assess and improve'}
             </Text>
             <Text style={{ marginTop: 4, color: "#E6F2FF", fontSize: 13, opacity: 0.9 }}>
-              {isAddToAssessmentMode 
+              {isAddToAssessmentMode
                 ? (selected.length > 0 ? `${selected.length} skill${selected.length !== 1 ? 's' : ''} will be added to assessment` : 'Select additional skills to add')
+                : isAddMoreSkillsMode
+                ? (selected.length > 0 ? `${selected.length} skill${selected.length !== 1 ? 's' : ''} will be added to your profile` : 'Select additional skills to add')
                 : (selected.length > 0 ? `${selected.length} skill${selected.length !== 1 ? 's' : ''} selected` : 'Select at least one skill to continue')
               }
             </Text>
