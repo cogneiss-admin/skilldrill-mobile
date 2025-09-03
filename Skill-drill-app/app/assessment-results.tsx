@@ -419,31 +419,106 @@ export default function AssessmentResultsScreen() {
               contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 100, maxWidth: 560, width: '100%', alignSelf: 'center' }}
               showsVerticalScrollIndicator={false}
             >
-              {/* Single consolidated view: score + insights + breakdown + feedback */}
+              {/* Holistic Analysis View - NEW FORMAT */}
               <MotiView from={{ opacity: 0, translateY: 20 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'timing', duration: 600, delay: 150 }}>
                 <Surface style={{ padding: 24, borderRadius: 20, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 12, elevation: 3, alignItems: 'center', backgroundColor: '#FAFAFA' }}>
                   <Text style={{ fontSize: 20, fontWeight: '700', color: '#1F2937', marginBottom: 16 }}>Your Performance Score</Text>
                   {renderScoreCircle(results.finalScore, 140)}
+
+                  {/* Show AI-generated level and stars */}
                   <View style={{ alignItems: 'center', marginTop: 20 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: levelColor + '20', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginBottom: 12 }}>
-                      <FontAwesome5 name={levelIcon} size={16} color={levelColor} style={{ marginRight: 8 }} />
-                      <Text style={{ fontSize: 18, fontWeight: '700', color: levelColor }}>{levelLabel}</Text>
-                    </View>
-                    {renderStars(results.stars)}
+                    {results.currentLevel && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: levelColor + '20', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginBottom: 12 }}>
+                        <FontAwesome5 name={levelIcon} size={16} color={levelColor} style={{ marginRight: 8 }} />
+                        <Text style={{ fontSize: 18, fontWeight: '700', color: levelColor }}>
+                          {results.levelLabel || levelLabel}
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Show AI-generated star rating */}
+                    {results.currentLevel ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                        <Text style={{ fontSize: 18, fontWeight: '700', color: '#1F2937', marginRight: 12 }}>
+                          {results.currentLevel}
+                        </Text>
+                        <Text style={{ fontSize: 14, color: '#6B7280' }}>
+                          Current Level
+                        </Text>
+                      </View>
+                    ) : (
+                      renderStars(results.stars)
+                    )}
                   </View>
                 </Surface>
               </MotiView>
 
-              {results.summary && (
+              {/* Holistic Analysis: Communication Style */}
+              {results.identifiedStyle && (
+                <Surface style={{ padding: 20, borderRadius: 16, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2, backgroundColor: '#FEF3C7' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#F59E0B' + '20', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                      <AntDesign name="user" size={18} color="#F59E0B" />
+                    </View>
+                    <Text style={{ fontSize: 18, fontWeight: '600', color: '#92400E' }}>Your Communication Style</Text>
+                  </View>
+                  <Text style={{ fontSize: 18, fontWeight: '700', color: '#92400E', marginBottom: 8 }}>
+                    {results.identifiedStyle}
+                  </Text>
+                  {results.whatThisMeans && (
+                    <Text style={{ fontSize: 16, color: '#92400E', lineHeight: 24 }}>
+                      {results.whatThisMeans}
+                    </Text>
+                  )}
+                </Surface>
+              )}
+
+              {/* Holistic Analysis: Identified Flaws */}
+              {results.identifiedFlaws && results.identifiedFlaws.length > 0 && (
+                <Surface style={{ padding: 20, borderRadius: 16, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2, backgroundColor: '#FEF2F2' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#DC2626' + '20', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                      <AntDesign name="warning" size={18} color="#DC2626" />
+                    </View>
+                    <Text style={{ fontSize: 18, fontWeight: '600', color: '#991B1B' }}>Areas for Improvement</Text>
+                  </View>
+                  {results.identifiedFlaws.map((flaw, index) => (
+                    <View key={index} style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8 }}>
+                      <Text style={{ fontSize: 16, color: '#DC2626', marginRight: 8, fontWeight: 'bold' }}>•</Text>
+                      <Text style={{ fontSize: 16, color: '#991B1B', lineHeight: 24, flex: 1 }}>
+                        {flaw}
+                      </Text>
+                    </View>
+                  ))}
+                </Surface>
+              )}
+
+              {/* Holistic Analysis: Strengths */}
+              {results.strengths && (
+                <Surface style={{ padding: 20, borderRadius: 16, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2, backgroundColor: '#F0FDF4' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#16A34A' + '20', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                      <AntDesign name="checkcircle" size={18} color="#16A34A" />
+                    </View>
+                    <Text style={{ fontSize: 18, fontWeight: '600', color: '#166534' }}>Your Strengths</Text>
+                  </View>
+                  <Text style={{ fontSize: 16, color: '#166534', lineHeight: 24 }}>
+                    {results.strengths}
+                  </Text>
+                </Surface>
+              )}
+
+              {/* Holistic Analysis: What This Means (Legacy Summary) */}
+              {results.whatThisMeans && !results.identifiedStyle && (
                 <Surface style={{ padding: 20, borderRadius: 16, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2, backgroundColor: '#F0F9FF' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
                     <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: BRAND + '20', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
                       <AntDesign name="bulb1" size={18} color={BRAND} />
                     </View>
-                    <Text style={{ fontSize: 18, fontWeight: '600', color: '#1F2937' }}>Summary</Text>
+                    <Text style={{ fontSize: 18, fontWeight: '600', color: '#1F2937' }}>Analysis Summary</Text>
                   </View>
-                  <Text style={{ fontSize: 16, color: '#374151', lineHeight: 24 }}>{results.summary}</Text>
-                  </Surface>
+                  <Text style={{ fontSize: 16, color: '#374151', lineHeight: 24 }}>{results.whatThisMeans}</Text>
+                </Surface>
               )}
 
               {results.subSkillScores && Object.keys(results.subSkillScores).length > 0 && (
@@ -473,25 +548,42 @@ export default function AssessmentResultsScreen() {
                   </Surface>
               )}
 
+              {/* Holistic Analysis: Improvement Feedback */}
               {results.improvementFeedback && (
                 <Surface style={{ padding: 20, borderRadius: 16, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2, backgroundColor: '#FEF3C7' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
                     <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#F59E0B' + '20', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
                       <AntDesign name="target" size={18} color="#F59E0B" />
                     </View>
-                    <Text style={{ fontSize: 18, fontWeight: '600', color: '#92400E' }}>Focus Areas</Text>
+                    <Text style={{ fontSize: 18, fontWeight: '600', color: '#92400E' }}>Improvement Plan</Text>
                   </View>
-                  <Text style={{ fontSize: 16, color: '#92400E', lineHeight: 24, fontWeight: '500' }}>{results.improvementFeedback}</Text>
+                  <Text style={{ fontSize: 16, color: '#92400E', lineHeight: 24, fontWeight: '500', marginBottom: 16 }}>
+                    {results.improvementFeedback}
+                  </Text>
+
+                  {/* Recommended Action */}
+                  {results.recommendedAction && (
+                    <View style={{ backgroundColor: '#F59E0B' + '15', padding: 16, borderRadius: 12, borderLeftWidth: 4, borderLeftColor: '#F59E0B' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                        <AntDesign name="arrowright" size={16} color="#F59E0B" style={{ marginRight: 8 }} />
+                        <Text style={{ fontSize: 16, fontWeight: '700', color: '#92400E' }}>Next Action Step</Text>
+                      </View>
+                      <Text style={{ fontSize: 16, color: '#92400E', lineHeight: 24 }}>
+                        {results.recommendedAction}
+                      </Text>
+                    </View>
+                  )}
                 </Surface>
               )}
 
-              {results.responses && results.responses.length > 0 && (
+              {/* Legacy Individual Responses - Only show if no holistic analysis available */}
+              {(!results.identifiedStyle && !results.improvementFeedback) && results.responses && results.responses.length > 0 && (
                 <Surface style={{ padding: 20, borderRadius: 16, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
                     <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: BRAND + '20', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
                       <AntDesign name="message1" size={18} color={BRAND} />
                     </View>
-                    <Text style={{ fontSize: 18, fontWeight: '600', color: '#1F2937' }}>AI Feedback</Text>
+                    <Text style={{ fontSize: 18, fontWeight: '600', color: '#1F2937' }}>Detailed Feedback</Text>
                   </View>
                     {results.responses.map((r, idx) => (
                     <View key={r.id || idx} style={{ marginBottom: 16, padding: 16, backgroundColor: '#F9FAFB', borderRadius: 12, borderLeftWidth: 4, borderLeftColor: BRAND }}>
