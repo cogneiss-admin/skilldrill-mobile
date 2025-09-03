@@ -224,14 +224,7 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
               }}>
                 {statusLabel}
               </Text>
-              {/* Debug info */}
-              <Text style={{
-                fontSize: 10,
-                color: 'rgba(255, 255, 255, 0.7)',
-                marginLeft: 8
-              }}>
-                {templateExists ? '✓' : '✗'} Template
-              </Text>
+
             </View>
           </View>
 

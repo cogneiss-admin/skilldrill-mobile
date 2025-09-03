@@ -216,9 +216,17 @@ export default function AssessmentResultsScreen() {
     );
   };
 
-  const renderStars = (stars) => {
+  // Convert 0-10 score to 0-5 stars
+  const convertScoreToStars = (score) => {
+    if (!score || score === 0) return 0;
+    // Convert 0-10 to 0-5 (multiply by 0.5)
+    return (score * 0.5);
+  };
+
+  const renderStars = (score) => {
     const totalStars = 5;
-    const filledStars = Math.round(stars || 0);
+    const stars = convertScoreToStars(score);
+    const filledStars = Math.round(stars);
     
     return (
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
@@ -227,7 +235,7 @@ export default function AssessmentResultsScreen() {
             key={index} 
             name={index < filledStars ? "star" : "staro"} 
             size={20} 
-            color={index < filledStars ? '#FFD700' : '#E5E7EB'} 
+            color={index < filledStars ? '#FFB800' : '#E5E7EB'} 
             style={{ marginHorizontal: 2 }}
           />
         ))}
@@ -252,6 +260,11 @@ export default function AssessmentResultsScreen() {
     if (stars >= 2.5) return "#0D9488";
     if (stars >= 1.5) return "#DC2626";
     return "#991B1B";
+  };
+
+  // Helper function to add transparency to hex colors
+  const addTransparency = (hexColor, transparency = '20') => {
+    return hexColor + transparency;
   };
 
   const getScoreColor = (score) => {
@@ -287,7 +300,7 @@ export default function AssessmentResultsScreen() {
               width: 80,
               height: 80,
               borderRadius: 40,
-              backgroundColor: BRAND + '20',
+              backgroundColor: addTransparency(BRAND),
               justifyContent: 'center',
               alignItems: 'center',
               marginBottom: 20
@@ -359,9 +372,10 @@ export default function AssessmentResultsScreen() {
 
   // Show results
   if (results) {
-    const levelLabel = getLevelLabel(results.stars);
-    const levelColor = getLevelColor(results.stars);
-    const levelIcon = getLevelIcon(results.stars);
+      const convertedStars = convertScoreToStars(results.finalScore);
+  const levelLabel = getLevelLabel(convertedStars);
+  const levelColor = getLevelColor(convertedStars);
+  const levelIcon = getLevelIcon(convertedStars);
 
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: BRAND }}>
@@ -428,7 +442,7 @@ export default function AssessmentResultsScreen() {
                   {/* Show AI-generated level and stars */}
                   <View style={{ alignItems: 'center', marginTop: 20 }}>
                     {results.currentLevel && (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: levelColor + '20', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginBottom: 12 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: addTransparency(levelColor), paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginBottom: 12 }}>
                         <FontAwesome5 name={levelIcon} size={16} color={levelColor} style={{ marginRight: 8 }} />
                         <Text style={{ fontSize: 18, fontWeight: '700', color: levelColor }}>
                           {results.levelLabel || levelLabel}
@@ -447,7 +461,7 @@ export default function AssessmentResultsScreen() {
                         </Text>
                       </View>
                     ) : (
-                      renderStars(results.stars)
+                      renderStars(results.finalScore)
                     )}
                   </View>
                 </Surface>
@@ -457,7 +471,7 @@ export default function AssessmentResultsScreen() {
               {results.identifiedStyle && (
                 <Surface style={{ padding: 20, borderRadius: 16, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2, backgroundColor: '#FEF3C7' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#F59E0B' + '20', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#F59E0B20', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
                       <AntDesign name="user" size={18} color="#F59E0B" />
                     </View>
                     <Text style={{ fontSize: 18, fontWeight: '600', color: '#92400E' }}>Your Communication Style</Text>
@@ -477,7 +491,7 @@ export default function AssessmentResultsScreen() {
               {results.identifiedFlaws && results.identifiedFlaws.length > 0 && (
                 <Surface style={{ padding: 20, borderRadius: 16, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2, backgroundColor: '#FEF2F2' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#DC2626' + '20', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#DC262620', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
                       <AntDesign name="warning" size={18} color="#DC2626" />
                     </View>
                     <Text style={{ fontSize: 18, fontWeight: '600', color: '#991B1B' }}>Areas for Improvement</Text>
@@ -497,7 +511,7 @@ export default function AssessmentResultsScreen() {
               {results.strengths && (
                 <Surface style={{ padding: 20, borderRadius: 16, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2, backgroundColor: '#F0FDF4' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#16A34A' + '20', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#16A34A20', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
                       <AntDesign name="checkcircle" size={18} color="#16A34A" />
                     </View>
                     <Text style={{ fontSize: 18, fontWeight: '600', color: '#166534' }}>Your Strengths</Text>
@@ -512,7 +526,7 @@ export default function AssessmentResultsScreen() {
               {results.whatThisMeans && !results.identifiedStyle && (
                 <Surface style={{ padding: 20, borderRadius: 16, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2, backgroundColor: '#F0F9FF' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: BRAND + '20', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: addTransparency(BRAND), justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
                       <AntDesign name="bulb1" size={18} color={BRAND} />
                     </View>
                     <Text style={{ fontSize: 18, fontWeight: '600', color: '#1F2937' }}>Analysis Summary</Text>
@@ -524,7 +538,7 @@ export default function AssessmentResultsScreen() {
               {results.subSkillScores && Object.keys(results.subSkillScores).length > 0 && (
                 <Surface style={{ padding: 20, borderRadius: 16, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: BRAND + '20', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: addTransparency(BRAND), justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
                       <AntDesign name="barschart" size={18} color={BRAND} />
                     </View>
                     <Text style={{ fontSize: 18, fontWeight: '600', color: '#1F2937' }}>Skill Breakdown</Text>
@@ -552,7 +566,7 @@ export default function AssessmentResultsScreen() {
               {results.improvementFeedback && (
                 <Surface style={{ padding: 20, borderRadius: 16, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2, backgroundColor: '#FEF3C7' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#F59E0B' + '20', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#F59E0B20', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
                       <AntDesign name="aim" size={18} color="#F59E0B" />
                     </View>
                     <Text style={{ fontSize: 18, fontWeight: '600', color: '#92400E' }}>Improvement Plan</Text>
@@ -563,7 +577,7 @@ export default function AssessmentResultsScreen() {
 
                   {/* Recommended Action */}
                   {results.recommendedAction && (
-                    <View style={{ backgroundColor: '#F59E0B' + '15', padding: 16, borderRadius: 12, borderLeftWidth: 4, borderLeftColor: '#F59E0B' }}>
+                    <View style={{ backgroundColor: '#F59E0B15', padding: 16, borderRadius: 12, borderLeftWidth: 4, borderLeftColor: '#F59E0B' }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
                         <AntDesign name="arrowright" size={16} color="#F59E0B" style={{ marginRight: 8 }} />
                         <Text style={{ fontSize: 16, fontWeight: '700', color: '#92400E' }}>Next Action Step</Text>
@@ -580,7 +594,7 @@ export default function AssessmentResultsScreen() {
               {(!results.identifiedStyle && !results.improvementFeedback) && results.responses && results.responses.length > 0 && (
                 <Surface style={{ padding: 20, borderRadius: 16, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: BRAND + '20', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: addTransparency(BRAND), justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
                       <AntDesign name="message1" size={18} color={BRAND} />
                     </View>
                     <Text style={{ fontSize: 18, fontWeight: '600', color: '#1F2937' }}>Detailed Feedback</Text>
@@ -590,7 +604,7 @@ export default function AssessmentResultsScreen() {
                       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
                         <Text style={{ fontSize: 14, color: '#64748b', marginBottom: 0, fontWeight: '600' }}>Scenario {idx + 1}</Text>
                         {typeof r.aiScore === 'number' && (
-                          <View style={{ marginLeft: 'auto', backgroundColor: getScoreColor(r.aiScore * 10) + '20', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
+                          <View style={{ marginLeft: 'auto', backgroundColor: addTransparency(getScoreColor(r.aiScore * 10)), paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
                             <Text style={{ fontSize: 12, color: getScoreColor(r.aiScore * 10), fontWeight: '700' }}>{r.aiScore}/10</Text>
                           </View>
                         )}
@@ -611,7 +625,7 @@ export default function AssessmentResultsScreen() {
               {/* Assessment details */}
               <Surface style={{ padding: 20, borderRadius: 16, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-                  <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#6B7280' + '20', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                                      <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#6B728020', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
                     <AntDesign name="infocirlceo" size={18} color="#6B7280" />
                   </View>
                   <Text style={{ fontSize: 18, fontWeight: '600', color: '#1F2937' }}>Assessment Details</Text>

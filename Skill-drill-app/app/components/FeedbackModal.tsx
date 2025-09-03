@@ -159,7 +159,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                     fontWeight: '700',
                     color: '#FFFFFF'
                   }}>
-                    {Math.round(score)}%
+                    {Math.round(score)}/10
                   </Text>
                 </View>
               )}

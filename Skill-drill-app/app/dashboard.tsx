@@ -214,6 +214,21 @@ export default function DashboardImproved() {
         list.forEach((r) => console.log('  →', r.skillName, r.finalScore, r.id));
         setRecentResults(list.slice(0, 5));
         setCompletedSkillIdsFromResults(new Set(list.map(r => r.skillId)));
+        
+        // Update user skills with assessment scores
+        setUserSkills(prevSkills => 
+          prevSkills.map(skill => {
+            const assessment = list.find(a => a.skillId === skill.skill.id);
+            if (assessment && skill.assessment_status !== 'COMPLETED') {
+              return {
+                ...skill,
+                assessment_status: 'COMPLETED' as const,
+                current_score: assessment.finalScore
+              };
+            }
+            return skill;
+          })
+        );
       } else {
         setRecentResults([]);
         setCompletedSkillIdsFromResults(new Set());
@@ -705,21 +720,21 @@ export default function DashboardImproved() {
             borderWidth: 1,
             borderColor: '#E6F2FF'
           }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
               <View style={{
                 width: 48,
                 height: 48,
                 borderRadius: 12,
-                backgroundColor: BRAND_LIGHT,
+                backgroundColor: '#E6F2FF',
                 justifyContent: 'center',
                 alignItems: 'center',
                 marginRight: 12
               }}>
-                <MaterialIcons name="star" size={24} color={BRAND} />
+                <MaterialIcons name="book" size={24} color={BRAND} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{
-                  fontSize: 16,
+                  fontSize: 18,
                   fontWeight: '700',
                   color: DARK_GRAY
                 }}>
@@ -735,47 +750,93 @@ export default function DashboardImproved() {
               </View>
             </View>
 
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {userSkills.slice(0, 3).map((userSkill, index) => (
+            {/* Individual Skill Cards */}
+            <View style={{ gap: 12 }}>
+              {userSkills.map((userSkill, index) => (
                 <View key={userSkill.id} style={{
-                  backgroundColor: userSkill.assessment_status === 'COMPLETED' ? '#E8F5E8' : 
-                                   userSkill.assessment_status === 'IN_PROGRESS' ? '#FEF3C7' : '#F3F4F6',
-                  paddingHorizontal: 12,
-                  paddingVertical: 8,
-                  borderRadius: 20,
+                  backgroundColor: WHITE,
+                  padding: 16,
+                  borderRadius: 12,
                   borderWidth: 1,
-                  borderColor: userSkill.assessment_status === 'COMPLETED' ? SUCCESS : 
-                               userSkill.assessment_status === 'IN_PROGRESS' ? '#F59E0B' : '#D1D5DB'
+                  borderColor: '#E5E7EB',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 2,
+                  elevation: 2
                 }}>
-                  <Text style={{
-                    fontSize: 12,
-                    fontWeight: '600',
-                    color: userSkill.assessment_status === 'COMPLETED' ? SUCCESS : 
-                           userSkill.assessment_status === 'IN_PROGRESS' ? '#F59E0B' : DARK_GRAY
-                  }}>
-                    {userSkill.skill.skill_name}
-                  </Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{
+                        fontSize: 16,
+                        fontWeight: '600',
+                        color: DARK_GRAY,
+                        marginBottom: 8
+                      }}>
+                        {userSkill.skill.skill_name}
+                      </Text>
+                      
+                      {/* Status Tag */}
+                      <View style={{
+                        backgroundColor: userSkill.assessment_status === 'COMPLETED' ? '#E8F5E8' : 
+                                       userSkill.assessment_status === 'IN_PROGRESS' ? '#FEF3C7' : '#F3F4F6',
+                        paddingHorizontal: 12,
+                        paddingVertical: 6,
+                        borderRadius: 16,
+                        alignSelf: 'flex-start'
+                      }}>
+                        <Text style={{
+                          fontSize: 12,
+                          fontWeight: '600',
+                          color: userSkill.assessment_status === 'COMPLETED' ? SUCCESS : 
+                                 userSkill.assessment_status === 'IN_PROGRESS' ? '#D97706' : '#6B7280'
+                        }}>
+                          {userSkill.assessment_status === 'COMPLETED' ? 'Completed' : 
+                           userSkill.assessment_status === 'IN_PROGRESS' ? 'In Progress' : 'Not Started'}
+                        </Text>
+                      </View>
+                    </View>
+                    
+                    {/* Score Display for Completed Skills */}
+                    {userSkill.assessment_status === 'COMPLETED' && userSkill.current_score && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <MaterialIcons name="star" size={16} color="#F59E0B" style={{ marginRight: 4 }} />
+                        <Text style={{
+                          fontSize: 16,
+                          fontWeight: '700',
+                          color: DARK_GRAY
+                        }}>
+                          {userSkill.current_score}/10
+                        </Text>
+                      </View>
+                    )}
+                  </View>
                 </View>
               ))}
-              {userSkills.length > 3 && (
-                <View style={{
-                  backgroundColor: '#F3F4F6',
-                  paddingHorizontal: 12,
-                  paddingVertical: 8,
-                  borderRadius: 20,
-                  borderWidth: 1,
-                  borderColor: '#D1D5DB'
-                }}>
-                  <Text style={{
-                    fontSize: 12,
-                    fontWeight: '600',
-                    color: DARK_GRAY
-                  }}>
-                    +{userSkills.length - 3} more
-                  </Text>
-                </View>
-              )}
             </View>
+
+            {/* Add More Skills Button */}
+            <TouchableOpacity
+              onPress={() => router.push('/auth/skills?mode=add-more-skills')}
+              style={{
+                backgroundColor: '#F3F4F6',
+                paddingVertical: 12,
+                paddingHorizontal: 16,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: '#E5E7EB',
+                marginTop: 16,
+                alignItems: 'center'
+              }}
+            >
+              <Text style={{
+                fontSize: 14,
+                fontWeight: '600',
+                color: DARK_GRAY
+              }}>
+                +1 more skill
+              </Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -836,12 +897,7 @@ export default function DashboardImproved() {
                     <Text style={{ fontSize: 12, color: GRAY, marginTop: 2 }}>{r.scoreLabel || 'Result'}</Text>
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={{ fontSize: 16, fontWeight: '700', color: BRAND }}>{Math.round(r.finalScore)}%</Text>
-                    {r.completedAt && (
-                      <Text style={{ fontSize: 11, color: GRAY, marginTop: 2 }}>
-                        {new Date(r.completedAt).toLocaleDateString()}
-                      </Text>
-                    )}
+                    <Text style={{ fontSize: 16, fontWeight: '700', color: BRAND }}>{r.finalScore}/10</Text>
                   </View>
                 </View>
               </View>

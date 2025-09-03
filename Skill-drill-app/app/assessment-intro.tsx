@@ -11,7 +11,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { useToast } from "../hooks/useToast";
 import { apiService } from "../services/api";
 import { AntDesign, MaterialIcons, Ionicons } from '@expo/vector-icons';
-import AIGenerationLoader from './components/AIGenerationLoader';
+
 
 const BRAND = "#0A66C2";
 const BRAND_LIGHT = "#E6F2FF";
@@ -36,8 +36,7 @@ export default function AssessmentIntroScreen() {
   const [userSkills, setUserSkills] = useState([]);
   const [loadingSkills, setLoadingSkills] = useState(true);
   const [creatingAssessment, setCreatingAssessment] = useState(false);
-  const [showAILoader, setShowAILoader] = useState(false);
-  const [aiProgress, setAiProgress] = useState(0);
+
   const [error, setError] = useState("");
   
   // Back button double-tap state
@@ -159,17 +158,6 @@ export default function AssessmentIntroScreen() {
   const handleCreateAssessment = async () => {
     try {
       setCreatingAssessment(true);
-      setShowAILoader(true);
-      setAiProgress(0);
-      // Simulate progress while waiting for backend
-      const steps = [0.1, 0.25, 0.4, 0.55, 0.7, 0.85, 0.95];
-      let idx = 0;
-      const progressInterval = setInterval(() => {
-        if (idx < steps.length) {
-          setAiProgress(steps[idx]);
-          idx += 1;
-        }
-      }, 1200);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
       
       console.log('🚀 Creating assessment with skills:', selectedSkills);
@@ -190,19 +178,15 @@ export default function AssessmentIntroScreen() {
       
       console.log('✅ Valid skill IDs for assessment:', validSkillIds);
       
-      // Create assessment session with extended timeout for AI generation
+      // Create assessment session
       const response = await apiService.post('/assessment/session/start', {
         skillIds: validSkillIds
-      }, { timeout: 150000 }); // 150s timeout for AI generation
+      }, { timeout: 60000 }); // 60s timeout
       
       if (response.success && response.data.sessionId) {
         console.log('✅ Assessment created successfully:', response.data);
         showToast('success', 'Assessment Created', 'Your assessment is ready!');
         
-        // Complete progress and navigate
-        setAiProgress(1.0);
-        clearInterval(progressInterval);
-        setShowAILoader(false);
         // Navigate to assessment screen with session ID
         router.replace({
           pathname: '/assessment',
@@ -234,7 +218,6 @@ export default function AssessmentIntroScreen() {
       showToast('error', 'Error', errorMessage);
     } finally {
       setCreatingAssessment(false);
-      setShowAILoader(false);
     }
   };
 
@@ -429,14 +412,14 @@ export default function AssessmentIntroScreen() {
         <View style={{ marginTop: 25 }}>
           <Text style={{
             color: WHITE,
-            fontSize: 16,
+            fontSize: 14,
             opacity: 0.9
           }}>
             Ready to assess! 🎯
           </Text>
           <Text style={{
             color: WHITE,
-            fontSize: 28,
+            fontSize: 24,
             fontWeight: '700',
             marginTop: 5
           }}>
@@ -444,10 +427,10 @@ export default function AssessmentIntroScreen() {
           </Text>
           <Text style={{
             color: WHITE,
-            fontSize: 16,
+            fontSize: 14,
             opacity: 0.9,
             marginTop: 8,
-            lineHeight: 22
+            lineHeight: 20
           }}>
             Let's evaluate your skills with personalized scenarios
           </Text>
@@ -458,7 +441,7 @@ export default function AssessmentIntroScreen() {
         style={{ flex: 1 }}
         contentContainerStyle={{ 
           paddingHorizontal: 20,
-          paddingVertical: 30
+          paddingVertical: 24
         }}
         showsVerticalScrollIndicator={false}
       >
@@ -467,10 +450,10 @@ export default function AssessmentIntroScreen() {
           from={{ opacity: 0, translateY: 20 }}
           animate={{ opacity: 1, translateY: 0 }}
           transition={{ type: 'timing', duration: 600, delay: 200 }}
-          style={{ marginBottom: 24 }}
+          style={{ marginBottom: 20 }}
         >
           <Surface style={{ 
-            padding: 24, 
+            padding: 20, 
             borderRadius: 16,
             backgroundColor: WHITE,
             shadowColor: BRAND,
@@ -483,19 +466,19 @@ export default function AssessmentIntroScreen() {
           }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
               <View style={{
-                width: 48,
-                height: 48,
-                borderRadius: 12,
+                width: 40,
+                height: 40,
+                borderRadius: 10,
                 backgroundColor: BRAND_LIGHT,
                 justifyContent: 'center',
                 alignItems: 'center',
                 marginRight: 12
               }}>
-                <MaterialIcons name="psychology" size={24} color={BRAND} />
+                <MaterialIcons name="psychology" size={20} color={BRAND} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{ 
-                  fontSize: 20, 
+                  fontSize: 16, 
                   fontWeight: '600', 
                   color: DARK_GRAY,
                   marginBottom: 4
@@ -503,24 +486,20 @@ export default function AssessmentIntroScreen() {
                   Selected Skills
                 </Text>
                 <Text style={{ 
-                  fontSize: 14, 
+                  fontSize: 13, 
                   color: GRAY 
                 }}>
                   {selectedSkills.length} skill{selectedSkills.length !== 1 ? 's' : ''} ready for assessment
                 </Text>
               </View>
-
             </View>
             
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {selectedSkills.map((skillId, index) => {
-                // Find skill name from userSkills or use fallback
-                const userSkill = userSkills.find(us => us.skill.id === skillId);
-                const skillName = userSkill?.skill?.skill_name || userSkill?.skill?.name || `Skill ${index + 1}`;
-                
-                return (
+              {userSkills
+                .filter(us => selectedSkills.includes(us.skill.id))
+                .map((userSkill, index) => (
                   <Chip
-                    key={skillId}
+                    key={userSkill.skill.id}
                     mode="outlined"
                     style={{ 
                       backgroundColor: BRAND_LIGHT,
@@ -528,10 +507,9 @@ export default function AssessmentIntroScreen() {
                     }}
                     textStyle={{ color: BRAND, fontWeight: '500' }}
                   >
-                    {skillName}
+                    {userSkill.skill.skill_name}
                   </Chip>
-                );
-              })}
+                ))}
             </View>
           </Surface>
         </MotiView>
@@ -541,10 +519,10 @@ export default function AssessmentIntroScreen() {
           from={{ opacity: 0, translateY: 20 }}
           animate={{ opacity: 1, translateY: 0 }}
           transition={{ type: 'timing', duration: 600, delay: 400 }}
-          style={{ marginBottom: 24 }}
+          style={{ marginBottom: 20 }}
         >
           <Surface style={{ 
-            padding: 24, 
+            padding: 20, 
             borderRadius: 16,
             backgroundColor: WHITE,
             shadowColor: BRAND,
@@ -557,18 +535,18 @@ export default function AssessmentIntroScreen() {
           }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
               <View style={{
-                width: 48,
-                height: 48,
-                borderRadius: 12,
+                width: 40,
+                height: 40,
+                borderRadius: 10,
                 backgroundColor: '#E8F5E8',
                 justifyContent: 'center',
                 alignItems: 'center',
                 marginRight: 12
               }}>
-                <MaterialIcons name="info-outline" size={24} color={SUCCESS} />
+                <MaterialIcons name="info-outline" size={20} color={SUCCESS} />
               </View>
               <Text style={{ 
-                fontSize: 20, 
+                fontSize: 16, 
                 fontWeight: '600', 
                 color: DARK_GRAY
               }}>
@@ -576,33 +554,33 @@ export default function AssessmentIntroScreen() {
               </Text>
             </View>
             
-            <View style={{ gap: 20 }}>
+            <View style={{ gap: 16 }}>
               <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
                 <View style={{ 
-                  width: 32, 
-                  height: 32, 
-                  borderRadius: 16, 
+                  width: 28, 
+                  height: 28, 
+                  borderRadius: 14, 
                   backgroundColor: BRAND,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  marginRight: 16,
+                  marginRight: 14,
                   marginTop: 2
                 }}>
-                  <Text style={{ color: WHITE, fontSize: 14, fontWeight: '600' }}>1</Text>
+                  <Text style={{ color: WHITE, fontSize: 12, fontWeight: '600' }}>1</Text>
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={{ 
-                    fontSize: 16, 
+                    fontSize: 14, 
                     fontWeight: '600', 
                     color: DARK_GRAY,
-                    marginBottom: 6
+                    marginBottom: 4
                   }}>
-                    AI-Generated Scenarios
+                    Personalized Scenarios
                   </Text>
                   <Text style={{ 
-                    fontSize: 14, 
+                    fontSize: 13, 
                     color: GRAY,
-                    lineHeight: 20
+                    lineHeight: 18
                   }}>
                     We'll create personalized workplace scenarios based on your career level and role
                   </Text>
@@ -611,30 +589,29 @@ export default function AssessmentIntroScreen() {
               
               <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
                 <View style={{ 
-                  width: 32, 
-                  height: 32, 
-                  borderRadius: 16, 
+                  width: 28, 
+                  height: 28, 
+                  borderRadius: 14, 
                   backgroundColor: BRAND,
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  marginRight: 16,
+                  marginRight: 14,
                   marginTop: 2
                 }}>
-                  <Text style={{ color: WHITE, fontSize: 14, fontWeight: '600' }}>2</Text>
+                  <Text style={{ color: WHITE, fontSize: 12, fontWeight: '600' }}>2</Text>
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={{ 
-                    fontSize: 16, 
+                    fontSize: 14, 
                     fontWeight: '600', 
                     color: DARK_GRAY,
-                    marginBottom: 6
+                    marginBottom: 4
                   }}>
                     Text-Based Responses
                   </Text>
                   <Text style={{ 
-                    fontSize: 14, 
+                    fontSize: 13, 
                     color: GRAY,
-                    lineHeight: 20
+                    lineHeight: 18
                   }}>
                     Answer 3 scenarios per skill with detailed written responses (no audio required)
                   </Text>
@@ -643,30 +620,30 @@ export default function AssessmentIntroScreen() {
               
               <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
                 <View style={{ 
-                  width: 32, 
-                  height: 32, 
-                  borderRadius: 16, 
+                  width: 28, 
+                  height: 28, 
+                  borderRadius: 14, 
                   backgroundColor: BRAND,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  marginRight: 16,
+                  marginRight: 14,
                   marginTop: 2
                 }}>
-                  <Text style={{ color: WHITE, fontSize: 14, fontWeight: '600' }}>3</Text>
+                  <Text style={{ color: WHITE, fontSize: 12, fontWeight: '600' }}>3</Text>
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={{ 
-                    fontSize: 16, 
+                    fontSize: 14, 
                     fontWeight: '600', 
                     color: DARK_GRAY,
-                    marginBottom: 6
+                    marginBottom: 4
                   }}>
-                    AI-Powered Scoring
+                    Smart Scoring & Feedback
                   </Text>
                   <Text style={{ 
-                    fontSize: 14, 
+                    fontSize: 13, 
                     color: GRAY,
-                    lineHeight: 20
+                    lineHeight: 18
                   }}>
                     Get detailed feedback and scores for each skill with improvement suggestions
                   </Text>
@@ -681,10 +658,10 @@ export default function AssessmentIntroScreen() {
           from={{ opacity: 0, translateY: 20 }}
           animate={{ opacity: 1, translateY: 0 }}
           transition={{ type: 'timing', duration: 600, delay: 600 }}
-          style={{ marginBottom: 32 }}
+          style={{ marginBottom: 28 }}
         >
           <Surface style={{ 
-            padding: 20, 
+            padding: 18, 
             borderRadius: 16,
             backgroundColor: BRAND_LIGHT,
             borderWidth: 1,
@@ -692,19 +669,19 @@ export default function AssessmentIntroScreen() {
           }}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <View style={{
-                width: 40,
-                height: 40,
-                borderRadius: 20,
+                width: 36,
+                height: 36,
+                borderRadius: 18,
                 backgroundColor: BRAND,
                 justifyContent: 'center',
                 alignItems: 'center',
                 marginRight: 12
               }}>
-                <Ionicons name="time-outline" size={20} color={WHITE} />
+                <Ionicons name="time-outline" size={18} color={WHITE} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{ 
-                  fontSize: 16, 
+                  fontSize: 15, 
                   fontWeight: '600', 
                   color: BRAND,
                   marginBottom: 2
@@ -712,7 +689,7 @@ export default function AssessmentIntroScreen() {
                   Estimated Time
                 </Text>
                 <Text style={{ 
-                  fontSize: 14, 
+                  fontSize: 13, 
                   color: DARK_GRAY
                 }}>
                   {estimatedMinutes} minutes ({Math.ceil(estimatedMinutes / 60)} hour{Math.ceil(estimatedMinutes / 60) !== 1 ? 's' : ''})
@@ -732,9 +709,9 @@ export default function AssessmentIntroScreen() {
             onPress={handleCreateAssessment}
             disabled={creatingAssessment || selectedSkills.length === 0}
             style={{
-              backgroundColor: creatingAssessment ? GRAY : BRAND,
+              backgroundColor: BRAND,
               borderRadius: 16,
-              paddingVertical: 18,
+              paddingVertical: 16,
               paddingHorizontal: 24,
               alignItems: 'center',
               flexDirection: 'row',
@@ -747,22 +724,41 @@ export default function AssessmentIntroScreen() {
             }}
           >
             {creatingAssessment ? (
-              <>
-                <AntDesign name="loading1" size={20} color={WHITE} style={{ marginRight: 8 }} />
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                {/* Rotating Ring Loader */}
+                <View style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 10,
+                  borderWidth: 2,
+                  borderColor: 'rgba(255, 255, 255, 0.3)',
+                  borderTopColor: WHITE,
+                  marginRight: 8
+                }}>
+                  <MotiView
+                    from={{ rotate: '0deg' }}
+                    animate={{ rotate: '360deg' }}
+                    transition={{
+                      type: 'timing',
+                      duration: 1000,
+                      loop: true
+                    }}
+                  />
+                </View>
                 <Text style={{
                   color: WHITE,
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: '600'
                 }}>
                   Creating Assessment...
                 </Text>
-              </>
+              </View>
             ) : (
               <>
-                <AntDesign name="play" size={20} color={WHITE} style={{ marginRight: 8 }} />
+                <AntDesign name="play" size={18} color={WHITE} style={{ marginRight: 8 }} />
                 <Text style={{
                   color: WHITE,
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: '600'
                 }}>
                   Start Assessment
@@ -772,8 +768,7 @@ export default function AssessmentIntroScreen() {
           </TouchableOpacity>
         </MotiView>
       </ScrollView>
-      {/* AI Generation Loader Overlay */}
-      <AIGenerationLoader visible={showAILoader} progress={aiProgress} onComplete={() => setShowAILoader(false)} />
+
     </SafeAreaView>
   );
 }

@@ -340,22 +340,7 @@ export default function MyActivity() {
           <Text style={{ color: '#FFFFFF', fontSize: 24, fontWeight: '700', marginTop: 5 }}>Skill Progress</Text>
           <Text style={{ color: '#FFFFFF', fontSize: 14, opacity: 0.8, marginTop: 5 }}>Track your assessment results and insights</Text>
           
-          {/* Debug refresh button */}
-          <TouchableOpacity 
-            onPress={handleRefresh}
-            style={{
-              marginTop: 15,
-              backgroundColor: 'rgba(255, 255, 255, 0.2)',
-              paddingHorizontal: 16,
-              paddingVertical: 8,
-              borderRadius: 20,
-              alignSelf: 'flex-start'
-            }}
-          >
-            <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '600' }}>
-              🔄 Sync Status
-            </Text>
-          </TouchableOpacity>
+
         </View>
       </LinearGradient>
       

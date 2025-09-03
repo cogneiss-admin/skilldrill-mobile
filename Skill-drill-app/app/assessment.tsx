@@ -659,6 +659,39 @@ export default function AssessmentScreen() {
     setShowShimmer(false);
   };
 
+  // Clean prompt text to remove assessment criteria and only show the scenario
+  const cleanPromptText = (promptText: string) => {
+    if (!promptText) return promptText;
+    
+    // Split by common separators that indicate assessment criteria
+    const separators = [
+      'Assess the soft skill',
+      'Focus on',
+      'Evaluate',
+      'Consider',
+      'Pay attention to',
+      'Look for',
+      'Examine',
+      'Analyze',
+      'in this scenario focusing on',
+      'in this scenario, focusing on',
+      'scenario focusing on',
+      'scenario, focusing on'
+    ];
+    
+    // Find the first occurrence of any separator
+    let cleanText = promptText;
+    for (const separator of separators) {
+      const index = promptText.indexOf(separator);
+      if (index !== -1) {
+        cleanText = promptText.substring(0, index).trim();
+        break;
+      }
+    }
+    
+    return cleanText;
+  };
+
   // Retry initialization handler
   const handleRetryInitialization = () => {
     setError('');
@@ -1782,7 +1815,7 @@ export default function AssessmentScreen() {
                     marginBottom: 20,
                     fontWeight: "500"
                   }}>
-                    {currentPrompt?.prompt_text || currentPrompt?.instruction || "Loading scenario..."}
+                    {cleanPromptText(currentPrompt?.prompt_text || currentPrompt?.instruction) || "Loading scenario..."}
                   </Text>
 
                   {!currentPrompt && (
