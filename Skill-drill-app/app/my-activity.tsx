@@ -16,8 +16,7 @@ import { useRouter } from "expo-router";
 import { AntDesign, MaterialIcons, Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { apiService } from "../services/api";
 import { useToast } from "../hooks/useToast";
-
-const BRAND = "#0A66C2";
+import { BRAND } from "./components/Brand";
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface UserSkill {

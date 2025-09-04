@@ -20,8 +20,7 @@ import { useToast } from "../hooks/useToast";
 import ActivitySkillCard from "./components/ActivitySkillCard";
 import ActivitySkillCardSkeleton from "./components/ActivitySkillCardSkeleton";
 import FeedbackDisplay from "./components/FeedbackDisplay";
-
-const BRAND = "#0A66C2";
+import { BRAND, GRADIENTS, BORDER_RADIUS, SHADOWS, PADDING } from "./components/Brand";
 const GRAY = "#6B7280";
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -80,8 +79,6 @@ interface AssessmentTemplate {
 }
 
 export default function MyActivity() {
-  console.log('🎯 MyActivity component loaded!');
-  console.log('🎯 Activity page rendering...');
   const router = useRouter();
   const { showToast } = useToast();
   
@@ -109,13 +106,10 @@ export default function MyActivity() {
   const loadActivityData = async () => {
     try {
       setLoading(true);
-      console.log('🔄 Loading activity data from backend...');
       
       // First sync assessment status to ensure consistency
       try {
-        console.log('🔄 Syncing assessment status...');
         await apiService.post('/user/skills/sync-status');
-        console.log('✅ Assessment status synced');
       } catch (syncError) {
         console.warn('⚠️ Assessment status sync failed:', syncError.message);
       }
@@ -123,19 +117,13 @@ export default function MyActivity() {
       const [skillsResponse, assessmentsResponse, sessionResponse] = await Promise.all([
         apiService.get('/user/skills'),
         apiService.get('/assessment/results'),
-        apiService.get('/assessment/session/status') // Get current session status and progress
+        apiService.get('/assessment/session/status')
       ]);
       
       if (skillsResponse.success) {
         setUserSkills(skillsResponse.data);
-        console.log('✅ User skills loaded:', skillsResponse.data.length);
 
-        // Log assessment statuses for debugging
-        skillsResponse.data.forEach(skill => {
-          console.log(`📊 Skill: ${skill.skill.skill_name}, Status: ${skill.assessment_status}, Progress: ${skill.progress?.percentage || 0}%`);
-        });
-
-        // Now check assessment templates for these skills
+        // Check assessment templates for these skills
         if (skillsResponse.data.length > 0) {
           const skillIds = skillsResponse.data.map(skill => skill.skill.id);
           await checkAssessmentTemplates(skillIds);
@@ -143,23 +131,19 @@ export default function MyActivity() {
       }
       if (assessmentsResponse.success) {
         setCompletedAssessments(assessmentsResponse.data || []);
-        console.log('✅ Completed assessments loaded:', assessmentsResponse.data?.length || 0);
       }
       if (sessionResponse.success && sessionResponse.data.hasActiveSession) {
         setActiveSession(sessionResponse.data);
-        console.log('✅ Active session loaded:', sessionResponse.data);
 
         // If there's an active session, refresh user skills to get updated assessment status
         if (skillsResponse.success && skillsResponse.data.length > 0) {
           const updatedSkillsResponse = await apiService.get('/user/skills');
           if (updatedSkillsResponse.success) {
             setUserSkills(updatedSkillsResponse.data);
-            console.log('✅ User skills refreshed with active session status');
           }
         }
       } else {
         setActiveSession(null);
-        console.log('ℹ️ No active session found');
       }
       
     } catch (error) {
@@ -176,7 +160,6 @@ export default function MyActivity() {
       const response = await apiService.post('/assessment/check-assessment-templates', { skillIds });
       if (response.success) {
         setAssessmentTemplates(response.data.skillsWithTemplates || []);
-        console.log('✅ Assessment templates checked:', response.data.skillsWithTemplates?.length || 0, 'templates found');
       }
     } catch (error) {
       console.error('❌ Error checking assessment templates:', error);
@@ -249,12 +232,10 @@ export default function MyActivity() {
   const handleViewFeedback = async (assessmentId: string) => {
     try {
       setFeedbackLoading(true);
-      console.log('🔍 Loading detailed feedback for assessment:', assessmentId);
 
       const response = await apiService.get(`/assessment/results/${assessmentId}`);
 
       if (response.success) {
-        console.log('✅ Feedback loaded successfully');
         setSelectedFeedback(response.data);
       } else {
         console.error('❌ Failed to load feedback:', response.message);
@@ -322,7 +303,7 @@ export default function MyActivity() {
       <StatusBar style="dark" />
       
       {/* Header and layout unchanged */}
-      <LinearGradient colors={[BRAND, '#1E40AF', '#3B82F6']} style={{ paddingTop: 20, paddingBottom: 30, paddingHorizontal: 20, borderBottomLeftRadius: 25, borderBottomRightRadius: 25 }}>
+              <LinearGradient colors={GRADIENTS.header} style={{ paddingTop: PADDING.lg, paddingBottom: 30, paddingHorizontal: PADDING.md, borderBottomLeftRadius: 25, borderBottomRightRadius: 25 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Image source={require('../assets/images/logo.png')} style={{ width: 32, height: 32 }} resizeMode="contain" />
@@ -374,7 +355,7 @@ export default function MyActivity() {
       )}
 
       <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#F8FAFC', borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingBottom: 20, paddingTop: 10 }}>
-        <View style={{ flexDirection: 'row', paddingHorizontal: 20 }}>
+        <View style={{ flexDirection: 'row', paddingHorizontal: PADDING.md }}>
           <TouchableOpacity onPress={() => router.push('/dashboard')} style={{ flex: 1, alignItems: 'center', paddingVertical: 8 }}>
             <AntDesign name="home" size={24} color={GRAY} />
             <Text style={{ fontSize: 12, color: GRAY, marginTop: 4, fontWeight: '400' }}>Home</Text>

@@ -3,29 +3,10 @@ import React from 'react';
 import { View, ScrollView, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti';
+import SkeletonLine from './SkeletonLine';
+import { BRAND } from './Brand';
 
-const BRAND = '#0A66C2';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-const SkeletonLine = ({ width = '100%', height = 14, radius = 8, style = {} }) => (
-  <View style={{
-    width,
-    height,
-    borderRadius: radius,
-    backgroundColor: '#E5E7EB',
-    overflow: 'hidden',
-    ...style
-  }}>
-    <MotiView
-      from={{ translateX: -SCREEN_WIDTH }}
-      animate={{ translateX: SCREEN_WIDTH }}
-      transition={{ type: 'timing', duration: 1200, loop: true }}
-      style={{ width: '50%', height: '100%' }}
-    >
-      <LinearGradient colors={["#E5E7EB", "#F3F4F6", "#E5E7EB"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ flex: 1 }} />
-    </MotiView>
-  </View>
-);
 
 const CardSkeleton = ({ height = 160 }) => (
   <View style={{

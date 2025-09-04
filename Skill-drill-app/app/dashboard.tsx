@@ -9,19 +9,21 @@ import {
   StatusBar,
   SafeAreaView,
   AppState,
-  RefreshControl
-, Alert } from 'react-native';
+  RefreshControl,
+  Alert,
+  StyleSheet
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
 import { apiService } from '../services/api';
-import { MotiView } from 'moti';
 import DashboardSkeleton from './components/DashboardSkeleton';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AntDesign, MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { BRAND, GRADIENTS, BORDER_RADIUS, SHADOWS, PADDING } from './components/Brand';
+import { useResponsive } from '../utils/responsive';
 
 // Define constants
-const BRAND = "#0A66C2";
 const BRAND_LIGHT = "#E6F2FF";
 const WHITE = "#FFFFFF";
 const GRAY = "#9CA3AF";
@@ -73,6 +75,7 @@ export default function DashboardImproved() {
   const router = useRouter();
   const { user, isLoading: authLoading, logout } = useAuth();
   const { showToast } = useToast();
+  const responsive = useResponsive();
   
   const [userSkills, setUserSkills] = useState<UserSkill[]>([]);
   const [loadingSkills, setLoadingSkills] = useState(true);
@@ -131,66 +134,15 @@ export default function DashboardImproved() {
     };
   }, [userSkills, completedSkillIdsFromResults]);
 
-  // Detailed breakdown logs for Not Started/In Progress/Completed
-  useEffect(() => {
-    try {
-      const selectedSkillIds = new Set(userSkills.map(s => s.skill.id));
-      const completedFromResults = new Set(Array.from(completedSkillIdsFromResults.values()));
-      const unionSkillIds = new Set<string>([...Array.from(selectedSkillIds), ...Array.from(completedFromResults)]);
-      const completedFromUser = new Set(userSkills.filter(s => s.assessment_status === 'COMPLETED').map(s => s.skill.id));
-      const inProgressFromUser = new Set(userSkills.filter(s => s.assessment_status === 'IN_PROGRESS').map(s => s.skill.id));
-      const pendingFromUser = new Set(userSkills.filter(s => s.assessment_status === 'PENDING' || s.assessment_status === 'NOT_STARTED').map(s => s.skill.id));
-
-      console.log('🔎 DASHBOARD BREAKDOWN');
-      console.log('  selectedSkillIds:', Array.from(selectedSkillIds));
-      console.log('  completedFromResults:', Array.from(completedFromResults));
-      console.log('  unionSkillIds (totalSkills):', Array.from(unionSkillIds));
-      console.log('  completedFromUser:', Array.from(completedFromUser));
-      console.log('  inProgressFromUser:', Array.from(inProgressFromUser));
-      console.log('  pending/NOT_STARTED from user:', Array.from(pendingFromUser));
-      console.log('  computed stats ->', stats);
-    } catch (e) {
-      // no-op
-    }
-  }, [userSkills, completedSkillIdsFromResults, stats]);
-
-  // Debug: log inputs and computed stats so we can correlate with UI
-  useEffect(() => {
-    try {
-      console.log('📊 DASHBOARD DEBUG → userSkills:', userSkills.map(s => ({
-        skillId: s.skill.id,
-        name: s.skill.skill_name,
-        status: s.assessment_status,
-        score: s.current_score
-      })));
-      console.log('📊 DASHBOARD DEBUG → recentResults:', recentResults.map(r => ({
-        assessmentId: r.id,
-        skillId: r.skillId,
-        skillName: r.skillName,
-        finalScore: r.finalScore
-      })));
-      console.log('📊 DASHBOARD DEBUG → completedSkillIdsFromResults:', Array.from(completedSkillIdsFromResults.values()));
-      console.log('📊 DASHBOARD DEBUG → computed stats:', stats);
-    } catch (e) {
-      // no-op
-    }
-  }, [userSkills, recentResults, completedSkillIdsFromResults, stats]);
 
   // Load user skills with better error handling
   const loadUserSkills = async () => {
     try {
-      console.log('🔍 Dashboard: Loading user skills...');
       const response = await apiService.get('/user/skills');
       
       if (response.success) {
-        console.log('✅ Dashboard: User skills loaded:', response.data.length);
-        // Log each skill's status for debugging
-        response.data.forEach((skill: UserSkill) => {
-          console.log(`📊 Skill: ${skill.skill.skill_name} - Status: ${skill.assessment_status} - Score: ${skill.current_score}`);
-        });
         setUserSkills(response.data);
       } else {
-        console.log('ℹ️ Dashboard: No skills found or error:', response.message);
         setUserSkills([]);
       }
     } catch (error) {
@@ -206,12 +158,9 @@ export default function DashboardImproved() {
   // Load completed assessments for recent results
   const loadCompletedAssessments = async () => {
     try {
-      console.log('🔍 Dashboard: Loading completed assessments...');
       const response = await apiService.get('/assessment/results');
       if (response.success) {
         const list: CompletedAssessment[] = response.data || [];
-        console.log('✅ Dashboard: Completed assessments loaded:', list.length);
-        list.forEach((r) => console.log('  →', r.skillName, r.finalScore, r.id));
         setRecentResults(list.slice(0, 5));
         setCompletedSkillIdsFromResults(new Set(list.map(r => r.skillId)));
         
@@ -309,7 +258,7 @@ export default function DashboardImproved() {
   // Loading state: render shimmer skeleton (non-blocking)
   if (authLoading || loadingSkills) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+      <SafeAreaView style={styles.container}>
         <StatusBar style="dark" />
         <DashboardSkeleton />
       </SafeAreaView>
@@ -319,52 +268,26 @@ export default function DashboardImproved() {
   // Main dashboard content
   const renderHomeContent = () => (
     <ScrollView 
-      style={{ flex: 1, backgroundColor: '#F8FAFC' }}
-      contentContainerStyle={{ paddingBottom: 100, paddingTop: 10 }}
+      style={styles.scrollContainer}
+      contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
       {/* Enhanced Header */}
-      <LinearGradient
-        colors={[BRAND, '#1E40AF', '#3B82F6']}
-        style={{
-          paddingTop: 20,
-          paddingBottom: 30,
-          paddingHorizontal: 20,
-          borderBottomLeftRadius: 25,
-          borderBottomRightRadius: 25
-        }}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Image source={logoSrc} style={{ width: 32, height: 32 }} resizeMode="contain" />
-            <Text style={{
-              marginLeft: 10,
-              color: WHITE,
-              fontSize: 18,
-              fontWeight: '900',
-              letterSpacing: 0.5
-            }}>{APP_NAME}</Text>
+              <LinearGradient
+          colors={GRADIENTS.header}
+          style={styles.headerGradient}
+        >
+        <View style={styles.headerRow}>
+          <View style={styles.headerLeft}>
+            <Image source={logoSrc} style={styles.logo} resizeMode="contain" />
+            <Text style={styles.appName}>{APP_NAME}</Text>
           </View>
           <TouchableOpacity onPress={handleLogout}>
-            <View style={{
-              width: 40,
-              height: 40,
-              borderRadius: 20,
-              backgroundColor: 'rgba(255, 255, 255, 0.15)',
-              justifyContent: 'center',
-              alignItems: 'center',
-              borderWidth: 1,
-              borderColor: 'rgba(255, 255, 255, 0.3)'
-            }}>
-              <Text style={{
-                color: WHITE,
-                fontSize: 16,
-                fontWeight: '700',
-                letterSpacing: 0.5
-              }}>
+            <View style={styles.userInitials}>
+              <Text style={styles.userInitialsText}>
                 {getUserInitials()}
               </Text>
             </View>
@@ -372,50 +295,24 @@ export default function DashboardImproved() {
         </View>
 
         {/* Enhanced Greeting Section */}
-        <View style={{ marginTop: 25 }}>
-          <Text style={{
-            color: WHITE,
-            fontSize: 16,
-            opacity: 0.9
-          }}>
+        <View style={styles.greetingSection}>
+          <Text style={styles.greetingText}>
             {getGreeting()}! 👋
           </Text>
-          <Text style={{
-            color: WHITE,
-            fontSize: 20,
-            fontWeight: '700',
-            marginTop: 4
-          }}>
+          <Text style={styles.readyText}>
             Ready to grow?
           </Text>
-          <Text style={{
-            color: WHITE,
-            fontSize: 14,
-            opacity: 0.8,
-            marginTop: 5
-          }}>
+          <Text style={styles.subtitleText}>
             Continue building skills that make a difference
           </Text>
         </View>
       </LinearGradient>
 
       {/* Enhanced Cards Section */}
-      <View style={{ paddingHorizontal: 20, marginTop: 30 }}>
+      <View style={styles.cardsContainer}>
         
         {/* Enhanced Progress Card */}
-        <View style={{
-          backgroundColor: WHITE,
-          borderRadius: 16,
-          padding: 20,
-          marginBottom: 16,
-          shadowColor: BRAND,
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.1,
-          shadowRadius: 12,
-          elevation: 5,
-          borderWidth: 1,
-          borderColor: '#E6F2FF'
-        }}>
+        <View style={styles.progressCard}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
             <View style={{
               width: 48,
@@ -642,7 +539,6 @@ export default function DashboardImproved() {
             {/* Add Skills Button */}
             <TouchableOpacity
               onPress={() => {
-                console.log('🎯 Navigating to Add More Skills...');
                 router.push({
                   pathname: '/auth/skills',
                   params: { mode: 'add-more-skills' }
@@ -677,7 +573,6 @@ export default function DashboardImproved() {
             {/* Recent Feedback Button */}
             <TouchableOpacity
               onPress={() => {
-                console.log('🎯 Navigating to Recent Feedback...');
                 router.push('/activity');
               }}
               style={{
@@ -909,7 +804,7 @@ export default function DashboardImproved() {
   );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+    <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
       
       {/* Main Content */}
@@ -918,67 +813,37 @@ export default function DashboardImproved() {
 
 
       {/* Bottom Navigation */}
-      <View style={{
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: '#F8FAFC',
-        borderTopWidth: 1,
-        borderTopColor: '#E2E8F0',
-        paddingBottom: 20,
-        paddingTop: 10
-      }}>
-        <View style={{ flexDirection: 'row', paddingHorizontal: 20 }}>
+      <View style={styles.bottomNavigation}>
+        <View style={styles.bottomNavRow}>
           <TouchableOpacity
             onPress={() => setActiveTab('home')}
-            style={{
-              flex: 1,
-              alignItems: 'center',
-              paddingVertical: 8
-            }}
+            style={styles.navButton}
           >
             <AntDesign 
               name="home" 
               size={24} 
               color={activeTab === 'home' ? BRAND : GRAY} 
             />
-            <Text style={{
-              fontSize: 12,
-              color: activeTab === 'home' ? BRAND : GRAY,
-              marginTop: 4,
-              fontWeight: activeTab === 'home' ? '600' : '400'
-            }}>
+            <Text style={[
+              activeTab === 'home' ? styles.navTextActive : styles.navText,
+              { color: activeTab === 'home' ? BRAND : GRAY }
+            ]}>
               Home
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={() => { 
-              console.log('🎯 Navigating to My Activity...');
-              console.log('🎯 Current route:', router.getCurrentPath?.() || 'unknown');
-              
-              // Simple direct navigation
               router.push('/activity');
-              console.log('✅ Navigation attempted');
             }}
-            style={{
-              flex: 1,
-              alignItems: 'center',
-              paddingVertical: 8
-            }}
+            style={styles.navButton}
           >
             <Ionicons 
               name="time-outline" 
               size={24} 
               color={activeTab === 'activity' ? BRAND : GRAY} 
             />
-            <Text style={{
-              fontSize: 12,
-              color: GRAY,
-              marginTop: 4,
-              fontWeight: '400'
-            }}>
+            <Text style={[styles.navText, { color: GRAY }]}>
               My Activity
             </Text>
           </TouchableOpacity>
@@ -986,4 +851,125 @@ export default function DashboardImproved() {
       </View>
     </SafeAreaView>
   );
-}
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC'
+  },
+  scrollContainer: {
+    flex: 1,
+    backgroundColor: '#F8FAFC'
+  },
+  scrollContent: {
+    paddingBottom: 100,
+    paddingTop: 10
+  },
+        headerGradient: {
+        paddingTop: PADDING.lg,
+        paddingBottom: 30,
+        paddingHorizontal: PADDING.md,
+        borderBottomLeftRadius: 25,
+        borderBottomRightRadius: 25
+      },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
+  logo: {
+    width: 32,
+    height: 32
+  },
+  appName: {
+    marginLeft: 10,
+    color: WHITE,
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 0.5
+  },
+  userInitials: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)'
+  },
+  userInitialsText: {
+    color: WHITE,
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.5
+  },
+  greetingSection: {
+    marginTop: 25
+  },
+  greetingText: {
+    color: WHITE,
+    fontSize: 16,
+    opacity: 0.9
+  },
+  readyText: {
+    color: WHITE,
+    fontSize: 20,
+    fontWeight: '700',
+    marginTop: 4
+  },
+  subtitleText: {
+    color: WHITE,
+    fontSize: 14,
+    opacity: 0.8,
+    marginTop: 5
+  },
+        cardsContainer: {
+        paddingHorizontal: PADDING.md,
+        marginTop: 30
+      },
+        progressCard: {
+        backgroundColor: WHITE,
+        borderRadius: BORDER_RADIUS.lg,
+        padding: PADDING.md,
+        marginBottom: PADDING.md,
+        ...SHADOWS.md,
+        borderWidth: 1,
+        borderColor: '#E6F2FF'
+      },
+  bottomNavigation: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#F8FAFC',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    paddingBottom: 20,
+    paddingTop: 10
+  },
+        bottomNavRow: {
+        flexDirection: 'row',
+        paddingHorizontal: PADDING.md
+      },
+  navButton: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 8
+  },
+  navText: {
+    fontSize: 12,
+    marginTop: 4,
+    fontWeight: '400'
+  },
+  navTextActive: {
+    fontSize: 12,
+    marginTop: 4,
+    fontWeight: '600'
+  }
+});

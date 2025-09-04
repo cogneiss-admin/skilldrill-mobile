@@ -18,7 +18,7 @@ export function detectInputType(value: string): InputType {
   return "unknown";
 }
 
-export function validationMessage(value: string): string {
+export function validationMessageFor(value: string): string {
   const type = detectInputType(value);
   if (type === "email") return isValidEmail(value) ? "" : "Enter a valid email address";
   if (type === "phone") return isValidPhone(value) ? "" : "Enter a valid phone number";
@@ -26,6 +26,9 @@ export function validationMessage(value: string): string {
   if (value.trim().length > 0) return "Enter a valid phone number";
   return "";
 }
+
+// Alias for backward compatibility
+export const validationMessage = validationMessageFor;
 
 // Provide a default export placeholder to satisfy expo-router route checks
 export default {};

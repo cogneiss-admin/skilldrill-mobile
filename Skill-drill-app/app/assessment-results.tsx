@@ -324,7 +324,7 @@ export default function AssessmentResultsScreen() {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: "#ffffff" }}>
         <StatusBar style="dark" />
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 20 }}>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 16 }}>
           <MotiView
             from={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -395,7 +395,7 @@ export default function AssessmentResultsScreen() {
             zIndex: 1000,
             backgroundColor: 'rgba(0, 0, 0, 0.8)',
             paddingVertical: 12,
-            paddingHorizontal: 20,
+            paddingHorizontal: 16,
             alignItems: 'center'
             }}
           >
@@ -430,7 +430,7 @@ export default function AssessmentResultsScreen() {
             shadowRadius: 16 
           }}>
             <ScrollView 
-              contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 100, maxWidth: 560, width: '100%', alignSelf: 'center' }}
+              contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100, maxWidth: 560, width: '100%', alignSelf: 'center' }}
               showsVerticalScrollIndicator={false}
             >
               {/* Holistic Analysis View - NEW FORMAT */}

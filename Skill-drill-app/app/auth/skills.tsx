@@ -18,7 +18,7 @@ import SkillsSkeleton from "../components/SkillsSkeleton";
 // Temporarily disabled Redux hook to fix import error
 // import { useSkillsRedux } from "../../hooks/useSkillsRedux";
 
-const BRAND = "#0A66C2";
+import { BRAND, GRADIENTS, BORDER_RADIUS, SHADOWS, PADDING } from "../components/Brand";
 const APP_NAME = "Skill Drill";
 const logoSrc = require("../../assets/images/logo.png");
 
@@ -294,12 +294,12 @@ export default function SkillsScreen() {
 
       {/* Hero header */}
       <View style={{ minHeight: 200, position: "relative" }}>
-        <LinearGradient colors={["#0A66C2", "#0E75D1", "#1285E0"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: "absolute", inset: 0 }} />
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "flex-start", paddingHorizontal: 18, paddingTop: 10 }}>
+        <LinearGradient colors={GRADIENTS.footer} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: "absolute", inset: 0 }} />
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "flex-start", paddingHorizontal: PADDING.md, paddingTop: 10 }}>
           <Image source={logoSrc} style={{ width: 56, height: 56, shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 10 }} resizeMode="contain" />
           <Text style={{ marginLeft: 12, color: "#ffffff", fontSize: 22, fontWeight: "900", letterSpacing: 0.8, textShadowColor: 'rgba(0,0,0,0.35)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6 }}>{APP_NAME}</Text>
         </View>
-        <View style={{ flex: 1, justifyContent: "center", paddingHorizontal: 18, paddingBottom: 20 }}>
+        <View style={{ flex: 1, justifyContent: "center", paddingHorizontal: PADDING.md, paddingBottom: 20 }}>
           <MotiView from={{ opacity: 0, translateY: 6 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: "timing", duration: 480 }}>
             <Text style={{ fontSize: 24, fontWeight: "900", color: "#ffffff" }}>
               {isAddToAssessmentMode ? 'Add More Skills' : isAddMoreSkillsMode ? 'Add More Skills' : 'Select Your Skills'}
@@ -322,7 +322,7 @@ export default function SkillsScreen() {
       {/* Content card */}
       <View style={{ flex: 1, marginTop: -24 }}>
         <View style={{ flex: 1, backgroundColor: "#ffffff", borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 24, shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 16 }}>
-          <ScrollView contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 100, maxWidth: 560, width: '100%', alignSelf: 'center' }} showsVerticalScrollIndicator={false}>
+          <ScrollView contentContainerStyle={{ paddingHorizontal: PADDING.md, paddingBottom: 100, maxWidth: 560, width: '100%', alignSelf: 'center' }} showsVerticalScrollIndicator={false}>
             
                         {/* Skills organized by tier */}
             {(() => {
@@ -377,8 +377,8 @@ export default function SkillsScreen() {
           </ScrollView>
           
           {/* Sticky footer CTA */}
-          <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 18, paddingTop: 12, paddingBottom: 34, zIndex: 1000, backgroundColor: "#ffffff" }}>
-            <LinearGradient colors={["#0A66C2", "#0E75D1", "#1285E0"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: "absolute", inset: 0, opacity: 0.1 }} />
+          <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: PADDING.md, paddingTop: 12, paddingBottom: 34, zIndex: 1000, backgroundColor: "#ffffff" }}>
+            <LinearGradient colors={GRADIENTS.footer} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: "absolute", inset: 0, opacity: 0.1 }} />
             <Button
               mode="contained"
               onPress={handleContinue}

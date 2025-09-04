@@ -6,16 +6,16 @@ import { Button, TextInput } from "react-native-paper";
 import ErrorBanner from "../../components/ErrorBanner";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
-import { isValidEmail, isValidPhone } from "../../components/validators";
+import { isValidEmail, isValidPhone } from "../components/validators";
 import { useSocialAuth } from "../../hooks/useSocialAuth";
 import { StatusBar } from "expo-status-bar";
 import { AntDesign } from "@expo/vector-icons";
 import GoogleGIcon from "../../components/GoogleGIcon";
 import LinkedInIcon from "../../components/LinkedInIcon";
 import CodeBoxes from "../../components/CodeBoxes";
+import { BRAND } from "../components/Brand";
 
 const logoSrc = require("../../assets/images/logo.png");
-const BRAND = "#0A66C2";
 const COUNTRY_CODE = "+91";
 
 export default function SignupScreen() {

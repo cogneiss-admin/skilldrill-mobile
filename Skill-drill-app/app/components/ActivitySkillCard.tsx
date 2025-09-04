@@ -5,8 +5,8 @@ import { MotiView } from 'moti';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AntDesign } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-
-const BRAND = "#0A66C2";
+import { BRAND, GRADIENTS, BORDER_RADIUS, SHADOWS, SPACING, COLORS, TYPOGRAPHY } from '../components/Brand';
+import { useResponsive } from '../../utils/responsive';
 
 interface ActivitySkillCardProps {
   id: string;
@@ -99,14 +99,7 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
   onViewFeedback
 }) => {
   const router = useRouter();
-  
-  // Debug logging
-  console.log(`🎯 ActivitySkillCard for ${skillName}:`, {
-    assessmentStatus,
-    templateExists,
-    progressData,
-    skillId
-  });
+  const responsive = useResponsive();
   
   const statusColor = getStatusColor(assessmentStatus);
   const statusLabel = getStatusLabel(assessmentStatus);
@@ -119,90 +112,46 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
   const completedResponses = progressData?.completedResponses || 0;
   const progress = totalPrompts > 0 ? Math.round((completedResponses / totalPrompts) * 100) : 0;
 
-  const handleCardPress = () => {
-    if (assessmentStatus === 'COMPLETED') {
-      // Show detailed feedback if available, otherwise navigate to results
-      if (onViewFeedback) {
-        onViewFeedback();
-      } else {
-        // Fallback to results screen if feedback handler not provided
-        router.push({
-          pathname: '/assessment-results',
-          params: { assessmentId: id }
-        });
-      }
-    } else if (assessmentStatus === 'IN_PROGRESS') {
-      // Resume assessment - go directly to assessment screen
-      if (skillId) {
-        // For resume, go directly to assessment screen with resume flag
-        router.push({
-          pathname: '/assessment',
-          params: {
-            skillId,
-            resume: 'true'
-          }
-        });
-      }
-    } else if (templateExists) {
-      // Navigate to assessment intro if template exists (new assessment)
-      if (skillId) {
-        router.push({
-          pathname: '/assessment-intro',
-          params: { skillId }
-        });
-      }
-    } else {
-      // Generate assessment template if none exists
-      if (onGenerateAssessment) {
-        onGenerateAssessment();
-      }
-    }
-  };
+
 
   return (
     <MotiView
       from={{ opacity: 0, translateY: 40, scale: 0.97 }}
       animate={{ opacity: 1, translateY: 0, scale: 1 }}
       transition={{ type: 'spring', delay: index * 80, damping: 16, stiffness: 110 }}
-      style={{ marginBottom: 16 }}
+      style={{ marginBottom: SPACING.margin.sm }}
     >
-      <TouchableOpacity
-        onPress={handleCardPress}
-        activeOpacity={0.8}
+      <View
         style={{
-          borderRadius: 20,
+          borderRadius: BORDER_RADIUS.xl,
           backgroundColor: '#FFFFFF',
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.1,
-          shadowRadius: 12,
-          elevation: 5,
+          ...SHADOWS.md,
           borderWidth: 1,
           borderColor: '#E5E7EB',
           overflow: 'hidden'
         }}
       >
         {/* Header with skill icon and status */}
-        <LinearGradient colors={[BRAND, '#0056B3']} style={{ padding: 20, paddingBottom: 16 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+        <LinearGradient colors={GRADIENTS.card} style={{ padding: SPACING.padding.md, paddingBottom: SPACING.padding.sm }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.margin.sm }}>
             <View style={{
-              width: 48,
-              height: 48,
-              borderRadius: 24,
+              width: 44,
+              height: 44,
+              borderRadius: BORDER_RADIUS.full,
               backgroundColor: 'rgba(255, 255, 255, 0.2)',
               justifyContent: 'center',
               alignItems: 'center',
-              marginRight: 12
+              marginRight: SPACING.margin.sm
             }}>
-              <AntDesign name={skillIcon} size={24} color="#FFFFFF" />
+              <AntDesign name={skillIcon} size={22} color="#FFFFFF" />
             </View>
             
             <View style={{ flex: 1 }}>
               <Text style={{
-                fontSize: 18,
-                fontWeight: '700',
-                color: '#FFFFFF',
-                marginBottom: 4
+                fontSize: TYPOGRAPHY.fontSize.lg,
+                fontWeight: TYPOGRAPHY.fontWeight.bold,
+                color: COLORS.text.inverse,
+                marginBottom: SPACING.margin.xs
               }}>
                 {skillName}
               </Text>
@@ -211,16 +160,16 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
             {/* Status Badge */}
             <View style={{
               backgroundColor: 'rgba(255, 255, 255, 0.2)',
-              paddingHorizontal: 12,
-              paddingVertical: 6,
+              paddingHorizontal: SPACING.padding.sm,
+              paddingVertical: SPACING.padding.xs,
               borderRadius: 16,
               flexDirection: 'row',
               alignItems: 'center'
             }}>
               <Text style={{
-                fontSize: 12,
-                fontWeight: '600',
-                color: '#FFFFFF'
+                fontSize: TYPOGRAPHY.fontSize.sm,
+                fontWeight: TYPOGRAPHY.fontWeight.semibold,
+                color: COLORS.text.inverse
               }}>
                 {statusLabel}
               </Text>
@@ -232,19 +181,19 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
           {aiTag && (
             <View style={{
               backgroundColor: 'rgba(255, 255, 255, 0.15)',
-              paddingHorizontal: 12,
-              paddingVertical: 8,
+              paddingHorizontal: SPACING.padding.sm,
+              paddingVertical: SPACING.padding.xs,
               borderRadius: 12,
               borderWidth: 1,
               borderColor: 'rgba(255, 255, 255, 0.3)',
               alignSelf: 'flex-start'
             }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <AntDesign name="robot1" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
+                <AntDesign name="robot1" size={16} color={COLORS.text.inverse} style={{ marginRight: SPACING.margin.xs }} />
                 <Text style={{
-                  fontSize: 14,
-                  fontWeight: '600',
-                  color: '#FFFFFF'
+                  fontSize: TYPOGRAPHY.fontSize.base,
+                  fontWeight: TYPOGRAPHY.fontWeight.semibold,
+                  color: COLORS.text.inverse
                 }}>
                   {aiTag}
                 </Text>
@@ -254,7 +203,7 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
         </LinearGradient>
 
         {/* Card Body */}
-        <View style={{ padding: 20 }}>
+        <View style={{ padding: SPACING.padding.md }}>
           {/* Content based on status */}
           {assessmentStatus === 'COMPLETED' && score ? (
             // Completed assessment - show score and feedback
@@ -279,8 +228,8 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
                     </Text>
                     <View style={{
                       backgroundColor: scoreColor + '20',
-                      paddingHorizontal: 8,
-                      paddingVertical: 4,
+                                    paddingHorizontal: SPACING.padding.xs,
+              paddingVertical: SPACING.padding.xs,
                       borderRadius: 8
                     }}>
                       <Text style={{
@@ -446,8 +395,8 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
             </View>
           )}
 
-          {/* Action Buttons */}
-          <View style={{ flexDirection: 'row', gap: 12 }}>
+                     {/* Action Buttons */}
+           <View style={{ flexDirection: 'row', gap: SPACING.gap.sm }}>
             {assessmentStatus === 'COMPLETED' ? (
               <TouchableOpacity
                 onPress={() => {
@@ -462,16 +411,16 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
                     });
                   }
                 }}
-                style={{
-                  flex: 1,
-                  backgroundColor: '#F3F4F6',
-                  paddingVertical: 12,
-                  paddingHorizontal: 16,
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: '#E5E7EB',
-                  alignItems: 'center'
-                }}
+                                  style={{
+                    flex: 1,
+                    backgroundColor: '#F3F4F6',
+                                      paddingVertical: SPACING.padding.sm,
+                  paddingHorizontal: SPACING.padding.sm,
+                    borderRadius: BORDER_RADIUS.md,
+                    borderWidth: 1,
+                    borderColor: '#E5E7EB',
+                    alignItems: 'center'
+                  }}
               >
                 <Text style={{
                   fontSize: 14,
@@ -491,14 +440,14 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
                     });
                   }
                 }}
-                style={{
-                  flex: 1,
-                  backgroundColor: BRAND,
-                  paddingVertical: 12,
-                  paddingHorizontal: 16,
-                  borderRadius: 12,
-                  alignItems: 'center'
-                }}
+                                  style={{
+                    flex: 1,
+                    backgroundColor: BRAND,
+                                      paddingVertical: SPACING.padding.sm,
+                  paddingHorizontal: SPACING.padding.md,
+                    borderRadius: BORDER_RADIUS.md,
+                    alignItems: 'center'
+                  }}
               >
                 <Text style={{
                   fontSize: 14,
@@ -521,9 +470,9 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
                 style={{
                   flex: 1,
                   backgroundColor: BRAND,
-                  paddingVertical: 12,
-                  paddingHorizontal: 16,
-                  borderRadius: 12,
+                  paddingVertical: SPACING.padding.sm,
+                  paddingHorizontal: SPACING.padding.sm,
+                  borderRadius: BORDER_RADIUS.md,
                   alignItems: 'center'
                 }}
               >
@@ -532,7 +481,7 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
                   fontWeight: '600',
                   color: '#FFFFFF'
                 }}>
-                  Start Assessment
+                                    Start Assessment
                 </Text>
               </TouchableOpacity>
             ) : (
@@ -542,9 +491,9 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
                 style={{
                   flex: 1,
                   backgroundColor: isGenerating ? '#9CA3AF' : BRAND,
-                  paddingVertical: 12,
-                  paddingHorizontal: 16,
-                  borderRadius: 12,
+                  paddingVertical: SPACING.padding.sm,
+                  paddingHorizontal: SPACING.padding.sm,
+                  borderRadius: BORDER_RADIUS.md,
                   alignItems: 'center',
                   flexDirection: 'row',
                   justifyContent: 'center'
@@ -577,7 +526,7 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
             )}
           </View>
         </View>
-      </TouchableOpacity>
+      </View>
     </MotiView>
   );
 };

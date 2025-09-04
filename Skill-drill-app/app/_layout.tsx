@@ -11,8 +11,7 @@ import { store } from "../store";
 import { useAuth } from "../hooks/useAuth";
 import ToastContainer from "../components/ToastContainer";
 import { useToast } from "../hooks/useToast";
-
-const BRAND = "#0A66C2";
+import { BRAND } from "./components/Brand";
 
 const theme = {
   ...MD3LightTheme,

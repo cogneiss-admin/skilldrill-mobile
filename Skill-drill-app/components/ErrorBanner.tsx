@@ -7,7 +7,7 @@ import * as Haptics from 'expo-haptics';
 
 type Props = {
   message?: string | null;
-  tone?: 'error' | 'success' | 'info';
+  tone?: 'error' | 'success' | 'info' | 'warning';
   compact?: boolean;
   ctaText?: string;
   onCtaPress?: () => void;
@@ -25,6 +25,13 @@ const COLORS = {
     text: '#991B1B',
     icon: '#B91C1C',
     bgLight: '#FEF7F7',
+  },
+  warning: {
+    bg: '#FFFBEB',
+    border: '#FCD34D',
+    text: '#92400E',
+    icon: '#D97706',
+    bgLight: '#FFFBEB',
   },
   success: {
     bg: '#ECFDF5',
@@ -148,7 +155,9 @@ export default function ErrorBanner({
         {showIcon && (
           <View style={styles.iconContainer}>
             <AntDesign 
-              name={tone === 'success' ? 'checkcircle' : tone === 'info' ? 'infocirlceo' : 'exclamationcircleo'} 
+              name={tone === 'success' ? 'checkcircle' : 
+                    tone === 'info' ? 'infocirlceo' : 
+                    tone === 'warning' ? 'warning' : 'exclamationcircleo'} 
               size={responsive.size(16)} 
               color={palette.icon} 
             />

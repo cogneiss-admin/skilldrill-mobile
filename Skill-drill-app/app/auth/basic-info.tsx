@@ -5,14 +5,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Button, TextInput } from "react-native-paper";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
-import { isValidEmail, isValidPhone } from "../../components/validators";
+import { isValidEmail, isValidPhone } from "../components/validators";
 import { LinearGradient } from "expo-linear-gradient";
 import { MotiView } from "moti";
 import { StatusBar } from "expo-status-bar";
 import { AntDesign } from "@expo/vector-icons";
 import { useAuth } from "../../hooks/useAuth";
-
-const BRAND = "#0A66C2";
+import { BRAND } from "../components/Brand";
 const APP_NAME = "Skill Drill";
 const logoSrc = require("../../assets/images/logo.png");
 

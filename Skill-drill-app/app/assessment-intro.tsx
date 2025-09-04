@@ -257,7 +257,7 @@ export default function AssessmentIntroScreen() {
           flex: 1, 
           justifyContent: 'center', 
           alignItems: 'center',
-          paddingHorizontal: 20
+          paddingHorizontal: 16
         }}>
           <MotiView
             from={{ opacity: 0, scale: 0.8 }}
@@ -294,7 +294,7 @@ export default function AssessmentIntroScreen() {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: WHITE }}>
         <StatusBar style="dark" />
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 20 }}>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 16 }}>
           <View style={{ alignItems: "center", marginBottom: 32 }}>
             <Text style={{ fontSize: 48, marginBottom: 16 }}>⚠️</Text>
             <Text style={{ fontSize: 20, fontWeight: "700", color: "#0f172a", textAlign: "center", marginBottom: 8 }}>
@@ -355,7 +355,7 @@ export default function AssessmentIntroScreen() {
             zIndex: 1000,
             backgroundColor: 'rgba(0, 0, 0, 0.8)',
             paddingVertical: 12,
-            paddingHorizontal: 20,
+            paddingHorizontal: 16,
             alignItems: 'center'
           }}
         >
@@ -376,7 +376,7 @@ export default function AssessmentIntroScreen() {
         style={{
           paddingTop: 20,
           paddingBottom: 30,
-          paddingHorizontal: 20,
+          paddingHorizontal: 16,
           borderBottomLeftRadius: 25,
           borderBottomRightRadius: 25
         }}
@@ -440,7 +440,7 @@ export default function AssessmentIntroScreen() {
       <ScrollView 
         style={{ flex: 1 }}
         contentContainerStyle={{ 
-          paddingHorizontal: 20,
+          paddingHorizontal: 16,
           paddingVertical: 24
         }}
         showsVerticalScrollIndicator={false}

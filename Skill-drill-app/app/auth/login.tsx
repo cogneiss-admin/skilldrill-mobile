@@ -3,7 +3,7 @@ import React, { useMemo, useState } from "react";
 import { Pressable, View, Image, ScrollView, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TextInput } from "react-native-paper";
-import CompactErrorBanner from "../../components/CompactErrorBanner";
+import ErrorBanner from "../../components/ErrorBanner";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { AntDesign, MaterialIcons } from "@expo/vector-icons";
@@ -12,13 +12,12 @@ import LinkedInIcon from "../../components/LinkedInIcon";
 import { StatusBar } from "expo-status-bar";
 import { useToast } from "../../hooks/useToast";
 import { parseApiError, formatErrorMessage } from "../../utils/errorHandler";
-import { detectInputType, isValidEmail, isValidPhone, validationMessageFor } from "../../components/validators";
+import { detectInputType, isValidEmail, isValidPhone, validationMessageFor } from "../components/validators";
 import { useSocialAuth } from "../../hooks/useSocialAuth";
 import { useResponsive } from "../../utils/responsive";
+import { BRAND } from "../components/Brand";
 
 const logoSrc = require("../../assets/images/logo.png");
-
-const BRAND = "#0A66C2";
 const COUNTRY_CODE = "+91";
 
 export default function LoginScreen() {
@@ -340,9 +339,10 @@ export default function LoginScreen() {
             marginBottom: responsive.spacing(10),
             width: '100%'
           }}>
-                    <CompactErrorBanner
+                    <ErrorBanner
           message={validationMessage}
           tone="error"
+          compact={true}
           dismissible={true}
           onDismiss={() => setValidationMessage("")}
           animated={true}

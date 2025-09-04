@@ -11,12 +11,12 @@ import { Button } from "react-native-paper";
 import { MotiView } from "moti";
 import { StatusBar } from "expo-status-bar";
 import { useAuth } from "../hooks/useAuth";
+import { BRAND } from "./components/Brand";
 import "./home"; // pre-load home route to avoid router spinner during navigation
 
 const logoSrc = require("../assets/images/logo.png");
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-const BRAND = "#0A66C2"; // keep consistent with splash
 
 const App = React.memo(() => {
   const [isSplashDone, setSplashDone] = useState(false);
