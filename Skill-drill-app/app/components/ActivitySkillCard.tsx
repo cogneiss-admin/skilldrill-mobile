@@ -435,7 +435,7 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
                 onPress={() => {
                   if (skillId) {
                     router.push({
-                      pathname: '/assessment-intro',
+                      pathname: '/adaptive-assessment',
                       params: { skillId }
                     });
                   }
@@ -462,7 +462,7 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
                 onPress={() => {
                   if (skillId) {
                     router.push({
-                      pathname: '/assessment-intro',
+                      pathname: '/adaptive-assessment',
                       params: { skillId }
                     });
                   }

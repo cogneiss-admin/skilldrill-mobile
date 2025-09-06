@@ -13,6 +13,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { apiService } from "../../services/api";
 import { useToast } from "../../hooks/useToast";
 import TierSection from "../components/TierSection";
+import AdaptiveTierSection from "../components/AdaptiveTierSection";
 import { useSkillsData } from "../../hooks/useSkillsData";
 import SkillsSkeleton from "../components/SkillsSkeleton";
 // Temporarily disabled Redux hook to fix import error
@@ -72,12 +73,11 @@ export default function SkillsScreen() {
           return;
         }
 
-        // For assessment mode, if user already has skills, start assessment directly
+        // For assessment mode, if user already has skills, navigate to skill selection in assessment mode
         // But if they're coming from dashboard after completing assessments, allow them to add new skills
         if (isAssessmentMode && !isFromCompleted) {
-          console.log('🎯 Assessment mode with existing skills: Starting assessment directly');
-          showToast('info', 'Starting Assessment', 'You already have skills selected. Starting your assessment...');
-          router.replace('/assessment-intro');
+          console.log('🎯 Assessment mode with existing skills: Continuing to skill selection...');
+          // Don't redirect - let user choose skills for assessment
           return;
         }
 
@@ -125,6 +125,16 @@ export default function SkillsScreen() {
     try { await Haptics.selectionAsync(); } catch {}
     toggleSkill(skillId);
   }, [toggleSkill, skillsData, skillsWithAssessments, showToast]);
+
+  const handleTraditionalAssessment = useCallback((skill) => {
+    router.push({
+      pathname: '/adaptive-assessment',
+      params: {
+        skillId: skill.mongo_id,
+        skillName: skill.name || skill.skill_name
+      }
+    });
+  }, [router]);
 
   // Check which skills already have assessments
   const checkSkillsWithAssessments = useCallback(async () => {
@@ -224,7 +234,7 @@ export default function SkillsScreen() {
           AsyncStorage.removeItem('selectedSkills').catch(console.error);
 
           router.replace({
-            pathname: '/assessment-intro',
+            pathname: '/adaptive-assessment',
             params: { selectedSkills: JSON.stringify(validSkillIds) }
           });
           return; // Exit early to prevent dashboard navigation
@@ -336,7 +346,21 @@ export default function SkillsScreen() {
                 const tierSkills = skillsByTier[tierKey as keyof typeof skillsByTier];
                 if (!tierSkills || tierSkills.length === 0) return null;
                 const config = tierConfig[tierKey];
-                return (
+                return isAssessmentMode ? (
+                  <AdaptiveTierSection
+                    key={tierKey}
+                    tierKey={tierKey}
+                    title={config.name}
+                    icon={config.icon}
+                    skills={tierSkills}
+                    selectedIds={selected}
+                    onToggle={handleToggleSkill}
+                    brand={BRAND}
+                    skillsWithAssessments={skillsWithAssessments}
+                    isAssessmentMode={true}
+                    onTraditionalAssessment={handleTraditionalAssessment}
+                  />
+                ) : (
                   <TierSection
                     key={tierKey}
                     tierKey={tierKey}

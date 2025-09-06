@@ -19,9 +19,10 @@ import { useToast } from '../hooks/useToast';
 import { apiService } from '../services/api';
 import DashboardSkeleton from './components/DashboardSkeleton';
 import { LinearGradient } from 'expo-linear-gradient';
-import { AntDesign, MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { BRAND, GRADIENTS, BORDER_RADIUS, SHADOWS, PADDING } from './components/Brand';
 import { useResponsive } from '../utils/responsive';
+import BottomNavigation from '../components/BottomNavigation';
 
 // Define constants
 const BRAND_LIGHT = "#E6F2FF";
@@ -32,6 +33,41 @@ const SUCCESS = "#22C55E";
 const WARNING = "#F59E0B";
 const ERROR = "#EF4444";
 const APP_NAME = "Skill Drill";
+
+// Typography System
+const TYPOGRAPHY = {
+  // Headers - Plain black for better readability
+  h1: { fontSize: 24, fontWeight: '700', color: '#000000', letterSpacing: 0.1 },
+  h2: { fontSize: 20, fontWeight: '600', color: '#000000', letterSpacing: 0.1 },
+  h3: { fontSize: 18, fontWeight: '600', color: '#000000', letterSpacing: 0.1 },
+  h4: { fontSize: 16, fontWeight: '600', color: '#000000', letterSpacing: 0.1 },
+  
+  // Body Text
+  bodyLarge: { fontSize: 16, fontWeight: '500', color: DARK_GRAY, lineHeight: 24 },
+  bodyMedium: { fontSize: 14, fontWeight: '500', color: DARK_GRAY, lineHeight: 20 },
+  bodySmall: { fontSize: 12, fontWeight: '500', color: DARK_GRAY, lineHeight: 18 },
+  
+  // Labels and Captions
+  labelLarge: { fontSize: 14, fontWeight: '600', color: '#000000', letterSpacing: 0.1 },
+  labelMedium: { fontSize: 12, fontWeight: '600', color: '#000000', letterSpacing: 0.1 },
+  labelSmall: { fontSize: 10, fontWeight: '600', color: '#000000', letterSpacing: 0.1 },
+  
+  // Secondary Text
+  secondaryLarge: { fontSize: 14, fontWeight: '500', color: GRAY, lineHeight: 20 },
+  secondaryMedium: { fontSize: 12, fontWeight: '500', color: GRAY, lineHeight: 18 },
+  secondarySmall: { fontSize: 10, fontWeight: '500', color: GRAY, lineHeight: 16 },
+  
+  // Button Text
+  buttonLarge: { fontSize: 16, fontWeight: '600', letterSpacing: 0.1 },
+  buttonMedium: { fontSize: 14, fontWeight: '600', letterSpacing: 0.1 },
+  buttonSmall: { fontSize: 12, fontWeight: '600', letterSpacing: 0.1 },
+  
+  // Special Text
+  brand: { fontSize: 18, fontWeight: '900', color: WHITE, letterSpacing: 0.5 },
+  score: { fontSize: 20, fontWeight: '700', color: BRAND, letterSpacing: 0.2 },
+  success: { fontSize: 12, fontWeight: '600', color: SUCCESS, letterSpacing: 0.1 },
+  warning: { fontSize: 12, fontWeight: '600', color: WARNING, letterSpacing: 0.1 },
+};
 
 // Import logo
 const logoSrc = require('../assets/images/logo.png');
@@ -80,7 +116,6 @@ export default function DashboardImproved() {
   const [userSkills, setUserSkills] = useState<UserSkill[]>([]);
   const [loadingSkills, setLoadingSkills] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'home' | 'profile'>('home');
   const [recentResults, setRecentResults] = useState<CompletedAssessment[]>([]);
   const [completedSkillIdsFromResults, setCompletedSkillIdsFromResults] = useState<Set<string>>(new Set());
 
@@ -91,6 +126,8 @@ export default function DashboardImproved() {
     if (hour < 17) return 'Good afternoon';
     return 'Good evening';
   };
+
+  // Tab navigation is now handled by BottomNavigation component
 
 
 
@@ -275,38 +312,29 @@ export default function DashboardImproved() {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
-      {/* Enhanced Header */}
-              <LinearGradient
-          colors={GRADIENTS.header}
-          style={styles.headerGradient}
-        >
-        <View style={styles.headerRow}>
-          <View style={styles.headerLeft}>
-            <Image source={logoSrc} style={styles.logo} resizeMode="contain" />
-            <Text style={styles.appName}>{APP_NAME}</Text>
-          </View>
-          <TouchableOpacity onPress={handleLogout}>
-            <View style={styles.userInitials}>
-              <Text style={styles.userInitialsText}>
+      {/* Clean Header - Minimal Design */}
+      <View style={styles.cleanHeader}>
+        <View style={styles.headerContent}>
+          <Text style={styles.appNameOnly}>Dashboard</Text>
+          <TouchableOpacity onPress={handleLogout} style={styles.profileButton}>
+            <View style={styles.profileCircle}>
+              <Text style={styles.profileText}>
                 {getUserInitials()}
               </Text>
             </View>
           </TouchableOpacity>
         </View>
+      </View>
 
-        {/* Enhanced Greeting Section */}
-        <View style={styles.greetingSection}>
-          <Text style={styles.greetingText}>
-            {getGreeting()}! 👋
-          </Text>
-          <Text style={styles.readyText}>
-            Ready to grow?
-          </Text>
-          <Text style={styles.subtitleText}>
-            Continue building skills that make a difference
-          </Text>
-        </View>
-      </LinearGradient>
+      {/* Greeting Section in Main Content */}
+      <View style={styles.greetingSection}>
+        <Text style={styles.greetingText}>
+          {getGreeting()}! 👋
+        </Text>
+        <Text style={styles.welcomeText}>
+          Ready to grow your skills?
+        </Text>
+      </View>
 
       {/* Enhanced Cards Section */}
       <View style={styles.cardsContainer}>
@@ -326,18 +354,10 @@ export default function DashboardImproved() {
               <MaterialIcons name="trending-up" size={24} color={SUCCESS} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{
-                fontSize: 16,
-                fontWeight: '700',
-                color: DARK_GRAY
-              }}>
+              <Text style={TYPOGRAPHY.h4}>
                 Your Progress
               </Text>
-              <Text style={{
-                fontSize: 14,
-                color: GRAY,
-                marginTop: 2
-              }}>
+              <Text style={[TYPOGRAPHY.secondaryMedium, { marginTop: 2 }]}>
                 Track your skill development
               </Text>
             </View>
@@ -345,53 +365,26 @@ export default function DashboardImproved() {
           
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
             <View style={{ alignItems: 'center', flex: 1 }}>
-              <Text style={{
-                fontSize: 24,
-                fontWeight: '800',
-                color: BRAND
-              }}>
+              <Text style={[TYPOGRAPHY.h1, { color: BRAND }]}>
                 {stats.totalSkills}
               </Text>
-              <Text style={{
-                fontSize: 12,
-                color: DARK_GRAY,
-                marginTop: 4,
-                fontWeight: '600'
-              }}>
+              <Text style={[TYPOGRAPHY.labelMedium, { marginTop: 4 }]}>
                 Total Skills
               </Text>
             </View>
             <View style={{ alignItems: 'center', flex: 1 }}>
-              <Text style={{
-                fontSize: 24,
-                fontWeight: '800',
-                color: SUCCESS
-              }}>
+              <Text style={[TYPOGRAPHY.h1, { color: SUCCESS }]}>
                 {stats.completedSkills}
               </Text>
-              <Text style={{
-                fontSize: 12,
-                color: DARK_GRAY,
-                marginTop: 4,
-                fontWeight: '600'
-              }}>
+              <Text style={[TYPOGRAPHY.labelMedium, { marginTop: 4 }]}>
                 Completed
               </Text>
             </View>
             <View style={{ alignItems: 'center', flex: 1 }}>
-              <Text style={{
-                fontSize: 24,
-                fontWeight: '800',
-                color: WARNING
-              }}>
+              <Text style={[TYPOGRAPHY.h1, { color: WARNING }]}>
                 {stats.completionRate}%
               </Text>
-              <Text style={{
-                fontSize: 12,
-                color: DARK_GRAY,
-                marginTop: 4,
-                fontWeight: '600'
-              }}>
+              <Text style={[TYPOGRAPHY.labelMedium, { marginTop: 4 }]}>
                 Success Rate
               </Text>
             </View>
@@ -405,12 +398,7 @@ export default function DashboardImproved() {
             borderWidth: 1,
             borderColor: '#E2E8F0'
           }}>
-            <Text style={{
-              fontSize: 14,
-              fontWeight: '600',
-              color: DARK_GRAY,
-              marginBottom: 12
-            }}>
+            <Text style={[TYPOGRAPHY.labelLarge, { marginBottom: 12 }]}>
               Progress Breakdown
             </Text>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -422,9 +410,9 @@ export default function DashboardImproved() {
                   backgroundColor: SUCCESS,
                   marginRight: 8
                 }} />
-                <Text style={{ fontSize: 12, color: DARK_GRAY }}>Completed</Text>
+                <Text style={TYPOGRAPHY.bodySmall}>Completed</Text>
               </View>
-              <Text style={{ fontSize: 12, fontWeight: '600', color: SUCCESS }}>
+              <Text style={[TYPOGRAPHY.labelSmall, { color: SUCCESS }]}>
                 {stats.completedSkills}
               </Text>
             </View>
@@ -437,9 +425,9 @@ export default function DashboardImproved() {
                   backgroundColor: WARNING,
                   marginRight: 8
                 }} />
-                <Text style={{ fontSize: 12, color: DARK_GRAY }}>In Progress</Text>
+                <Text style={TYPOGRAPHY.bodySmall}>In Progress</Text>
               </View>
-              <Text style={{ fontSize: 12, fontWeight: '600', color: WARNING }}>
+              <Text style={[TYPOGRAPHY.labelSmall, { color: WARNING }]}>
                 {stats.inProgressSkills}
               </Text>
             </View>
@@ -452,9 +440,9 @@ export default function DashboardImproved() {
                   backgroundColor: GRAY,
                   marginRight: 8
                 }} />
-                <Text style={{ fontSize: 12, color: DARK_GRAY }}>Not Started</Text>
+                <Text style={TYPOGRAPHY.bodySmall}>Not Started</Text>
               </View>
-              <Text style={{ fontSize: 12, fontWeight: '600', color: GRAY }}>
+              <Text style={[TYPOGRAPHY.labelSmall, { color: GRAY }]}>
                 {stats.notStartedSkills}
               </Text>
             </View>
@@ -471,18 +459,10 @@ export default function DashboardImproved() {
               borderColor: '#BAE6FD'
             }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Text style={{
-                  fontSize: 14,
-                  fontWeight: '600',
-                  color: '#0369A1'
-                }}>
+                <Text style={[TYPOGRAPHY.labelLarge, { color: '#0369A1' }]}>
                   Average Score
                 </Text>
-                <Text style={{
-                  fontSize: 20,
-                  fontWeight: '700',
-                  color: '#0369A1'
-                }}>
+                <Text style={[TYPOGRAPHY.score, { color: '#0369A1' }]}>
                   {stats.averageScore}/10
                 </Text>
               </View>
@@ -493,110 +473,180 @@ export default function DashboardImproved() {
         {/* Quick Actions Card */}
         <View style={{
           backgroundColor: WHITE,
-          borderRadius: 16,
-          padding: 16,
+          borderRadius: 20,
+          padding: 20,
           marginBottom: 16,
           shadowColor: BRAND,
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.1,
-          shadowRadius: 12,
-          elevation: 5,
+          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.12,
+          shadowRadius: 16,
+          elevation: 8,
           borderWidth: 1,
-          borderColor: '#E6F2FF'
+          borderColor: '#F0F4FF'
         }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
             <View style={{
-              width: 40,
-              height: 40,
-              borderRadius: 10,
-              backgroundColor: '#FEF3C7',
+              width: 48,
+              height: 48,
+              borderRadius: 14,
+              backgroundColor: '#F0F9FF',
               justifyContent: 'center',
               alignItems: 'center',
-              marginRight: 10
+              marginRight: 12,
+              borderWidth: 1,
+              borderColor: '#E0F2FE'
             }}>
-              <Ionicons name="flash" size={20} color="#F59E0B" />
+              <Ionicons name="rocket-outline" size={24} color={BRAND} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{
-                fontSize: 16,
-                fontWeight: '600',
-                color: DARK_GRAY
-              }}>
+              <Text style={TYPOGRAPHY.h3}>
                 Quick Actions
               </Text>
-              <Text style={{
-                fontSize: 12,
-                color: GRAY,
-                marginTop: 1
-              }}>
-                Manage your skills and feedback
+              <Text style={[TYPOGRAPHY.secondaryMedium, { marginTop: 2 }]}>
+                Jump into your learning journey
               </Text>
             </View>
           </View>
 
-          {/* Two Button Layout */}
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            {/* Add Skills Button */}
+          {/* Enhanced Button Layout */}
+          <View style={{ gap: 12 }}>
+            {/* Primary Action - Take Assessment */}
             <TouchableOpacity
               onPress={() => {
                 router.push({
                   pathname: '/auth/skills',
-                  params: { mode: 'add-more-skills' }
+                  params: { mode: 'assessment' }
                 });
               }}
               style={{
-                flex: 1,
-                backgroundColor: 'transparent',
-                paddingVertical: 14,
-                borderRadius: 10,
-                borderWidth: 1.5,
-                borderColor: BRAND,
+                backgroundColor: BRAND,
+                paddingVertical: 16,
+                paddingHorizontal: 20,
+                borderRadius: 16,
                 alignItems: 'center',
-                minHeight: 50,
-                justifyContent: 'center'
+                justifyContent: 'center',
+                shadowColor: BRAND,
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 8,
+                elevation: 6,
+                borderWidth: 1,
+                borderColor: '#3B82F6'
               }}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
             >
-              <View style={{ alignItems: 'center' }}>
-                <Ionicons name="add-circle-outline" size={18} color={BRAND} style={{ marginBottom: 3 }} />
-                <Text style={{
-                  color: BRAND,
-                  fontSize: 12,
-                  fontWeight: '600',
-                  letterSpacing: 0.3
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                <View style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginRight: 12
                 }}>
-                  Add Skills
-                </Text>
+                  <MaterialIcons name="psychology" size={18} color={WHITE} />
+                </View>
+                <View style={{ alignItems: 'flex-start' }}>
+                  <Text style={[TYPOGRAPHY.buttonLarge, { color: WHITE }]}>
+                    Take Assessment
+                  </Text>
+                  <Text style={[TYPOGRAPHY.secondarySmall, { color: 'rgba(255, 255, 255, 0.8)', marginTop: 1 }]}>
+                    Test your skills now
+                  </Text>
+                </View>
               </View>
             </TouchableOpacity>
 
-            {/* Recent Feedback Button */}
-            <TouchableOpacity
-              onPress={() => {
-                router.push('/activity');
-              }}
-              style={{
-                flex: 1,
-                backgroundColor: 'transparent',
-                paddingVertical: 14,
-                borderRadius: 10,
-                borderWidth: 1.5,
-                borderColor: BRAND,
-                alignItems: 'center'
-              }}
-            >
-              <View style={{ alignItems: 'center' }}>
-                <MaterialIcons name="analytics" size={18} color={BRAND} style={{ marginBottom: 3 }} />
-                <Text style={{
-                  color: BRAND,
-                  fontSize: 12,
-                  fontWeight: '600',
-                  letterSpacing: 0.3
+            {/* Secondary Actions Row */}
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              {/* Add Skills Button */}
+              <TouchableOpacity
+                onPress={() => {
+                  router.push({
+                    pathname: '/auth/skills',
+                    params: { mode: 'add-more-skills' }
+                  });
+                }}
+                style={{
+                  flex: 1,
+                  backgroundColor: '#F8FAFC',
+                  paddingVertical: 14,
+                  paddingHorizontal: 16,
+                  borderRadius: 14,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 4,
+                  elevation: 2
+                }}
+                activeOpacity={0.8}
+              >
+                <View style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 7,
+                  backgroundColor: '#E0F2FE',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginBottom: 8
                 }}>
-                  Recent Feedback
+                  <Ionicons name="add-circle" size={16} color={BRAND} />
+                </View>
+                <Text style={[TYPOGRAPHY.buttonSmall, { textAlign: 'center' }]}>
+                  Add Skills
                 </Text>
-              </View>
-            </TouchableOpacity>
+                <Text style={[TYPOGRAPHY.secondarySmall, { marginTop: 2, textAlign: 'center' }]}>
+                  Expand your toolkit
+                </Text>
+              </TouchableOpacity>
+
+              {/* View Feedback Button */}
+              <TouchableOpacity
+                onPress={() => {
+                  router.push('/activity');
+                }}
+                style={{
+                  flex: 1,
+                  backgroundColor: '#F8FAFC',
+                  paddingVertical: 14,
+                  paddingHorizontal: 16,
+                  borderRadius: 14,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 4,
+                  elevation: 2
+                }}
+                activeOpacity={0.8}
+              >
+                <View style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 7,
+                  backgroundColor: '#F0FDF4',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginBottom: 8
+                }}>
+                  <MaterialIcons name="analytics" size={16} color={SUCCESS} />
+                </View>
+                <Text style={[TYPOGRAPHY.buttonSmall, { textAlign: 'center' }]}>
+                  View Feedback
+                </Text>
+                <Text style={[TYPOGRAPHY.secondarySmall, { marginTop: 2, textAlign: 'center' }]}>
+                  Track progress
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 
@@ -628,18 +678,10 @@ export default function DashboardImproved() {
                 <MaterialIcons name="book" size={24} color={BRAND} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={{
-                  fontSize: 18,
-                  fontWeight: '700',
-                  color: DARK_GRAY
-                }}>
+                <Text style={TYPOGRAPHY.h3}>
                   Your Skills
                 </Text>
-                <Text style={{
-                  fontSize: 14,
-                  color: GRAY,
-                  marginTop: 2
-                }}>
+                <Text style={[TYPOGRAPHY.secondaryMedium, { marginTop: 2 }]}>
                   {userSkills.length} skill{userSkills.length !== 1 ? 's' : ''} selected
                 </Text>
               </View>
@@ -662,12 +704,7 @@ export default function DashboardImproved() {
                 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                     <View style={{ flex: 1 }}>
-                      <Text style={{
-                        fontSize: 16,
-                        fontWeight: '600',
-                        color: DARK_GRAY,
-                        marginBottom: 8
-                      }}>
+                      <Text style={[TYPOGRAPHY.h4, { marginBottom: 8 }]}>
                         {userSkill.skill.skill_name}
                       </Text>
                       
@@ -680,12 +717,11 @@ export default function DashboardImproved() {
                         borderRadius: 16,
                         alignSelf: 'flex-start'
                       }}>
-                        <Text style={{
-                          fontSize: 12,
-                          fontWeight: '600',
-                          color: userSkill.assessment_status === 'COMPLETED' ? SUCCESS : 
-                                 userSkill.assessment_status === 'IN_PROGRESS' ? '#D97706' : '#6B7280'
-                        }}>
+                        <Text style={[
+                          TYPOGRAPHY.labelSmall,
+                          { color: userSkill.assessment_status === 'COMPLETED' ? SUCCESS : 
+                                   userSkill.assessment_status === 'IN_PROGRESS' ? '#D97706' : '#6B7280' }
+                        ]}>
                           {userSkill.assessment_status === 'COMPLETED' ? 'Completed' : 
                            userSkill.assessment_status === 'IN_PROGRESS' ? 'In Progress' : 'Not Started'}
                         </Text>
@@ -696,11 +732,7 @@ export default function DashboardImproved() {
                     {userSkill.assessment_status === 'COMPLETED' && userSkill.current_score && (
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <MaterialIcons name="star" size={16} color="#F59E0B" style={{ marginRight: 4 }} />
-                        <Text style={{
-                          fontSize: 16,
-                          fontWeight: '700',
-                          color: DARK_GRAY
-                        }}>
+                        <Text style={[TYPOGRAPHY.score, { color: DARK_GRAY }]}>
                           {userSkill.current_score}/10
                         </Text>
                       </View>
@@ -724,11 +756,7 @@ export default function DashboardImproved() {
                 alignItems: 'center'
               }}
             >
-              <Text style={{
-                fontSize: 14,
-                fontWeight: '600',
-                color: DARK_GRAY
-              }}>
+              <Text style={TYPOGRAPHY.buttonMedium}>
                 +1 more skill
               </Text>
             </TouchableOpacity>
@@ -763,18 +791,10 @@ export default function DashboardImproved() {
                 <Ionicons name="ribbon-outline" size={24} color={BRAND} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={{
-                  fontSize: 16,
-                  fontWeight: '700',
-                  color: DARK_GRAY
-                }}>
+                <Text style={TYPOGRAPHY.h4}>
                   Recent Results
                 </Text>
-                <Text style={{
-                  fontSize: 14,
-                  color: GRAY,
-                  marginTop: 2
-                }}>
+                <Text style={[TYPOGRAPHY.secondaryMedium, { marginTop: 2 }]}>
                   Your latest completed assessments
                 </Text>
               </View>
@@ -788,11 +808,11 @@ export default function DashboardImproved() {
               }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <View style={{ flex: 1, paddingRight: 12 }}>
-                    <Text style={{ fontSize: 16, fontWeight: '600', color: DARK_GRAY }}>{r.skillName}</Text>
-                    <Text style={{ fontSize: 12, color: GRAY, marginTop: 2 }}>{r.scoreLabel || 'Result'}</Text>
+                    <Text style={TYPOGRAPHY.h4}>{r.skillName}</Text>
+                    <Text style={[TYPOGRAPHY.secondarySmall, { marginTop: 2 }]}>{r.scoreLabel || 'Result'}</Text>
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={{ fontSize: 16, fontWeight: '700', color: BRAND }}>{r.finalScore}/10</Text>
+                    <Text style={[TYPOGRAPHY.score, { color: BRAND }]}>{r.finalScore}/10</Text>
                   </View>
                 </View>
               </View>
@@ -806,49 +826,14 @@ export default function DashboardImproved() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
-      
+
       {/* Main Content */}
       {renderHomeContent()}
 
 
 
       {/* Bottom Navigation */}
-      <View style={styles.bottomNavigation}>
-        <View style={styles.bottomNavRow}>
-          <TouchableOpacity
-            onPress={() => setActiveTab('home')}
-            style={styles.navButton}
-          >
-            <AntDesign 
-              name="home" 
-              size={24} 
-              color={activeTab === 'home' ? BRAND : GRAY} 
-            />
-            <Text style={[
-              activeTab === 'home' ? styles.navTextActive : styles.navText,
-              { color: activeTab === 'home' ? BRAND : GRAY }
-            ]}>
-              Home
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => { 
-              router.push('/activity');
-            }}
-            style={styles.navButton}
-          >
-            <Ionicons 
-              name="time-outline" 
-              size={24} 
-              color={activeTab === 'activity' ? BRAND : GRAY} 
-            />
-            <Text style={[styles.navText, { color: GRAY }]}>
-              My Activity
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      <BottomNavigation activeTab="home" />
     </SafeAreaView>
   );
 };
@@ -864,74 +849,87 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 100,
-    paddingTop: 10
+    paddingTop: 5
   },
-        headerGradient: {
-        paddingTop: PADDING.lg,
-        paddingBottom: 30,
-        paddingHorizontal: PADDING.md,
-        borderBottomLeftRadius: 25,
-        borderBottomRightRadius: 25
-      },
-  headerRow: {
+  cleanHeader: {
+    backgroundColor: '#FFFFFF',
+    paddingTop: 15,
+    paddingBottom: 15,
+    paddingHorizontal: PADDING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  headerContent: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'space-between'
   },
   headerLeft: {
     flexDirection: 'row',
-    alignItems: 'center'
+    alignItems: 'center',
   },
   logo: {
     width: 32,
-    height: 32
+    height: 32,
+    marginRight: 12,
   },
-  appName: {
-    marginLeft: 10,
-    color: WHITE,
-    fontSize: 18,
-    fontWeight: '900',
-    letterSpacing: 0.5
+  appNameOnly: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: 0.8,
+    textShadowColor: 'rgba(0, 0, 0, 0.1)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
-  userInitials: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  profileButton: {
+    padding: 4,
+  },
+  profileCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F8FAFC',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)'
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 3,
   },
-  userInitialsText: {
-    color: WHITE,
+  profileText: {
+    color: '#374151',
     fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 0.5
+    fontWeight: '600',
   },
   greetingSection: {
-    marginTop: 25
+    paddingHorizontal: PADDING.md,
+    paddingTop: 10,
+    paddingBottom: 5,
   },
   greetingText: {
-    color: WHITE,
-    fontSize: 16,
-    opacity: 0.9
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 8,
   },
-  readyText: {
-    color: WHITE,
-    fontSize: 20,
-    fontWeight: '700',
-    marginTop: 4
-  },
-  subtitleText: {
-    color: WHITE,
+  welcomeText: {
     fontSize: 14,
-    opacity: 0.8,
-    marginTop: 5
+    fontWeight: '400',
+    color: '#6B7280',
+    lineHeight: 20,
   },
         cardsContainer: {
         paddingHorizontal: PADDING.md,
-        marginTop: 30
+        marginTop: 15
       },
         progressCard: {
         backgroundColor: WHITE,
@@ -942,34 +940,5 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#E6F2FF'
       },
-  bottomNavigation: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#F8FAFC',
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-    paddingBottom: 20,
-    paddingTop: 10
-  },
-        bottomNavRow: {
-        flexDirection: 'row',
-        paddingHorizontal: PADDING.md
-      },
-  navButton: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 8
-  },
-  navText: {
-    fontSize: 12,
-    marginTop: 4,
-    fontWeight: '400'
-  },
-  navTextActive: {
-    fontSize: 12,
-    marginTop: 4,
-    fontWeight: '600'
-  }
+  // Footer styles moved to BottomNavigation component
 });

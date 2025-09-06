@@ -29,12 +29,12 @@ interface FeedbackData {
   strengths?: string;
   improvementFeedback?: string;
   recommendedAction?: string;
-  responses?: Array<{
+  responses?: {
     id: string;
     prompt: string;
     aiFeedback?: string;
     aiScore?: number;
-  }>;
+  }[];
   subSkillScores?: Record<string, any>;
   completedAt?: string;
 }

@@ -80,7 +80,7 @@ export function useAssessmentStatus(args: UseAssessmentStatusArgs): UseAssessmen
     }
     // No session and not completed → regular start
     if (onStart) return onStart();
-    router?.push('/assessment-intro' as Href);
+    router?.push('/adaptive-assessment' as Href);
   }, [hasActiveSession, activeSession?.sessionId, isCompleted, onResume, router, onAddSkills, onStart, showToast]);
 
   const showSecondaryAddSkills = useMemo(() => {

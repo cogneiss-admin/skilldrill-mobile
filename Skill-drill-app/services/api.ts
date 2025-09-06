@@ -408,6 +408,53 @@ class ApiService {
   public async healthCheck(): Promise<ApiResponse> {
     return this.get('/auth/health');
   }
+
+  // ===========================================
+  // ADAPTIVE ASSESSMENT METHODS
+  // ===========================================
+
+  /**
+   * Start new adaptive assessment session (Sequential)
+   */
+  public async startAdaptiveAssessment(skillId: string): Promise<ApiResponse> {
+    console.log('🎯 Starting adaptive assessment for skill:', skillId);
+    return this.post('/assessment/adaptive/start', { skillId });
+  }
+
+  /**
+   * Submit answer and get next question (Sequential)
+   */
+  public async submitAnswerAndGetNext(sessionId: string, answer: string): Promise<ApiResponse> {
+    console.log('📝 Submitting answer for session:', sessionId);
+    return this.post('/assessment/adaptive/answer', {
+      sessionId,
+      answer
+    });
+  }
+
+  /**
+   * Submit all assessment responses (Legacy - for backwards compatibility)
+   */
+  public async submitAssessmentResponses(assessmentId: string, responses: Array<{
+    questionId: string;
+    answer: string;
+    timeTaken?: number;
+  }>): Promise<ApiResponse> {
+    console.log('📝 Submitting all assessment responses for:', assessmentId);
+    return this.post('/assessment/adaptive/submit', {
+      assessmentId,
+      responses
+    });
+  }
+
+  /**
+   * Get adaptive assessment results
+   */
+  public async getAdaptiveResults(sessionId: string): Promise<ApiResponse> {
+    console.log('📊 Getting adaptive results for session:', sessionId);
+    return this.get(`/assessment/adaptive/results/${sessionId}`);
+  }
+
 }
 
 // Create and export singleton instance

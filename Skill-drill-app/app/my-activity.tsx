@@ -17,6 +17,7 @@ import { AntDesign, MaterialIcons, Ionicons, FontAwesome5 } from '@expo/vector-i
 import { apiService } from "../services/api";
 import { useToast } from "../hooks/useToast";
 import { BRAND } from "./components/Brand";
+// BottomNavigation removed - using activity.tsx as main activity screen
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface UserSkill {
@@ -274,7 +275,7 @@ export default function MyActivity() {
             } else {
               // Navigate to assessment intro
               router.push({
-                pathname: '/assessment-intro',
+                pathname: '/adaptive-assessment',
                 params: { skillId: skill.skill.id }
               });
             }
@@ -627,7 +628,7 @@ export default function MyActivity() {
                 <TouchableOpacity
                   onPress={() => {
                     router.push({
-                      pathname: '/assessment-intro',
+                      pathname: '/adaptive-assessment',
                       params: { skillId: skill.skill.id }
                     });
                   }}
@@ -940,6 +941,8 @@ export default function MyActivity() {
           </>
         )}
       </ScrollView>
+
+      {/* Footer navigation removed - using centralized BottomNavigation in activity.tsx */}
     </SafeAreaView>
   );
 }

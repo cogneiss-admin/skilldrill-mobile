@@ -18,7 +18,7 @@ export function TierSection({
   title: string;
   icon: string;
   skills: any[];
-  selectedIds: Array<string | number>;
+  selectedIds: (string | number)[];
   onToggle: (id: string | number) => void;
   brand?: string;
   skillsWithAssessments?: Set<string>;

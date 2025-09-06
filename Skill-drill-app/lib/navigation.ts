@@ -7,20 +7,12 @@ export type RouterLike = {
   replace?: (href: string | { pathname: Href; params?: Record<string, string> }) => void;
 };
 
-export const goToAssessmentIntro = (router?: RouterLike) => {
-  router?.push('/assessment-intro' as Href);
-};
-
-export const resumeAssessment = (router: RouterLike | undefined, sessionId: string) => {
+export const resumeAdaptiveAssessment = (router: RouterLike | undefined, sessionId: string) => {
   if (!router || !sessionId) return;
-  router.push({ pathname: '/assessment' as Href, params: { sessionId, resume: 'true' } });
+  router.push({ pathname: '/adaptive-assessment' as Href, params: { sessionId, resume: 'true' } });
 };
 
-export const goToSkillsAddToAssessment = (router?: RouterLike) => {
-  router?.push({ pathname: '/auth/skills' as Href, params: { mode: 'add-to-assessment' } });
-};
-
-export const goToSkillsForNewAssessment = (router?: RouterLike) => {
+export const goToSkillsForAssessment = (router?: RouterLike) => {
   router?.push({ pathname: '/auth/skills' as Href, params: { mode: 'assessment', fromCompleted: 'true' } });
 };
 

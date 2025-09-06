@@ -1,403 +1,251 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiService } from '../services/api';
 import { useToast } from './useToast';
 
-// Assessment session storage keys
-const ASSESSMENT_SESSION_KEY = 'assessment_session_data';
-const ASSESSMENT_RESPONSES_KEY = 'assessment_responses_data';
-
-export interface AssessmentSession {
-  sessionId: string;
-  currentAssessment: any;
-  currentScenario: number;
-  timeRemaining: number;
-  startTime: number;
-  timestamp: number;
-}
-
-export interface AssessmentResponse {
-  [promptId: string]: string;
-}
+// Constants
+const ASSESSMENT_SESSION_KEY = 'adaptive_session_data';
 
 export const useAssessmentSession = () => {
+  // State (Updated for sequential flow)
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [currentAssessment, setCurrentAssessment] = useState<any>(null);
-  const [currentScenario, setCurrentScenario] = useState(0);
-  const [userResponse, setUserResponse] = useState('');
-  const [responses, setResponses] = useState<AssessmentResponse>({});
-  const [timeRemaining, setTimeRemaining] = useState(3600); // 60 minutes
-  const [startTime, setStartTime] = useState<number | null>(null);
+  const [currentQuestion, setCurrentQuestion] = useState<any>(null);
+  const [progress, setProgress] = useState<any>({ currentQuestion: 1, totalQuestions: 5, currentTier: 'L1' });
+  const [userResponses, setUserResponses] = useState<Array<{
+    questionId: string;
+    answer: string;
+    timeTaken?: number;
+  }>>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isSessionActive, setIsSessionActive] = useState(false);
+  const [isAssessmentActive, setIsAssessmentActive] = useState(false);
 
   const { showToast } = useToast();
   
-  // Refs for cleanup
-  const timeIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const sessionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Legacy compatibility - for components that still expect these
+  const [assessmentId, setAssessmentId] = useState<string | null>(null);
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 
-  // Cleanup function to prevent memory leaks
-  const cleanup = useCallback(() => {
-    if (timeIntervalRef.current) {
-      clearInterval(timeIntervalRef.current);
-      timeIntervalRef.current = null;
-    }
-    if (sessionTimeoutRef.current) {
-      clearTimeout(sessionTimeoutRef.current);
-      sessionTimeoutRef.current = null;
-    }
-  }, []);
-
-  // Load saved session data
-  const loadSavedSession = useCallback(async (): Promise<boolean> => {
+  // Clear assessment data
+  const clearAssessmentData = useCallback(async () => {
     try {
-      const savedSession = await AsyncStorage.getItem(ASSESSMENT_SESSION_KEY);
-      const savedResponses = await AsyncStorage.getItem(ASSESSMENT_RESPONSES_KEY);
+      await AsyncStorage.removeItem(ASSESSMENT_SESSION_KEY);
+      setIsAssessmentActive(false);
+      setSessionId(null);
+      setCurrentQuestion(null);
+      setProgress({ currentQuestion: 1, totalQuestions: 5, currentTier: 'L1' });
+      setUserResponses([]);
       
-      if (savedSession) {
-        const sessionData: AssessmentSession = JSON.parse(savedSession);
-        const now = Date.now();
-        const sessionAge = now - sessionData.timestamp;
-        
-        // Check if session is still valid (24 hours)
-        if (sessionAge < 24 * 60 * 60 * 1000) {
-          console.log('🔄 Restoring saved session:', sessionData);
-          setSessionId(sessionData.sessionId);
-          setCurrentAssessment(sessionData.currentAssessment);
-          setCurrentScenario(sessionData.currentScenario);
-          setTimeRemaining(sessionData.timeRemaining);
-          setStartTime(sessionData.startTime);
-          setIsSessionActive(true);
-          
-          if (savedResponses) {
-            setResponses(JSON.parse(savedResponses));
-          }
-          
-          return true;
-        } else {
-          // Clear expired session
-          await AsyncStorage.multiRemove([ASSESSMENT_SESSION_KEY, ASSESSMENT_RESPONSES_KEY]);
-        }
-      }
-      return false;
+      // Legacy compatibility
+      setAssessmentId(null);
+      setQuestions([]);
+      setCurrentQuestionIndex(0);
     } catch (error) {
-      console.error('❌ Error loading saved session:', error);
-      return false;
+      console.error('❌ Error clearing assessment data:', error);
     }
   }, []);
 
-  // Save session data
-  const saveSessionData = useCallback(async () => {
-    try {
-      // Validate required data before saving
-      if (!sessionId || !startTime) {
-        console.log('⚠️ Cannot save session data: missing sessionId or startTime');
-        return;
-      }
-
-      const sessionData: AssessmentSession = {
-        sessionId: sessionId,
-        currentAssessment,
-        currentScenario,
-        timeRemaining: timeRemaining || 3600,
-        startTime: startTime,
-        timestamp: Date.now()
-      };
-      
-      await AsyncStorage.setItem(ASSESSMENT_SESSION_KEY, JSON.stringify(sessionData));
-      await AsyncStorage.setItem(ASSESSMENT_RESPONSES_KEY, JSON.stringify(responses));
-    } catch (error) {
-      console.error('❌ Error saving session data:', error);
-    }
-  }, [sessionId, currentAssessment, currentScenario, timeRemaining, startTime, responses]);
-
-  // Clear session data
-  const clearSessionData = useCallback(async () => {
-    try {
-      await AsyncStorage.multiRemove([ASSESSMENT_SESSION_KEY, ASSESSMENT_RESPONSES_KEY]);
-      setIsSessionActive(false);
-    } catch (error) {
-      console.error('❌ Error clearing session data:', error);
-    }
-  }, []);
-
-  // Start new assessment session
-  const startSession = useCallback(async (skillIds: string[]) => {
+  // Start new adaptive assessment (Updated for sequential flow)
+  const startAdaptiveSession = useCallback(async (skillId: string) => {
     try {
       setLoading(true);
       setError(null);
 
-      if (!skillIds || skillIds.length === 0) {
-        throw new Error('No skills selected for assessment');
-      }
+      console.log('🎯 Starting sequential adaptive assessment for skill:', skillId);
 
-      console.log('🎯 Starting assessment session for skills:', skillIds);
-
-      const response = await apiService.post('/assessment/session/start', {
-        skillIds
-      });
+      const response = await apiService.startAdaptiveAssessment(skillId);
 
       if (response.success) {
-        console.log('✅ Assessment session started:', response.data);
+        console.log('✅ Sequential adaptive assessment started:', response.data);
+        
+        // Set sequential state
         setSessionId(response.data.sessionId);
-        setCurrentAssessment(response.data.currentAssessment);
-        setCurrentScenario(0);
-        setResponses({});
-        setStartTime(Date.now());
-        setTimeRemaining(3600); // 60 minutes in seconds
-        setIsSessionActive(true);
+        setCurrentQuestion(response.data.question);
+        setProgress(response.data.progress || { currentQuestion: 1, totalQuestions: 5, currentTier: 'L1' });
+        setIsAssessmentActive(true);
         
-        // Save session data after a short delay to ensure state is set
-        setTimeout(() => {
-          saveSessionData();
-        }, 100);
-        
+        // Legacy compatibility - set these for components that expect them
+        setAssessmentId(response.data.sessionId); // Use sessionId as assessmentId for compatibility
+        setQuestions([response.data.question]); // Set as array with single question
+        setCurrentQuestionIndex(0);
+        setUserResponses([]);
+
+        // Save session data for persistence
+        await AsyncStorage.setItem(ASSESSMENT_SESSION_KEY, JSON.stringify({
+          sessionId: response.data.sessionId,
+          skillId: skillId,
+          currentQuestion: response.data.question,
+          progress: response.data.progress,
+          timestamp: Date.now()
+        }));
+
         return response.data;
       } else {
-        throw new Error(response.message || 'Failed to start assessment session');
+        throw new Error(response.message || 'Failed to start assessment');
       }
+
     } catch (error: any) {
-      console.error('❌ Assessment initialization error:', error);
-      setError(error.message || 'Failed to initialize assessment');
+      console.error('❌ Error starting sequential adaptive assessment:', error);
+      setError(error.message || 'Failed to start assessment');
       throw error;
     } finally {
       setLoading(false);
     }
-  }, [saveSessionData]);
+  }, []);
 
-  // Load current assessment for session
-  const loadCurrentAssessment = useCallback(async () => {
-    if (!sessionId) return;
-
-    try {
-      const response = await apiService.get(`/assessment/session/${sessionId}/current`);
-      
-      if (response.success) {
-        if (response.data.completed) {
-          // All assessments completed
-          await clearSessionData();
-          showToast('success', 'Assessment Complete', 'All assessments have been completed!');
-          return { completed: true };
-        }
-        
-        setCurrentAssessment(response.data.assessment);
-        setCurrentScenario(0);
-        setResponses({});
-        await saveSessionData();
-        return response.data;
-      } else {
-        throw new Error(response.message || 'Failed to load current assessment');
-      }
-    } catch (error: any) {
-      console.error('❌ Load assessment error:', error);
-      setError(error.message || 'Failed to load assessment');
-      throw error;
-    }
-  }, [sessionId, saveSessionData, clearSessionData, showToast]);
-
-  // Submit assessment responses
-  const submitResponses = useCallback(async () => {
-    if (!sessionId || !currentAssessment) {
-      throw new Error('No active assessment session');
+  // Submit answer and get next question (Sequential)
+  const submitAnswerAndGetNext = useCallback(async (answer: string) => {
+    if (!sessionId) {
+      throw new Error('No active session');
     }
 
     try {
       setLoading(true);
+      setError(null);
 
-      // Save final response
-      const currentQ = currentAssessment.template?.prompts?.[currentScenario];
-      if (currentQ && userResponse.trim()) {
-        setResponses(prev => ({
-          ...prev,
-          [currentQ.id]: userResponse
-        }));
-      }
+      console.log('📝 Submitting answer for sequential assessment');
 
-      // Format responses for bulk submission
-      const allResponses = { ...responses };
-      if (currentQ && userResponse.trim()) {
-        allResponses[currentQ.id] = userResponse;
-      }
-
-      const formattedResponses = Object.entries(allResponses).map(([promptId, response]) => ({
-        promptId,
-        response: typeof response === 'string' ? response : response.toString()
-      }));
-
-      console.log('📊 Submitting responses:', formattedResponses);
-
-      // Submit current assessment responses
-      const response = await apiService.post('/assessment/response/bulk', {
-        assessmentId: currentAssessment.id,
-        responses: formattedResponses
-      });
+      const response = await apiService.submitAnswerAndGetNext(sessionId, answer.trim());
 
       if (response.success) {
-        console.log('✅ Assessment responses submitted');
-        
-        // Move to next assessment in session
-        const nextResponse = await apiService.post(`/assessment/session/${sessionId}/next`);
-        
-        if (nextResponse.success) {
-          if (nextResponse.data.completed) {
-            // All assessments completed
-            await clearSessionData();
-            showToast('success', 'Assessment Complete', 'All assessments have been completed!');
-            return { completed: true };
-          } else {
-            // Load next assessment
-            setCurrentAssessment(nextResponse.data.assessment);
-            setCurrentScenario(0);
-            setResponses({});
-            setUserResponse('');
-            await saveSessionData();
-            return nextResponse.data;
-          }
+        if (response.data.completed) {
+          // Assessment is complete
+          console.log('🎉 Sequential assessment completed!');
+          await clearAssessmentData();
+          return { completed: true, results: response.data.results };
         } else {
-          throw new Error(nextResponse.message || 'Failed to continue to next assessment');
+          // Got next question
+          console.log('✅ Answer submitted, got next question');
+          
+          // Update state with next question
+          setCurrentQuestion(response.data.question);
+          setProgress(response.data.progress);
+          
+          // Legacy compatibility - update questions array
+          setQuestions(prev => [...prev, response.data.question]);
+          setCurrentQuestionIndex(prev => prev + 1);
+          
+          return { completed: false, question: response.data.question, progress: response.data.progress };
         }
       } else {
-        throw new Error(response.message || 'Failed to submit assessment responses');
+        throw new Error(response.message || 'Failed to submit answer');
       }
+
     } catch (error: any) {
-      console.error('❌ Assessment submission error:', error);
+      console.error('❌ Error submitting answer:', error);
+      setError(error.message || 'Failed to submit answer');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, [sessionId, clearAssessmentData]);
+
+  // Save answer for current question (Legacy compatibility)
+  const saveAnswer = useCallback((answer: string, timeTaken?: number) => {
+    if (!currentQuestion) {
+      throw new Error('No current question');
+    }
+
+    const newResponse = {
+      questionId: currentQuestion.id || `q_${progress.currentQuestion}`,
+      answer: answer.trim(),
+      timeTaken: timeTaken
+    };
+
+    // Update or add response for current question
+    setUserResponses(prev => {
+      const existing = prev.findIndex(r => r.questionId === newResponse.questionId);
+      if (existing >= 0) {
+        const updated = [...prev];
+        updated[existing] = newResponse;
+        return updated;
+      } else {
+        return [...prev, newResponse];
+      }
+    });
+
+    console.log(`✅ Saved answer for question ${progress.currentQuestion}/${progress.totalQuestions}`);
+  }, [currentQuestion, progress]);
+
+  // Move to next question
+  const nextQuestion = useCallback(() => {
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(prev => prev + 1);
+      return true;
+    }
+    return false; // No more questions
+  }, [currentQuestionIndex, questions.length]);
+
+  // Move to previous question
+  const previousQuestion = useCallback(() => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(prev => prev - 1);
+      return true;
+    }
+    return false; // Already at first question
+  }, [currentQuestionIndex]);
+
+  // Submit all responses
+  const submitAllResponses = useCallback(async () => {
+    if (!assessmentId) {
+      throw new Error('No active assessment');
+    }
+
+    if (userResponses.length !== 5) {
+      throw new Error('All 5 questions must be answered before submission');
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      console.log('🔍 Submitting all 5 responses for assessment:', assessmentId);
+
+      const response = await apiService.submitAssessmentResponses(assessmentId, userResponses);
+
+      if (response.success) {
+        console.log('🎉 Assessment completed successfully!');
+        await clearAssessmentData();
+        showToast('success', 'Assessment Complete!', 'Your results are ready.');
+        return { completed: true, results: response.data };
+      } else {
+        throw new Error(response.message || 'Failed to submit assessment');
+      }
+
+    } catch (error: any) {
+      console.error('❌ Error submitting assessment:', error);
       setError(error.message || 'Failed to submit assessment');
       throw error;
     } finally {
       setLoading(false);
     }
-  }, [sessionId, currentAssessment, currentScenario, userResponse, responses, saveSessionData, clearSessionData, showToast]);
-
-  // Navigate to next scenario
-  const nextScenario = useCallback(() => {
-    if (!currentAssessment) return;
-
-    const currentQ = currentAssessment.template?.prompts?.[currentScenario];
-    if (!currentQ) return;
-
-    // Save current response
-    if (userResponse.trim()) {
-      setResponses(prev => ({
-        ...prev,
-        [currentQ.id]: userResponse
-      }));
-    }
-
-    if (currentScenario < (currentAssessment.template?.prompts?.length || 0) - 1) {
-      setCurrentScenario(prev => prev + 1);
-      const nextQ = currentAssessment.template?.prompts?.[currentScenario + 1];
-      setUserResponse(responses[nextQ?.id] || '');
-    }
-  }, [currentAssessment, currentScenario, userResponse, responses]);
-
-  // Navigate to previous scenario
-  const previousScenario = useCallback(() => {
-    if (currentScenario > 0) {
-      const currentQ = currentAssessment.template?.prompts?.[currentScenario];
-      if (currentQ && userResponse.trim()) {
-        setResponses(prev => ({
-          ...prev,
-          [currentQ.id]: userResponse
-        }));
-      }
-      
-      setCurrentScenario(prev => prev - 1);
-      const prevQ = currentAssessment.template?.prompts?.[currentScenario - 1];
-      setUserResponse(responses[prevQ?.id] || '');
-    }
-  }, [currentScenario, currentAssessment, userResponse, responses]);
-
-  // Update user response
-  const updateUserResponse = useCallback((response: string) => {
-    setUserResponse(response);
-  }, []);
-
-  // Timer management
-  useEffect(() => {
-    if (isSessionActive && startTime && timeRemaining > 0) {
-      timeIntervalRef.current = setInterval(() => {
-        setTimeRemaining(prev => {
-          // Handle invalid values
-          if (!prev || isNaN(prev) || !isFinite(prev) || prev <= 0) {
-            return 0;
-          }
-          
-          const newTime = prev - 1;
-          if (newTime <= 0) {
-            return 0;
-          }
-          return newTime;
-        });
-      }, 1000);
-
-      return () => {
-        if (timeIntervalRef.current) {
-          clearInterval(timeIntervalRef.current);
-          timeIntervalRef.current = null;
-        }
-      };
-    }
-  }, [isSessionActive, startTime, timeRemaining]);
-
-  // Auto-save session data
-  useEffect(() => {
-    if (sessionId && isSessionActive) {
-      sessionTimeoutRef.current = setTimeout(() => {
-        saveSessionData();
-      }, 30000); // Save every 30 seconds
-
-      return () => {
-        if (sessionTimeoutRef.current) {
-          clearTimeout(sessionTimeoutRef.current);
-        }
-      };
-    }
-  }, [sessionId, isSessionActive, saveSessionData]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return cleanup;
-  }, [cleanup]);
-
-  // Format time display
-  const formatTime = useCallback((seconds: number) => {
-    // Handle invalid values
-    if (!seconds || isNaN(seconds) || !isFinite(seconds) || seconds < 0) {
-      return "00:00";
-    }
-    
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  }, []);
+  }, [assessmentId, userResponses, clearAssessmentData, showToast]);
 
   return {
-    // State
+    // Sequential state (NEW)
     sessionId,
-    currentAssessment,
-    currentScenario,
-    userResponse,
-    responses,
-    timeRemaining,
+    currentQuestion,
+    progress,
+    
+    // Sequential actions (NEW)
+    submitAnswerAndGetNext,
+    
+    // Legacy state (for compatibility)
+    assessmentId,
+    questions,
+    currentQuestionIndex,
+    userResponses,
     loading,
     error,
-    isSessionActive,
-    
+    isAssessmentActive,
+
     // Actions
-    startSession,
-    loadSavedSession,
-    loadCurrentAssessment,
-    submitResponses,
-    nextScenario,
-    previousScenario,
-    updateUserResponse,
-    clearSessionData,
-    saveSessionData,
-    formatTime,
-    
-    // Utilities
-    setError
+    startAdaptiveSession,
+    saveAnswer,
+    nextQuestion,
+    previousQuestion,
+    submitAllResponses,
+    clearAssessmentData
   };
 };

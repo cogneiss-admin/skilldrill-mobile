@@ -21,6 +21,7 @@ import ActivitySkillCard from "./components/ActivitySkillCard";
 import ActivitySkillCardSkeleton from "./components/ActivitySkillCardSkeleton";
 import FeedbackDisplay from "./components/FeedbackDisplay";
 import { BRAND, GRADIENTS, BORDER_RADIUS, SHADOWS, PADDING } from "./components/Brand";
+import BottomNavigation from "../components/BottomNavigation";
 const GRAY = "#6B7280";
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -170,27 +171,16 @@ export default function MyActivity() {
   const generateAssessmentTemplate = async (skillId: string, skillName: string) => {
     try {
       setGeneratingAssessment(skillId);
-      showToast('info', 'Generating Assessment', `Creating AI-powered assessment for ${skillName}...`);
+      showToast('success', 'Starting Assessment', `Launching sequential assessment for ${skillName}...`);
       
-      const response = await apiService.post('/assessment/generate-assessment-template', { skillId });
-      
-      if (response.success) {
-        showToast('success', 'Assessment Generated', `${skillName} assessment is ready!`);
-        
-        // Refresh templates and skills data
-        await loadActivityData();
-        
-        // Navigate to assessment intro
-        router.push({
-          pathname: '/assessment-intro',
-          params: { skillId }
-        });
-      } else {
-        showToast('error', 'Generation Failed', response.message || 'Failed to generate assessment');
-      }
+      // Navigate directly to assessment since sequential mode generates questions on-demand
+      router.push({
+        pathname: '/adaptive-assessment',
+        params: { skillId }
+      });
     } catch (error) {
-      console.error('❌ Error generating assessment template:', error);
-      showToast('error', 'Generation Failed', 'Failed to generate assessment. Please try again.');
+      console.error('❌ Error starting assessment:', error);
+      showToast('error', 'Start Failed', 'Failed to start assessment. Please try again.');
     } finally {
       setGeneratingAssessment(null);
     }
@@ -302,28 +292,32 @@ export default function MyActivity() {
     <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
       <StatusBar style="dark" />
       
-      {/* Header and layout unchanged */}
-              <LinearGradient colors={GRADIENTS.header} style={{ paddingTop: PADDING.lg, paddingBottom: 30, paddingHorizontal: PADDING.md, borderBottomLeftRadius: 25, borderBottomRightRadius: 25 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Image source={require('../assets/images/logo.png')} style={{ width: 32, height: 32 }} resizeMode="contain" />
-            <Text style={{ marginLeft: 10, color: '#FFFFFF', fontSize: 18, fontWeight: '900', letterSpacing: 0.5 }}>Skill Drill</Text>
-          </View>
-          <TouchableOpacity onPress={() => router.back()}>
-            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255, 255, 255, 0.15)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)' }}>
-              <AntDesign name="arrowleft" size={20} color="#FFFFFF" />
-            </View>
-          </TouchableOpacity>
+      {/* Enhanced Header - Clean Design */}
+      <View style={{
+        backgroundColor: '#FFFFFF',
+        paddingTop: 15,
+        paddingBottom: 15,
+        paddingHorizontal: PADDING.md,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
+      }}>
+        <View style={{ alignItems: 'center' }}>
+          <Text style={{
+            fontSize: 22,
+            fontWeight: '800',
+            color: '#0F172A',
+            letterSpacing: 0.8,
+            textShadowColor: 'rgba(0, 0, 0, 0.1)',
+            textShadowOffset: { width: 0, height: 1 },
+            textShadowRadius: 2,
+          }}>My Activity</Text>
         </View>
-
-        <View style={{ marginTop: 25 }}>
-          <Text style={{ color: '#FFFFFF', fontSize: 16, opacity: 0.9 }}>Your Activity 📊</Text>
-          <Text style={{ color: '#FFFFFF', fontSize: 24, fontWeight: '700', marginTop: 5 }}>Skill Progress</Text>
-          <Text style={{ color: '#FFFFFF', fontSize: 14, opacity: 0.8, marginTop: 5 }}>Track your assessment results and insights</Text>
-          
-
-        </View>
-      </LinearGradient>
+      </View>
       
       {selectedFeedback ? (
         // Show detailed feedback
@@ -354,18 +348,7 @@ export default function MyActivity() {
         </ScrollView>
       )}
 
-      <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#F8FAFC', borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingBottom: 20, paddingTop: 10 }}>
-        <View style={{ flexDirection: 'row', paddingHorizontal: PADDING.md }}>
-          <TouchableOpacity onPress={() => router.push('/dashboard')} style={{ flex: 1, alignItems: 'center', paddingVertical: 8 }}>
-            <AntDesign name="home" size={24} color={GRAY} />
-            <Text style={{ fontSize: 12, color: GRAY, marginTop: 4, fontWeight: '400' }}>Home</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push('/activity')} style={{ flex: 1, alignItems: 'center', paddingVertical: 8 }}>
-            <Ionicons name="time-outline" size={24} color={BRAND} />
-            <Text style={{ fontSize: 12, color: BRAND, marginTop: 4, fontWeight: '600' }}>My Activity</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      <BottomNavigation />
     </SafeAreaView>
   );
 }
