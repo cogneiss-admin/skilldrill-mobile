@@ -6,23 +6,23 @@ import SessionManager from '../utils/sessionManager';
 
 // Environment variables with platform detection
 const getApiBaseUrl = () => {
-  // Use environment variable first, then fallback to localhost
+  // Use environment variable first, then fallback to current network IP
   if (Constants.expoConfig?.extra?.API_BASE_URL) {
     return Constants.expoConfig.extra.API_BASE_URL;
   }
   
-  // Fallback for development
+  // Fallback for development - use network IP instead of localhost
   if (__DEV__) {
-    return 'http://localhost:3000/api';
+    return 'http://192.168.1.33:3000/api';
   }
   
   // Platform-specific fallbacks
   if (Platform.OS === 'android') {
-    return 'http://localhost:3000/api';
+    return 'http://192.168.1.33:3000/api';
   } else if (Platform.OS === 'ios') {
-    return 'http://localhost:3000/api';
+    return 'http://192.168.1.33:3000/api';
   } else {
-    return 'http://localhost:3000/api';
+    return 'http://192.168.1.33:3000/api';
   }
 };
 

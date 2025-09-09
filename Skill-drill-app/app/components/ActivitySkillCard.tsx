@@ -400,10 +400,18 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
             {assessmentStatus === 'COMPLETED' ? (
               <TouchableOpacity
                 onPress={() => {
+                  console.log('🔍 DEBUG: View Details button pressed');
+                  console.log('🔍 DEBUG: onViewFeedback exists?', !!onViewFeedback);
+                  console.log('🔍 DEBUG: assessmentId (id):', id);
+                  console.log('🔍 DEBUG: skillId:', skillId);
+                  
                   // Show detailed feedback if available
                   if (onViewFeedback) {
+                    console.log('✅ DEBUG: Calling onViewFeedback()');
                     onViewFeedback();
                   } else {
+                    console.log('❌ DEBUG: No onViewFeedback handler - redirecting to fallback');
+                    console.log('❌ DEBUG: Redirecting to /assessment-results with assessmentId:', id);
                     // Fallback to results screen if feedback handler not provided
                     router.push({
                       pathname: '/assessment-results',

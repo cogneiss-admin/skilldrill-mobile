@@ -131,6 +131,7 @@ export default function MyActivity() {
         }
       }
       if (assessmentsResponse.success) {
+        console.log('📊 Raw assessments response:', assessmentsResponse.data);
         setCompletedAssessments(assessmentsResponse.data || []);
       }
       if (sessionResponse.success && sessionResponse.data.hasActiveSession) {
@@ -221,17 +222,23 @@ export default function MyActivity() {
   // Handle viewing detailed feedback for an assessment
   const handleViewFeedback = async (assessmentId: string) => {
     try {
+      console.log('🔍 DEBUG: handleViewFeedback called with assessmentId:', assessmentId);
       setFeedbackLoading(true);
 
+      console.log('🔍 DEBUG: Making API call to /assessment/results/' + assessmentId);
       const response = await apiService.get(`/assessment/results/${assessmentId}`);
+      console.log('🔍 DEBUG: API response:', response);
 
       if (response.success) {
+        console.log('✅ DEBUG: Setting feedback data:', response.data);
         setSelectedFeedback(response.data);
       } else {
+        console.error('❌ DEBUG: API call failed:', response.message);
         console.error('❌ Failed to load feedback:', response.message);
         showToast('error', 'Failed to load feedback', response.message || 'Unable to load detailed feedback');
       }
     } catch (error) {
+      console.error('❌ DEBUG: Exception in handleViewFeedback:', error);
       console.error('❌ Error loading feedback:', error);
       showToast('error', 'Error', 'Failed to load feedback details');
     } finally {
@@ -247,6 +254,12 @@ export default function MyActivity() {
   const renderSkillCards = () => {
     return userSkills.map((skill, index) => {
       const completedAssessment = completedAssessments.find(a => a.skillId === skill.skill.id);
+      
+      // Check if we have completed assessment data
+      if (skill.assessment_status === 'COMPLETED' && !completedAssessment) {
+        console.log('⚠️ COMPLETED skill without assessment data:', skill.skill.skill_name);
+      }
+      
       const aiTag = getAITag(skill, completedAssessment);
       const aiInsights = getAIInsights(skill, completedAssessment);
       const score = getScore(completedAssessment);
@@ -258,6 +271,8 @@ export default function MyActivity() {
 
       // Check if assessment template exists
       const templateExists = hasAssessmentTemplate(skill.skill.id);
+
+      // Pass data to ActivitySkillCard
 
       return (
         <ActivitySkillCard
