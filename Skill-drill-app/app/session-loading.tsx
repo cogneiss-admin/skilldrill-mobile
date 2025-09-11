@@ -7,6 +7,7 @@ import { useRouter } from "expo-router";
 import { apiService } from "../services/api";
 import { MotiView } from "moti";
 import { AntDesign } from '@expo/vector-icons';
+import SessionManager from "../utils/sessionManager";
 
 const BRAND = "#0A66C2";
 
@@ -86,13 +87,15 @@ export default function SessionLoadingScreen() {
       console.error('Session loading error:', error);
       
       // Check if this is an authentication error (401 or specific error codes)
-      const isAuthError = error?.status === 401 || 
+      // But only if user is not currently logging out
+      const isAuthError = !SessionManager.isCurrentlyLoggingOut() && 
+                         (error?.status === 401 || 
                          error?.code === 'INVALID_TOKEN' ||
                          error?.code === 'INVALID_REFRESH_TOKEN' ||
                          error?.code === 'UNAUTHORIZED' ||
                          error?.message?.includes('Unauthorized') ||
                          error?.message?.includes('session expired') ||
-                         error?.message?.includes('login again');
+                         error?.message?.includes('login again'));
       
       if (isAuthError) {
         setStatus("Session expired. Redirecting to login...");

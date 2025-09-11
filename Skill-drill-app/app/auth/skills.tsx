@@ -337,11 +337,11 @@ export default function SkillsScreen() {
                         {/* Skills organized by tier */}
             {(() => {
               const tierConfig = {
-                'TIER_1_CORE_SURVIVAL': { name: 'Core Survival Skills', icon: '🛡️', color: '#3B82F6' },
-                'TIER_2_PROGRESSION': { name: 'Progression Enabler Skills', icon: '🚀', color: '#1D4ED8' },
-                'TIER_3_EXECUTIVE': { name: 'Executive & Strategic Multipliers', icon: '👑', color: '#1E3A8A' }
+                'TIER_1': { name: 'Core Survival Skills', icon: '🛡️', color: '#3B82F6' },
+                'TIER_2': { name: 'Progression Enabler Skills', icon: '🚀', color: '#1D4ED8' },
+                'TIER_3': { name: 'Executive & Strategic Multipliers', icon: '👑', color: '#1E3A8A' }
               } as const;
-              const tierOrder = ['TIER_1_CORE_SURVIVAL', 'TIER_2_PROGRESSION', 'TIER_3_EXECUTIVE'] as const;
+              const tierOrder = ['TIER_1', 'TIER_2', 'TIER_3'] as const;
               return tierOrder.map((tierKey) => {
                 const tierSkills = skillsByTier[tierKey as keyof typeof skillsByTier];
                 if (!tierSkills || tierSkills.length === 0) return null;

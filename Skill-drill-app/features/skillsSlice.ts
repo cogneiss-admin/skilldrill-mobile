@@ -4,12 +4,12 @@ import { apiService } from '../services/api';
 export interface Skill {
   id: string;
   name: string;
-  description: string;
-  icon: string;
+  description?: string;
+  icon?: string;
   category: string;
   tier: string;
   skill_id: string;
-  mongo_id: string;
+  mongo_id?: string;
 }
 
 interface SkillsState {
@@ -52,10 +52,10 @@ export const fetchSkills = createAsyncThunk(
               const skillData: Skill = {
                 id: skill.skill_id, // Use skill_id for selection
                 name: skillName,
-                description: skill.description || 'Skill description',
+                description: skill.description,
                 icon: icon,
                 category: group.title || 'Personal Effectiveness',
-                tier: skill.tier || 'TIER_1_CORE_SURVIVAL',
+                tier: skill.tier || 'TIER_1',
                 skill_id: skill.skill_id,
                 mongo_id: skill.id // Keep MongoDB id for backend operations
               };

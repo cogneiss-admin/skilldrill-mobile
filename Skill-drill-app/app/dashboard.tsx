@@ -17,6 +17,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
 import { apiService } from '../services/api';
+import SessionManager from '../utils/sessionManager';
 import DashboardSkeleton from './components/DashboardSkeleton';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
@@ -76,7 +77,7 @@ interface UserSkill {
   id: string;
   skill: {
     id: string;
-    skill_name: string;
+    name: string; // Updated from skill_name
     category: string;
     icon?: string;
   };
@@ -174,6 +175,12 @@ export default function DashboardImproved() {
 
   // Load user skills with better error handling
   const loadUserSkills = async () => {
+    // Don't load skills if user is not authenticated or is logging out
+    if (!user || SessionManager.isCurrentlyLoggingOut()) {
+      setLoadingSkills(false);
+      return;
+    }
+
     try {
       const response = await apiService.get('/user/skills');
       
@@ -194,6 +201,11 @@ export default function DashboardImproved() {
 
   // Load completed assessments for recent results
   const loadCompletedAssessments = async () => {
+    // Don't load assessments if user is not authenticated or is logging out
+    if (!user || SessionManager.isCurrentlyLoggingOut()) {
+      return;
+    }
+
     try {
       const response = await apiService.get('/assessment/results');
       if (response.success) {
@@ -228,6 +240,11 @@ export default function DashboardImproved() {
 
   // Refresh data
   const onRefresh = async () => {
+    // Don't refresh if user is not authenticated or is logging out
+    if (!user || SessionManager.isCurrentlyLoggingOut()) {
+      return;
+    }
+
     setRefreshing(true);
     await Promise.all([loadUserSkills(), loadCompletedAssessments()]);
     setRefreshing(false);
@@ -274,23 +291,23 @@ export default function DashboardImproved() {
 
   // Load data on mount
   useEffect(() => {
-    if (!authLoading) {
+    if (!authLoading && user) {
       loadUserSkills();
       loadCompletedAssessments();
     }
-  }, [authLoading]);
+  }, [authLoading, user]);
 
   // Refresh data when app becomes active
   useEffect(() => {
     const handleAppStateChange = (nextAppState: string) => {
-      if (nextAppState === 'active') {
+      if (nextAppState === 'active' && user && !SessionManager.isCurrentlyLoggingOut()) {
         loadUserSkills();
       }
     };
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription?.remove();
-  }, []);
+  }, [user]);
 
   // Loading state: render shimmer skeleton (non-blocking)
   if (authLoading || loadingSkills) {
@@ -705,7 +722,7 @@ export default function DashboardImproved() {
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                     <View style={{ flex: 1 }}>
                       <Text style={[TYPOGRAPHY.h4, { marginBottom: 8 }]}>
-                        {userSkill.skill.skill_name}
+                        {userSkill.skill.name}
                       </Text>
                       
                       {/* Status Tag */}

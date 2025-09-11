@@ -16,6 +16,7 @@ import { useRouter } from "expo-router";
 import { AntDesign, MaterialIcons, Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { apiService } from "../services/api";
 import { useToast } from "../hooks/useToast";
+import SessionManager from "../utils/sessionManager";
 import { BRAND } from "./components/Brand";
 // BottomNavigation removed - using activity.tsx as main activity screen
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -24,7 +25,7 @@ interface UserSkill {
   id: string;
   skill: {
     id: string;
-    skill_name: string;
+    name: string; // Updated from skill_name
     category: string;
     description: string;
     icon?: string;
@@ -83,6 +84,11 @@ export default function MyActivity() {
   };
 
   const loadUserSkills = async () => {
+    // Don't load skills if user is logging out
+    if (SessionManager.isCurrentlyLoggingOut()) {
+      return;
+    }
+
     try {
       const response = await apiService.get('/user/skills');
       
@@ -104,6 +110,11 @@ export default function MyActivity() {
   };
 
   const loadCompletedAssessments = async () => {
+    // Don't load assessments if user is logging out
+    if (SessionManager.isCurrentlyLoggingOut()) {
+      return;
+    }
+
     try {
       const response = await apiService.get('/assessment/results');
       
@@ -190,7 +201,7 @@ export default function MyActivity() {
     }
     
     // Generate tags based on skill name and status
-    const skillName = skill.skill.skill_name.toLowerCase();
+    const skillName = skill.skill.name.toLowerCase();
     if (skillName.includes('communication')) return 'Collaborative Communicator';
     if (skillName.includes('leadership')) return 'Natural Leader';
     if (skillName.includes('problem')) return 'Strategic Thinker';
@@ -232,7 +243,7 @@ export default function MyActivity() {
     const statusColor = getStatusColor(effectiveStatus);
     const statusIcon = getStatusIcon(effectiveStatus);
     const statusLabel = getStatusLabel(effectiveStatus);
-    const skillIcon = getSkillIcon(skill.skill.skill_name);
+    const skillIcon = getSkillIcon(skill.skill.name);
     const completedAssessment = completedAssessments.find(a => a.skillId === skill.skill.id);
     const aiTag = getAITag(skill, completedAssessment);
     const score = skill.current_score || completedAssessment?.finalScore;
@@ -319,7 +330,7 @@ export default function MyActivity() {
                   color: '#1F2937',
                   marginBottom: 4
                 }}>
-                  {skill.skill.skill_name}
+                  {skill.skill.name}
                 </Text>
                 <Text style={{
                   fontSize: 14,

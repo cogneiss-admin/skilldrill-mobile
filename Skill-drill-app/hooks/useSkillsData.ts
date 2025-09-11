@@ -32,7 +32,7 @@ export function useSkillsData(params: {
                 name: skill.name || skill.skill_name || 'Unknown Skill',
                 description: skill.description || '',
                 category: skill.category || 'Personal Effectiveness',
-                tier: skill.tier || 'TIER_1_CORE_SURVIVAL',
+                tier: skill.tier || 'TIER_1',
                 mongo_id: skill.mongo_id || skill.id
               });
             });
@@ -100,7 +100,7 @@ export function useSkillsData(params: {
   const skillsByTier = useMemo(() => {
     const groups: Record<string, any[]> = {};
     for (const skill of skillsData) {
-      const tierName = skill.tier || 'TIER_1_CORE_SURVIVAL';
+      const tierName = skill.tier || 'TIER_1';
       (groups[tierName] ||= []).push({ ...skill });
     }
     return groups;

@@ -12,6 +12,7 @@ import { useAuth } from "../hooks/useAuth";
 import ToastContainer from "../components/ToastContainer";
 import { useToast } from "../hooks/useToast";
 import { BRAND } from "./components/Brand";
+import SessionManager from "../utils/sessionManager";
 
 const theme = {
   ...MD3LightTheme,
@@ -77,10 +78,13 @@ const AuthMiddleware = React.memo(({ children }: { children: React.ReactNode }) 
       return;
     }
 
-    // If still loading, redirect ALL screens to splash screen
+    // If still loading, only redirect to splash if we're not already there
+    // This prevents infinite redirects when session expiration dialog is showing
     if (isLoading) {
-      console.log('🔄 AuthMiddleware: Still loading, redirecting to splash screen');
-      router.replace('/');
+      if (!isRootPath) {
+        console.log('🔄 AuthMiddleware: Still loading, redirecting to splash screen');
+        router.replace('/');
+      }
       return;
     }
 
@@ -214,6 +218,11 @@ const RootLayout = React.memo(() => {
   const segments = useSegments();
   const [routeOverlayVisible, setRouteOverlayVisible] = useState(false);
   const { toasts, dismissToast } = useToast();
+
+  // Initialize SessionManager when app starts
+  useEffect(() => {
+    SessionManager.initialize();
+  }, []);
 
   // Disable previous blue flash overlay during navigation for smoother transitions
   const segmentKey = useMemo(() => segments.join("/"), [segments]);

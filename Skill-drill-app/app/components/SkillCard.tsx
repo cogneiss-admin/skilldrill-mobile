@@ -17,10 +17,13 @@ const DEFAULT_BRAND = '#0A66C2';
 const getTierLabel = (tier?: string) => {
   switch (tier) {
     case 'TIER_1_CORE_SURVIVAL':
+    case 'TIER_1':
       return 'Core Survival';
     case 'TIER_2_PROGRESSION':
+    case 'TIER_2':
       return 'Progression';
     case 'TIER_3_EXECUTIVE':
+    case 'TIER_3':
       return 'Executive';
     default:
       return 'General';

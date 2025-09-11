@@ -9,11 +9,52 @@ const USER_DATA_KEY = 'skilldrill_user_data';
 
 export class SessionManager {
   private static isHandlingSessionExpiration = false;
+  private static isLoggingOut = false;
+  private static logoutTimeoutId: NodeJS.Timeout | null = null;
+
+  /**
+   * Set logout state to prevent session expiration alerts during logout
+   */
+  static setLoggingOut(isLoggingOut: boolean): void {
+    this.isLoggingOut = isLoggingOut;
+    
+    if (isLoggingOut) {
+      // Set a timeout to automatically reset the logout flag after 10 seconds
+      // This prevents the flag from getting stuck if logout fails or is interrupted
+      if (this.logoutTimeoutId) {
+        clearTimeout(this.logoutTimeoutId);
+      }
+      this.logoutTimeoutId = setTimeout(() => {
+        console.log('🔐 Auto-resetting logout flag after timeout');
+        this.isLoggingOut = false;
+        this.logoutTimeoutId = null;
+      }, 10000); // 10 seconds timeout
+    } else {
+      // Clear the timeout if logout is completed normally
+      if (this.logoutTimeoutId) {
+        clearTimeout(this.logoutTimeoutId);
+        this.logoutTimeoutId = null;
+      }
+    }
+  }
+
+  /**
+   * Check if currently logging out
+   */
+  static isCurrentlyLoggingOut(): boolean {
+    return this.isLoggingOut;
+  }
 
   /**
    * Handle session expiration by showing alert and redirecting to login
    */
   static async handleSessionExpiration(reason: string = 'Session expired') {
+    // Don't show session expiration alert if user is logging out
+    if (this.isLoggingOut) {
+      console.log('🔐 Skipping session expiration alert - user is logging out');
+      return;
+    }
+
     // Prevent multiple simultaneous session expiration handlers
     if (this.isHandlingSessionExpiration) {
       return;
@@ -73,6 +114,13 @@ export class SessionManager {
    */
   static redirectToLogin(): void {
     try {
+      // Reset logout flag when redirecting to login
+      this.isLoggingOut = false;
+      if (this.logoutTimeoutId) {
+        clearTimeout(this.logoutTimeoutId);
+        this.logoutTimeoutId = null;
+      }
+      
       // Navigate to login screen and reset the navigation stack
       router.replace('/auth/login');
       console.log('🔄 Redirected to login screen');
@@ -125,6 +173,27 @@ export class SessionManager {
    */
   static async triggerSessionExpiration(reason: string = 'Session expired'): Promise<void> {
     await this.handleSessionExpiration(reason);
+  }
+
+  /**
+   * Reset all session management flags (for cleanup purposes)
+   */
+  static resetFlags(): void {
+    this.isHandlingSessionExpiration = false;
+    this.isLoggingOut = false;
+    if (this.logoutTimeoutId) {
+      clearTimeout(this.logoutTimeoutId);
+      this.logoutTimeoutId = null;
+    }
+  }
+
+  /**
+   * Initialize session manager (call this when app starts)
+   */
+  static initialize(): void {
+    // Reset all flags when app initializes
+    this.resetFlags();
+    console.log('🔐 SessionManager initialized');
   }
 }
 

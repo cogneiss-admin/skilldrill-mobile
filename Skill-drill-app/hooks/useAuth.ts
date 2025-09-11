@@ -81,8 +81,17 @@ export const useAuth = () => {
         }
       }
       
-      // No token or invalid token
+      // No token - check if user was previously logged in
       if (!isMountedRef.current) return;
+      
+      // Check if there's user data from previous session
+      const userData = await authService.getUserData();
+      
+      if (userData && !SessionManager.isCurrentlyLoggingOut()) {
+        // User was previously logged in but now has no token - session expired
+        console.log('🔐 useAuth: User was logged in but no token found - handling session expiration');
+        await SessionManager.handleSessionExpiration('Your session has expired');
+      }
       
       setAuthState({
         isAuthenticated: false,
@@ -99,7 +108,9 @@ export const useAuth = () => {
       console.error('🔐 useAuth: Error during auth check:', error);
       
       // Check if it's an authentication error that should trigger session expiration
-      if (error.status === 401 || error.code === 'INVALID_TOKEN' || error.code === 'INVALID_REFRESH_TOKEN') {
+      // But only if user is not currently logging out
+      if (!SessionManager.isCurrentlyLoggingOut() && 
+          (error.status === 401 || error.code === 'INVALID_TOKEN' || error.code === 'INVALID_REFRESH_TOKEN')) {
         await SessionManager.handleInvalidToken();
       }
       

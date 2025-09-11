@@ -289,7 +289,7 @@ const AdaptiveResults: React.FC<AdaptiveResultsProps> = ({
                   textAlign: 'center',
                   marginTop: 8,
                 }}>
-                  {results.questions_answered || 5} questions • Adaptive difficulty
+                  {results.questions_answered || 'Multiple'} questions • Adaptive difficulty
                 </Text>
                 
                 <Text style={{ fontSize: 12, color: '#666', marginTop: 4 }}>

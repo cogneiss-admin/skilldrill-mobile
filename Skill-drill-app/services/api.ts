@@ -11,11 +11,6 @@ const getApiBaseUrl = () => {
     return Constants.expoConfig.extra.API_BASE_URL;
   }
   
-  // Fallback for development - use network IP instead of localhost
-  if (__DEV__) {
-    return 'http://192.168.1.33:3000/api';
-  }
-  
   // Platform-specific fallbacks
   if (Platform.OS === 'android') {
     return 'http://192.168.1.33:3000/api';
@@ -322,7 +317,7 @@ class ApiService {
       
       // Handle 401 Unauthorized errors
       if (status === 401) {
-        // Don't handle session expiration for auth-related endpoints
+        // Don't handle session expiration for auth-related endpoints or during logout
         const url = error.config?.url || '';
         const isAuthEndpoint =
           url.includes('/login') ||
@@ -330,7 +325,13 @@ class ApiService {
           url.includes('/otp') ||
           url.includes('/multi-auth/logout');
 
-        // Only trigger session-expired flow if user is on a protected route.
+        // Don't trigger session expiration if user is logging out
+        if (SessionManager.isCurrentlyLoggingOut()) {
+          console.log('🔐 Skipping 401 handling - user is logging out');
+          return new ApiError('Logout in progress', status, data?.code, data);
+        }
+
+        // Only trigger session-expired flow if user is on a protected route and not logging out
         if (!isAuthEndpoint && SessionManager.isOnProtectedRoute()) {
           SessionManager.handleUnauthorized();
         }
@@ -366,18 +367,22 @@ class ApiService {
           break;
         case 'INVALID_REFRESH_TOKEN':
           message = 'Session expired. Please login again.';
-          // Handle session expiration
-          SessionManager.handleTokenRefreshFailure();
+          // Handle session expiration only if not logging out
+          if (!SessionManager.isCurrentlyLoggingOut()) {
+            SessionManager.handleTokenRefreshFailure();
+          }
           break;
         case 'INVALID_TOKEN':
           message = 'Invalid session token. Please login again.';
-          // Handle invalid token
-          SessionManager.handleInvalidToken();
+          // Handle invalid token only if not logging out
+          if (!SessionManager.isCurrentlyLoggingOut()) {
+            SessionManager.handleInvalidToken();
+          }
           break;
         case 'UNAUTHORIZED':
           message = 'Unauthorized access. Please login again.';
-          // Handle unauthorized access only on protected routes
-          if (SessionManager.isOnProtectedRoute()) {
+          // Handle unauthorized access only on protected routes and not during logout
+          if (SessionManager.isOnProtectedRoute() && !SessionManager.isCurrentlyLoggingOut()) {
             SessionManager.handleUnauthorized();
           }
           break;

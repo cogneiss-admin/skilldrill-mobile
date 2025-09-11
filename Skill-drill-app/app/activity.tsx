@@ -29,7 +29,7 @@ interface UserSkill {
   id: string;
   skill: {
     id: string;
-    skill_name: string;
+    name: string; // Updated from skill_name
     category: string;
     description: string;
     icon?: string;
@@ -67,7 +67,7 @@ interface AssessmentSession {
   };
   currentSkill?: {
     id: string;
-    skill_name: string;
+    name: string; // Updated from skill_name
   };
 }
 
@@ -257,7 +257,7 @@ export default function MyActivity() {
       
       // Check if we have completed assessment data
       if (skill.assessment_status === 'COMPLETED' && !completedAssessment) {
-        console.log('⚠️ COMPLETED skill without assessment data:', skill.skill.skill_name);
+        console.log('⚠️ COMPLETED skill without assessment data:', skill.skill.name);
       }
       
       const aiTag = getAITag(skill, completedAssessment);
@@ -278,7 +278,7 @@ export default function MyActivity() {
         <ActivitySkillCard
           key={skill.id}
           id={skill.id}
-          skillName={skill.skill.skill_name}
+          skillName={skill.skill.name}
           assessmentStatus={skill.assessment_status}
           aiInsights={aiInsights}
           aiTag={aiTag}
@@ -294,7 +294,7 @@ export default function MyActivity() {
           // Pass template existence and generation state
           templateExists={templateExists}
           isGenerating={generatingAssessment === skill.skill.id}
-          onGenerateAssessment={() => generateAssessmentTemplate(skill.skill.id, skill.skill.skill_name)}
+          onGenerateAssessment={() => generateAssessmentTemplate(skill.skill.id, skill.skill.name)}
           onViewFeedback={completedAssessment ? () => handleViewFeedback(completedAssessment.id) : undefined}
         />
       );

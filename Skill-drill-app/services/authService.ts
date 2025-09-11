@@ -253,6 +253,9 @@ class AuthService {
 
   public async logout(): Promise<ApiResponse> {
     try {
+      // Set logout flag to prevent session expiration alerts
+      SessionManager.setLoggingOut(true);
+      
       const refreshToken = await this.getRefreshToken();
       if (refreshToken) {
         await apiService.post('/multi-auth/logout', { refresh_token: refreshToken });
@@ -261,6 +264,8 @@ class AuthService {
       console.error('Error during logout:', error);
     } finally {
       await this.clearAuthData();
+      // Clear logout flag after logout is complete
+      SessionManager.setLoggingOut(false);
     }
     
     return { success: true, data: {}, message: 'Logout successful' };
@@ -351,21 +356,30 @@ class AuthService {
         return { isValid: false, user: null };
       }
 
+      // Don't validate token if user is logging out
+      if (SessionManager.isCurrentlyLoggingOut()) {
+        console.log('🔐 Skipping token validation - user is logging out');
+        return { isValid: false, user: null };
+      }
+
       // Try to get fresh user data from API
       const response = await this.getProfileFromAPI();
       
       if (response.success && response.data) {
         return { isValid: true, user: response.data };
       } else {
-        // Token is invalid, handle session expiration
-        await SessionManager.handleInvalidToken();
+        // Token is invalid, handle session expiration only if not logging out
+        if (!SessionManager.isCurrentlyLoggingOut()) {
+          await SessionManager.handleInvalidToken();
+        }
         return { isValid: false, user: null };
       }
     } catch (error) {
       console.error('Token validation error:', error);
       
-      // Check if it's an authentication error
-      if (error instanceof ApiError && (error.status === 401 || error.code === 'INVALID_TOKEN')) {
+      // Check if it's an authentication error and not logging out
+      if (!SessionManager.isCurrentlyLoggingOut() && 
+          error instanceof ApiError && (error.status === 401 || error.code === 'INVALID_TOKEN')) {
         await SessionManager.handleInvalidToken();
       }
       

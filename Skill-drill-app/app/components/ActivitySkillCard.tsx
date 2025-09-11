@@ -68,6 +68,7 @@ const getLevelLabel = (score: number): string => {
 };
 
 const getSkillIcon = (skillName: string): string => {
+  if (!skillName) return 'book';
   const name = skillName.toLowerCase();
   if (name.includes('communication')) return 'message1';
   if (name.includes('leadership')) return 'team';
