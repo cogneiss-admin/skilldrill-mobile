@@ -10,7 +10,7 @@ export const useAssessmentSession = () => {
   // State (Updated for sequential flow)
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<any>(null);
-  const [progress, setProgress] = useState<any>({ currentQuestion: 1, totalQuestions: 5, currentTier: 'L1' }); // Default, will be updated from backend
+  const [progress, setProgress] = useState<any>({ currentQuestion: 1, totalQuestions: 0, currentTier: 'L1' }); // Will be updated from backend
   const [userResponses, setUserResponses] = useState<Array<{
     questionId: string;
     answer: string;
@@ -34,7 +34,7 @@ export const useAssessmentSession = () => {
       setIsAssessmentActive(false);
       setSessionId(null);
       setCurrentQuestion(null);
-      setProgress({ currentQuestion: 1, totalQuestions: 5, currentTier: 'L1' }); // Default, backend will provide actual count
+      setProgress({ currentQuestion: 1, totalQuestions: 0, currentTier: 'L1' }); // Will be updated from backend
       setUserResponses([]);
       
       // Legacy compatibility
@@ -62,7 +62,7 @@ export const useAssessmentSession = () => {
         // Set sequential state
         setSessionId(response.data.sessionId);
         setCurrentQuestion(response.data.question);
-        setProgress(response.data.progress || { currentQuestion: 1, totalQuestions: response.data.totalQuestions || 5, currentTier: 'L1' });
+        setProgress(response.data.progress || { currentQuestion: 1, totalQuestions: response.data.totalQuestions || 0, currentTier: 'L1' });
         setIsAssessmentActive(true);
         
         // Legacy compatibility - set these for components that expect them

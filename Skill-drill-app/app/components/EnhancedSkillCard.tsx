@@ -182,7 +182,7 @@ const EnhancedSkillCard: React.FC<EnhancedSkillCardProps> = ({
                 lineHeight: 18,
                 marginBottom: 12,
               }}>
-                Personalized 5-question assessment that adapts to your responses and provides AI-generated feedback with your communication style.
+                Personalized assessment that adapts to your responses and provides AI-generated feedback with your communication style.
               </Text>
               
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
