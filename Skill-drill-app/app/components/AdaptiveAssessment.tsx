@@ -12,6 +12,8 @@ import { useToast } from "../../hooks/useToast";
 import { useResponsive } from "../../utils/responsive";
 import { AntDesign } from '@expo/vector-icons';
 import AIGenerationLoader from './AIGenerationLoader';
+import AssessmentCompletionDialog from './AssessmentCompletionDialog';
+import { safeProgress, safeNumber } from '../../utils/mathUtils';
 
 const BRAND = "#0A66C2";
 const APP_NAME = "Skill Drill";
@@ -31,7 +33,8 @@ const ProgressIndicator = ({ currentQuestion, totalQuestions }: {
   currentQuestion: number;
   totalQuestions: number;
 }) => {
-  const progress = currentQuestion / totalQuestions;
+  // Use bulletproof safe progress calculation
+  const progress = safeProgress(safeNumber(currentQuestion), safeNumber(totalQuestions, 1));
 
   return (
     <View style={{ marginBottom: 16 }}>
@@ -73,6 +76,7 @@ const AdaptiveAssessment: React.FC<AdaptiveAssessmentProps> = ({
     sessionId,
     currentQuestion,
     progress,
+    skillName: apiSkillName,
     submitAnswerAndGetNext,
     loading,
     error,
@@ -83,6 +87,8 @@ const AdaptiveAssessment: React.FC<AdaptiveAssessmentProps> = ({
 
   const [userResponse, setUserResponse] = useState('');
   const [isInitializing, setIsInitializing] = useState(true);
+  const [showCompletionDialog, setShowCompletionDialog] = useState(false);
+  const [assessmentResults, setAssessmentResults] = useState(null);
 
   // Initialize adaptive session
   useEffect(() => {
@@ -136,25 +142,16 @@ const AdaptiveAssessment: React.FC<AdaptiveAssessmentProps> = ({
       setUserResponse('');
       
       if (result.completed) {
-        // Assessment completed - show results
+        // Assessment completed - show dialog instead of navigating
         console.log('🎉 Assessment completed:', result.results);
         showToast('success', 'Assessment Complete', 'Generating your personalized feedback...');
         
-        if (onComplete) {
-          onComplete(result.results);
-        } else {
-          // Navigate to results page
-          router.push({
-            pathname: "/adaptive-results",
-            params: {
-              results: JSON.stringify(result.results),
-              skillName: skillName,
-            }
-          });
-        }
+        // Store results and show completion dialog
+        setAssessmentResults(result.results);
+        setShowCompletionDialog(true);
       } else {
         // Got next question
-        showToast('success', 'Response Saved', `Question ${result.progress.currentQuestion} of ${result.progress.totalQuestions}`);
+        showToast('success', 'Response Saved', `Question ${result.progress?.currentQuestion || 'unknown'} of ${result.progress?.totalQuestions || 'unknown'}`);
       }
       
     } catch (error: any) {
@@ -181,6 +178,33 @@ const AdaptiveAssessment: React.FC<AdaptiveAssessmentProps> = ({
         }
       ]
     );
+  };
+
+  // Handle dialog actions
+  const handleSeeResults = () => {
+    console.log('See Results pressed');
+    setShowCompletionDialog(false);
+    
+    // Navigate to feedback/results page
+    if (onComplete && assessmentResults) {
+      onComplete(assessmentResults);
+    } else if (assessmentResults) {
+      router.push({
+        pathname: "/adaptive-results",
+        params: {
+          results: JSON.stringify(assessmentResults),
+          skillName: apiSkillName || skillName,
+        }
+      });
+    }
+  };
+
+  const handleContinueNext = () => {
+    console.log('Continue to Next Assessment pressed');
+    setShowCompletionDialog(false);
+    
+    // Navigate to skills selection page
+    router.push("/dashboard");
   };
 
   // Show loading state during initialization
@@ -243,14 +267,14 @@ const AdaptiveAssessment: React.FC<AdaptiveAssessmentProps> = ({
             </Button>
           </View>
           <Text style={{ color: "white", fontSize: 18, fontWeight: "bold" }}>
-            {skillName} Assessment
+            {apiSkillName || skillName || "Unknown Skill"} Assessment
           </Text>
           <View style={{ width: 80 }} />
         </View>
         
         <ProgressIndicator 
-          currentQuestion={progress.currentQuestion}
-          totalQuestions={progress.totalQuestions}
+          currentQuestion={safeNumber(progress?.currentQuestion, 1)}
+          totalQuestions={safeNumber(progress?.totalQuestions, 3)}
         />
       </View>
 
@@ -391,7 +415,7 @@ const AdaptiveAssessment: React.FC<AdaptiveAssessmentProps> = ({
                   labelStyle={{ fontSize: 16, fontWeight: '600' }}
                 >
                   {loading ? 'Processing...' : 
-                   progress.currentQuestion === progress.totalQuestions ? 
+                   progress?.currentQuestion === progress?.totalQuestions ? 
                    'Complete Assessment' : 'Submit & Next Question'}
                 </Button>
               </View>
@@ -399,6 +423,14 @@ const AdaptiveAssessment: React.FC<AdaptiveAssessmentProps> = ({
           </ScrollView>
         </LinearGradient>
       </View>
+
+      {/* Assessment Completion Dialog */}
+      <AssessmentCompletionDialog
+        visible={showCompletionDialog}
+        skillName={apiSkillName || skillName || "Communication"}
+        onSeeResults={handleSeeResults}
+        onContinueNext={handleContinueNext}
+      />
     </SafeAreaView>
   );
 };

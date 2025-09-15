@@ -8,10 +8,11 @@ const AdaptiveAssessmentScreen = () => {
     skillName: string;
   }>();
 
+
   return (
     <AdaptiveAssessment
       skillId={skillId || ""}
-      skillName={skillName || "Communication"}
+      skillName={skillName || "Unknown Skill"}
     />
   );
 };

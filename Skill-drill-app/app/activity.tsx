@@ -19,7 +19,6 @@ import { apiService } from "../services/api";
 import { useToast } from "../hooks/useToast";
 import ActivitySkillCard from "./components/ActivitySkillCard";
 import ActivitySkillCardSkeleton from "./components/ActivitySkillCardSkeleton";
-import FeedbackDisplay from "./components/FeedbackDisplay";
 import { BRAND, GRADIENTS, BORDER_RADIUS, SHADOWS, PADDING } from "./components/Brand";
 import BottomNavigation from "../components/BottomNavigation";
 const GRAY = "#6B7280";
@@ -89,7 +88,6 @@ export default function MyActivity() {
   const [assessmentTemplates, setAssessmentTemplates] = useState<AssessmentTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedFeedback, setSelectedFeedback] = useState<any>(null);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
 
   // Add refresh functionality
@@ -161,7 +159,13 @@ export default function MyActivity() {
     try {
       const response = await apiService.post('/assessment/check-assessment-templates', { skillIds });
       if (response.success) {
-        setAssessmentTemplates(response.data.skillsWithTemplates || []);
+        // Transform API response to match expected format
+        const templates = response.data.map(item => ({
+          skill_id: item.skillId,
+          hasTemplate: item.hasTemplate,
+          templateType: item.templateType
+        }));
+        setAssessmentTemplates(templates);
       }
     } catch (error) {
       console.error('❌ Error checking assessment templates:', error);
@@ -194,14 +198,12 @@ export default function MyActivity() {
 
   // Backend-only: return identifiedStyle or empty
   const getAITag = (skill: UserSkill, assessment?: CompletedAssessment) => {
-    return assessment?.identifiedStyle || '';
+    return assessment?.identifiedStyle;
   };
 
-  // Backend-only: prefer improvementFeedback; fallback to summary; else empty
+  // Backend-only: return improvementFeedback only
   const getAIInsights = (skill: UserSkill, assessment?: CompletedAssessment) => {
-    if (assessment?.improvementFeedback) return assessment.improvementFeedback;
-    if (assessment?.summary) return assessment.summary;
-    return '';
+    return assessment?.improvementFeedback;
   };
 
   const getScore = (assessment?: CompletedAssessment) => {
@@ -212,33 +214,37 @@ export default function MyActivity() {
   const getSkillProgress = (skillId: string) => {
     // Check if this skill is part of the active session
     if (activeSession && activeSession.selectedSkills.includes(skillId)) {
-      return activeSession.progress || { totalPrompts: 3, completedResponses: 0, status: 'PENDING' };
+      return activeSession.progress;
     }
 
-    // Default progress for skills not in active session
-    return { totalPrompts: 3, completedResponses: 0, status: 'PENDING' };
+    // No default progress - return null if not in active session
+    return null;
   };
 
-  // Handle viewing detailed feedback for an assessment
+  // Handle viewing feedback - navigate to new results screen
   const handleViewFeedback = async (assessmentId: string) => {
     try {
-      console.log('🔍 DEBUG: handleViewFeedback called with assessmentId:', assessmentId);
+      console.log('🔍 Fetching assessment results for:', assessmentId);
       setFeedbackLoading(true);
 
-      console.log('🔍 DEBUG: Making API call to /assessment/results/' + assessmentId);
       const response = await apiService.get(`/assessment/results/${assessmentId}`);
-      console.log('🔍 DEBUG: API response:', response);
 
       if (response.success) {
-        console.log('✅ DEBUG: Setting feedback data:', response.data);
-        setSelectedFeedback(response.data);
+        console.log('✅ Assessment results fetched, navigating to results screen');
+        
+        // Navigate to new adaptive-results screen
+        router.push({
+          pathname: "/adaptive-results",
+          params: {
+            results: JSON.stringify(response.data),
+            skillName: response.data.skillName,
+          }
+        });
       } else {
-        console.error('❌ DEBUG: API call failed:', response.message);
         console.error('❌ Failed to load feedback:', response.message);
-        showToast('error', 'Failed to load feedback', response.message || 'Unable to load detailed feedback');
+        showToast('error', 'Failed to load feedback', response.message);
       }
     } catch (error) {
-      console.error('❌ DEBUG: Exception in handleViewFeedback:', error);
       console.error('❌ Error loading feedback:', error);
       showToast('error', 'Error', 'Failed to load feedback details');
     } finally {
@@ -246,10 +252,6 @@ export default function MyActivity() {
     }
   };
 
-  // Handle closing feedback view
-  const handleCloseFeedback = () => {
-    setSelectedFeedback(null);
-  };
 
   const renderSkillCards = () => {
     return userSkills.map((skill, index) => {
@@ -266,8 +268,8 @@ export default function MyActivity() {
       
       // Get assessment progress for this skill
       const skillProgress = getSkillProgress(skill.skill.id);
-      const totalPrompts = skillProgress.totalPrompts;
-      const completedResponses = skillProgress.completedResponses;
+      const totalPrompts = skillProgress?.totalPrompts;
+      const completedResponses = skillProgress?.completedResponses;
 
       // Check if assessment template exists
       const templateExists = hasAssessmentTemplate(skill.skill.id);
@@ -286,11 +288,11 @@ export default function MyActivity() {
           index={index}
           skillId={skill.skill.id}
           // Pass progress data directly
-          progressData={{
+          progressData={skillProgress ? {
             totalPrompts,
             completedResponses,
             status: skillProgress.status
-          }}
+          } : null}
           // Pass template existence and generation state
           templateExists={templateExists}
           isGenerating={generatingAssessment === skill.skill.id}
@@ -334,16 +336,6 @@ export default function MyActivity() {
         </View>
       </View>
       
-      {selectedFeedback ? (
-        // Show detailed feedback
-        <View style={{ flex: 1 }}>
-          <FeedbackDisplay
-            feedback={selectedFeedback}
-            onClose={handleCloseFeedback}
-            showCloseButton={true}
-          />
-        </View>
-      ) : (
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 24, paddingBottom: 100 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadActivityData} />} showsVerticalScrollIndicator={false}>
           {loading ? (
             // Shimmer skeletons while data loads
@@ -361,7 +353,6 @@ export default function MyActivity() {
             renderSkillCards()
           )}
         </ScrollView>
-      )}
 
       <BottomNavigation />
     </SafeAreaView>

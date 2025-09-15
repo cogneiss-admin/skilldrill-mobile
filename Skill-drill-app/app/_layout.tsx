@@ -157,6 +157,13 @@ const AuthMiddleware = React.memo(({ children }: { children: React.ReactNode }) 
       return;
     }
 
+    // Don't redirect if we're on the adaptive-results screen
+    const isAdaptiveResultsScreen = segments[0] === 'adaptive-results';
+    if (isAdaptiveResultsScreen) {
+      console.log('📊 AuthMiddleware: On adaptive-results screen, not redirecting');
+      return;
+    }
+
     // Don't redirect if we're on the activity screen
     const isActivityScreen = segments[0] === 'activity';
     if (isActivityScreen) {

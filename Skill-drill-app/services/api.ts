@@ -109,7 +109,7 @@ class ApiService {
     // Request interceptor to add auth token
     this.api.interceptors.request.use(
       async (config) => {
-        const fullUrl = (config.baseURL || '') + (config.url || '');
+        const fullUrl = config.baseURL + config.url;
         console.log('📡 Making request to:', fullUrl);
         console.log('📡 Method:', config.method?.toUpperCase());
         console.log('📡 Headers:', config.headers);
@@ -318,7 +318,7 @@ class ApiService {
       // Handle 401 Unauthorized errors
       if (status === 401) {
         // Don't handle session expiration for auth-related endpoints or during logout
-        const url = error.config?.url || '';
+        const url = error.config?.url;
         const isAuthEndpoint =
           url.includes('/login') ||
           url.includes('/signup') ||
@@ -338,7 +338,7 @@ class ApiService {
       }
       
       // Handle specific error codes
-      let message = data?.message || 'An error occurred';
+      let message = data?.message;
       
       switch (data?.code) {
         case 'RATE_LIMIT_EXCEEDED':
@@ -405,7 +405,7 @@ class ApiService {
         return new ApiError('Network error - no response received from server', 0, 'NETWORK_ERROR');
       }
     } else {
-      return new ApiError(error.message || 'An unexpected error occurred', 0);
+      return new ApiError(error.message, 0);
     }
   }
 

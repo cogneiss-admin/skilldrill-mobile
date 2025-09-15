@@ -7,6 +7,7 @@ import { AntDesign } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { BRAND, GRADIENTS, BORDER_RADIUS, SHADOWS, SPACING, COLORS, TYPOGRAPHY } from '../components/Brand';
 import { useResponsive } from '../../utils/responsive';
+import { safePercentage, safeNumber } from '../../utils/mathUtils';
 
 interface ActivitySkillCardProps {
   id: string;
@@ -108,10 +109,10 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
   const scoreColor = score ? getScoreColor(score) : '#6B7280';
   const levelLabel = score ? getLevelLabel(score) : 'Not Assessed';
 
-  // Calculate progress based on backend session data
-  const totalPrompts = progressData?.totalPrompts || 3;
-  const completedResponses = progressData?.completedResponses || 0;
-  const progress = totalPrompts > 0 ? Math.round((completedResponses / totalPrompts) * 100) : 0;
+  // Calculate progress based on backend session data - bulletproof version
+  const totalPrompts = safeNumber(progressData?.totalPrompts);
+  const completedResponses = safeNumber(progressData?.completedResponses);
+  const progress = Math.round(safePercentage(completedResponses, totalPrompts, 0));
 
 
 
@@ -132,75 +133,36 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
           overflow: 'hidden'
         }}
       >
-        {/* Header with skill icon and status */}
+        {/* Header with skill name and status */}
         <LinearGradient colors={GRADIENTS.card} style={{ padding: SPACING.padding.md, paddingBottom: SPACING.padding.sm }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.margin.sm }}>
-            <View style={{
-              width: 44,
-              height: 44,
-              borderRadius: BORDER_RADIUS.full,
-              backgroundColor: 'rgba(255, 255, 255, 0.2)',
-              justifyContent: 'center',
-              alignItems: 'center',
-              marginRight: SPACING.margin.sm
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.margin.sm }}>
+            <Text style={{
+              fontSize: TYPOGRAPHY.fontSize.lg,
+              fontWeight: TYPOGRAPHY.fontWeight.bold,
+              color: COLORS.text.inverse,
+              flex: 1
             }}>
-              <AntDesign name={skillIcon} size={22} color="#FFFFFF" />
-            </View>
-            
-            <View style={{ flex: 1 }}>
-              <Text style={{
-                fontSize: TYPOGRAPHY.fontSize.lg,
-                fontWeight: TYPOGRAPHY.fontWeight.bold,
-                color: COLORS.text.inverse,
-                marginBottom: SPACING.margin.xs
-              }}>
-                {skillName}
-              </Text>
-            </View>
+              {skillName}
+            </Text>
 
             {/* Status Badge */}
             <View style={{
-              backgroundColor: 'rgba(255, 255, 255, 0.2)',
-              paddingHorizontal: SPACING.padding.sm,
-              paddingVertical: SPACING.padding.xs,
-              borderRadius: 16,
+              backgroundColor: assessmentStatus === 'COMPLETED' ? '#10B981' : '#EF4444',
+              paddingHorizontal: 8,
+              paddingVertical: 4,
+              borderRadius: 12,
               flexDirection: 'row',
               alignItems: 'center'
             }}>
               <Text style={{
-                fontSize: TYPOGRAPHY.fontSize.sm,
+                fontSize: 12,
                 fontWeight: TYPOGRAPHY.fontWeight.semibold,
-                color: COLORS.text.inverse
+                color: '#FFFFFF'
               }}>
                 {statusLabel}
               </Text>
-
             </View>
           </View>
-
-          {/* AI Tag */}
-          {aiTag && (
-            <View style={{
-              backgroundColor: 'rgba(255, 255, 255, 0.15)',
-              paddingHorizontal: SPACING.padding.sm,
-              paddingVertical: SPACING.padding.xs,
-              borderRadius: 12,
-              borderWidth: 1,
-              borderColor: 'rgba(255, 255, 255, 0.3)',
-              alignSelf: 'flex-start'
-            }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <AntDesign name="robot1" size={16} color={COLORS.text.inverse} style={{ marginRight: SPACING.margin.xs }} />
-                <Text style={{
-                  fontSize: TYPOGRAPHY.fontSize.base,
-                  fontWeight: TYPOGRAPHY.fontWeight.semibold,
-                  color: COLORS.text.inverse
-                }}>
-                  {aiTag}
-                </Text>
-              </View>
-            </View>
-          )}
         </LinearGradient>
 
         {/* Card Body */}
@@ -209,34 +171,37 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
           {assessmentStatus === 'COMPLETED' && score ? (
             // Completed assessment - show score and feedback
             <View style={{ marginBottom: 16 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                 <View style={{ flex: 1 }}>
                   <Text style={{
-                    fontSize: 12,
-                    color: '#6B7280',
-                    marginBottom: 4
+                    fontSize: 18,
+                    fontWeight: '700',
+                    color: '#111827',
+                    marginBottom: 8
                   }}>
                     Final Score
                   </Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Text style={{
-                      fontSize: 24,
-                      fontWeight: '700',
-                      color: scoreColor,
-                      marginRight: 8
+                      fontSize: 16,
+                      fontWeight: '600',
+                      color: '#111827',
+                      marginRight: 12
                     }}>
                       {Math.round(score)}/10
                     </Text>
                     <View style={{
-                      backgroundColor: scoreColor + '20',
-                                    paddingHorizontal: SPACING.padding.xs,
-              paddingVertical: SPACING.padding.xs,
-                      borderRadius: 8
+                      backgroundColor: '#F3F4F6',
+                      paddingHorizontal: SPACING.padding.sm,
+                      paddingVertical: SPACING.padding.xs,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: '#E5E7EB'
                     }}>
                       <Text style={{
                         fontSize: 12,
                         fontWeight: '600',
-                        color: scoreColor
+                        color: '#374151'
                       }}>
                         {levelLabel}
                       </Text>
@@ -244,66 +209,28 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
                   </View>
                 </View>
 
-                {/* Progress Circle */}
-                <View style={{
-                  width: 60,
-                  height: 60,
-                  borderRadius: 30,
-                  borderWidth: 4,
-                  borderColor: '#E5E7EB',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  position: 'relative'
-                }}>
+                {/* Identified Style Chip */}
+                {aiTag && (
                   <View style={{
-                    position: 'absolute',
-                    width: 60,
-                    height: 60,
-                    borderRadius: 30,
-                    borderWidth: 4,
-                    borderColor: 'transparent',
-                    borderTopColor: scoreColor,
-                    borderRightColor: score >= 2.5 ? scoreColor : 'transparent',
-                    borderBottomColor: score >= 5 ? scoreColor : 'transparent',
-                    borderLeftColor: score >= 7.5 ? scoreColor : 'transparent',
-                    transform: [{ rotate: '-90deg' }]
-                  }} />
-                  <Text style={{
-                    fontSize: 12,
-                    fontWeight: '700',
-                    color: scoreColor
+                    backgroundColor: '#E3F2FD',
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: '#BBDEFB',
+                    marginLeft: 12
                   }}>
-                    {Math.round(score)}
-                  </Text>
-                </View>
+                    <Text style={{
+                      fontSize: 12,
+                      fontWeight: '600',
+                      color: '#1976D2',
+                      textAlign: 'center'
+                    }}>
+                      {aiTag}
+                    </Text>
+                  </View>
+                )}
               </View>
-
-              {/* Feedback section */}
-              {aiInsights && (
-                <View style={{
-                  backgroundColor: '#F9FAFB',
-                  padding: 12,
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: '#E5E7EB'
-                }}>
-                  <Text style={{
-                    fontSize: 12,
-                    color: '#6B7280',
-                    marginBottom: 4,
-                    fontWeight: '600'
-                  }}>
-                    AI Feedback
-                  </Text>
-                  <Text style={{
-                    fontSize: 13,
-                    color: '#374151',
-                    lineHeight: 18
-                  }} numberOfLines={3}>
-                    {aiInsights}
-                  </Text>
-                </View>
-              )}
             </View>
           ) : assessmentStatus === 'IN_PROGRESS' || assessmentStatus === 'PENDING' ? (
             // In progress or pending - show progress bar based on backend data
@@ -352,12 +279,14 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
                 }}>
                   {assessmentStatus === 'IN_PROGRESS' ? 'Continue your assessment' : 'Assessment ready to start'}
                 </Text>
-                <Text style={{
-                  fontSize: 11,
-                  color: '#6B7280'
-                }}>
-                  {completedResponses}/{totalPrompts} questions
-                </Text>
+                {(totalPrompts > 0) && (
+                  <Text style={{
+                    fontSize: 11,
+                    color: '#6B7280'
+                  }}>
+                    {completedResponses}/{totalPrompts} questions
+                  </Text>
+                )}
               </View>
             </View>
           ) : (
@@ -391,7 +320,7 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
                 textAlign: 'center',
                 marginTop: 4
               }}>
-                {templateExists ? `${totalPrompts} scenario-based questions` : 'Click to generate AI-powered assessment'}
+                {templateExists ? (totalPrompts > 0 ? `${totalPrompts} scenario-based questions` : 'Scenario-based assessment') : 'Click to generate AI-powered assessment'}
               </Text>
             </View>
           )}

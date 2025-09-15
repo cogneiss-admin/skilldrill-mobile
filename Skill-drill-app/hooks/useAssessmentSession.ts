@@ -11,6 +11,7 @@ export const useAssessmentSession = () => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<any>(null);
   const [progress, setProgress] = useState<any>({ currentQuestion: 1, totalQuestions: 0, currentTier: 'L1' }); // Will be updated from backend
+  const [skillName, setSkillName] = useState<string | null>(null);
   const [userResponses, setUserResponses] = useState<Array<{
     questionId: string;
     answer: string;
@@ -35,6 +36,7 @@ export const useAssessmentSession = () => {
       setSessionId(null);
       setCurrentQuestion(null);
       setProgress({ currentQuestion: 1, totalQuestions: 0, currentTier: 'L1' }); // Will be updated from backend
+      setSkillName(null);
       setUserResponses([]);
       
       // Legacy compatibility
@@ -63,6 +65,7 @@ export const useAssessmentSession = () => {
         setSessionId(response.data.sessionId);
         setCurrentQuestion(response.data.question);
         setProgress(response.data.progress || { currentQuestion: 1, totalQuestions: response.data.totalQuestions || 0, currentTier: 'L1' });
+        setSkillName(response.data.skillName);
         setIsAssessmentActive(true);
         
         // Legacy compatibility - set these for components that expect them
@@ -75,6 +78,7 @@ export const useAssessmentSession = () => {
         await AsyncStorage.setItem(ASSESSMENT_SESSION_KEY, JSON.stringify({
           sessionId: response.data.sessionId,
           skillId: skillId,
+          skillName: response.data.skillName,
           currentQuestion: response.data.question,
           progress: response.data.progress,
           timestamp: Date.now()
@@ -147,6 +151,10 @@ export const useAssessmentSession = () => {
       throw new Error('No current question');
     }
 
+    if (!progress) {
+      throw new Error('No progress data available');
+    }
+
     const newResponse = {
       questionId: currentQuestion.id || `q_${progress.currentQuestion}`,
       answer: answer.trim(),
@@ -165,7 +173,7 @@ export const useAssessmentSession = () => {
       }
     });
 
-    console.log(`✅ Saved answer for question ${progress.currentQuestion}/${progress.totalQuestions}`);
+    console.log(`✅ Saved answer for question ${progress?.currentQuestion || 'unknown'}/${progress?.totalQuestions || 'unknown'}`);
   }, [currentQuestion, progress]);
 
   // Move to next question
@@ -227,6 +235,7 @@ export const useAssessmentSession = () => {
     sessionId,
     currentQuestion,
     progress,
+    skillName,
     
     // Sequential actions (NEW)
     submitAnswerAndGetNext,
