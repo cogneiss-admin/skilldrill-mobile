@@ -33,7 +33,7 @@ interface UserSkill {
     description: string;
     icon?: string;
   };
-  assessment_status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'PENDING';
+  assessment_status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED';
   current_score?: number;
   last_assessed_at?: string;
   assessment_count?: number;
@@ -252,6 +252,29 @@ export default function MyActivity() {
     }
   };
 
+  // Handle deleting assessment progress (for testing)
+  const handleDeleteAssessment = async (skillId: string, skillName: string) => {
+    try {
+      console.log('🗑️ Deleting assessment progress for skill:', skillName);
+      showToast('info', 'Deleting...', `Removing assessment progress for ${skillName}`);
+
+      const response = await apiService.delete(`/user/skills/${skillId}/assessment`);
+
+      if (response.success) {
+        console.log('✅ Assessment deleted successfully');
+        showToast('success', 'Deleted!', `Assessment progress for ${skillName} has been reset`);
+        
+        // Refresh the activity data to show updated state
+        await loadActivityData();
+      } else {
+        console.error('❌ Failed to delete assessment:', response.message);
+        showToast('error', 'Delete Failed', response.message);
+      }
+    } catch (error) {
+      console.error('❌ Error deleting assessment:', error);
+      showToast('error', 'Error', 'Failed to delete assessment progress');
+    }
+  };
 
   const renderSkillCards = () => {
     return userSkills.map((skill, index) => {
@@ -298,6 +321,7 @@ export default function MyActivity() {
           isGenerating={generatingAssessment === skill.skill.id}
           onGenerateAssessment={() => generateAssessmentTemplate(skill.skill.id, skill.skill.name)}
           onViewFeedback={completedAssessment ? () => handleViewFeedback(completedAssessment.id) : undefined}
+          onDeleteAssessment={() => handleDeleteAssessment(skill.skill.id, skill.skill.name)}
         />
       );
     });

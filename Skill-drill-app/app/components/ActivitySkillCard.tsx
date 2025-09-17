@@ -12,7 +12,7 @@ import { safePercentage, safeNumber } from '../../utils/mathUtils';
 interface ActivitySkillCardProps {
   id: string;
   skillName: string;
-  assessmentStatus: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'PENDING';
+  assessmentStatus: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED';
   aiInsights: string;
   aiTag: string;
   score?: number;
@@ -29,14 +29,15 @@ interface ActivitySkillCardProps {
   isGenerating?: boolean;
   onGenerateAssessment?: () => void;
   onViewFeedback?: () => void;
+  onDeleteAssessment?: () => void; // Testing: Delete assessment progress
 }
 
 const getStatusColor = (status: string): string => {
   switch (status) {
     case 'COMPLETED': return '#10B981';
     case 'IN_PROGRESS': return '#F59E0B';
-    case 'NOT_STARTED': return '#6B7280';
     case 'PENDING': return '#8B5CF6';
+    case 'SKIPPED': return '#6B7280';
     default: return '#6B7280';
   }
 };
@@ -46,8 +47,8 @@ const getStatusLabel = (status: string): string => {
   switch (status) {
     case 'COMPLETED': return 'COMPLETED';
     case 'IN_PROGRESS': return 'IN_PROGRESS';
-    case 'NOT_STARTED': return 'NOT_STARTED';
     case 'PENDING': return 'PENDING';
+    case 'SKIPPED': return 'SKIPPED';
     default: return status; // Fallback to show actual backend value
   }
 };
@@ -98,7 +99,8 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
   templateExists = false,
   isGenerating = false,
   onGenerateAssessment,
-  onViewFeedback
+  onViewFeedback,
+  onDeleteAssessment
 }) => {
   const router = useRouter();
   const responsive = useResponsive();
@@ -328,6 +330,7 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
                      {/* Action Buttons */}
            <View style={{ flexDirection: 'row', gap: SPACING.gap.sm }}>
             {assessmentStatus === 'COMPLETED' ? (
+              <>
               <TouchableOpacity
                 onPress={() => {
                   console.log('🔍 DEBUG: View Details button pressed');
@@ -368,7 +371,27 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
                   View Details
                 </Text>
               </TouchableOpacity>
+              
+              {/* Delete Button for Testing - COMPLETED status */}
+              {onDeleteAssessment && (
+                <TouchableOpacity
+                  onPress={onDeleteAssessment}
+                  style={{
+                    backgroundColor: '#EF4444',
+                    paddingVertical: SPACING.padding.sm,
+                    paddingHorizontal: 12,
+                    borderRadius: BORDER_RADIUS.md,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: 50
+                  }}
+                >
+                  <AntDesign name="delete" size={16} color="#FFFFFF" />
+                </TouchableOpacity>
+              )}
+              </>
             ) : assessmentStatus === 'IN_PROGRESS' ? (
+              <>
               <TouchableOpacity
                 onPress={() => {
                   if (skillId) {
@@ -378,14 +401,14 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
                     });
                   }
                 }}
-                                  style={{
-                    flex: 1,
-                    backgroundColor: BRAND,
-                                      paddingVertical: SPACING.padding.sm,
+                style={{
+                  flex: 1,
+                  backgroundColor: BRAND,
+                  paddingVertical: SPACING.padding.sm,
                   paddingHorizontal: SPACING.padding.md,
-                    borderRadius: BORDER_RADIUS.md,
-                    alignItems: 'center'
-                  }}
+                  borderRadius: BORDER_RADIUS.md,
+                  alignItems: 'center'
+                }}
               >
                 <Text style={{
                   fontSize: 14,
@@ -395,6 +418,25 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
                   Resume Assessment
                 </Text>
               </TouchableOpacity>
+              
+              {/* Delete Button for Testing - IN_PROGRESS status */}
+              {onDeleteAssessment && (
+                <TouchableOpacity
+                  onPress={onDeleteAssessment}
+                  style={{
+                    backgroundColor: '#EF4444',
+                    paddingVertical: SPACING.padding.sm,
+                    paddingHorizontal: 12,
+                    borderRadius: BORDER_RADIUS.md,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: 50
+                  }}
+                >
+                  <AntDesign name="delete" size={16} color="#FFFFFF" />
+                </TouchableOpacity>
+              )}
+              </>
             ) : templateExists ? (
               <TouchableOpacity
                 onPress={() => {

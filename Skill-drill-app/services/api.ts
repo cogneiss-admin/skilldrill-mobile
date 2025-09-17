@@ -421,9 +421,9 @@ class ApiService {
   /**
    * Start new adaptive assessment session (Sequential)
    */
-  public async startAdaptiveAssessment(skillId: string): Promise<ApiResponse> {
-    console.log('🎯 Starting adaptive assessment for skill:', skillId);
-    return this.post('/assessment/adaptive/start', { skillId });
+  public async startAssessment(skillId: string): Promise<ApiResponse> {
+    console.log('🎯 Starting assessment for skill:', skillId);
+    return this.post('/assessment/start', { skillId });
   }
 
   /**

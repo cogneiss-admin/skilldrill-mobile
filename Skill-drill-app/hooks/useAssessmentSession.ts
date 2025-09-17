@@ -4,7 +4,7 @@ import { apiService } from '../services/api';
 import { useToast } from './useToast';
 
 // Constants
-const ASSESSMENT_SESSION_KEY = 'adaptive_session_data';
+const ASSESSMENT_SESSION_KEY = 'assessment_session_data';
 
 export const useAssessmentSession = () => {
   // State (Updated for sequential flow)
@@ -48,18 +48,18 @@ export const useAssessmentSession = () => {
     }
   }, []);
 
-  // Start new adaptive assessment (Updated for sequential flow)
-  const startAdaptiveSession = useCallback(async (skillId: string) => {
+  // Start new assessment (Updated for sequential flow)
+  const startAssessmentSession = useCallback(async (skillId: string) => {
     try {
       setLoading(true);
       setError(null);
 
-      console.log('🎯 Starting sequential adaptive assessment for skill:', skillId);
+      console.log('🎯 Starting assessment for skill:', skillId);
 
-      const response = await apiService.startAdaptiveAssessment(skillId);
+      const response = await apiService.startAssessment(skillId);
 
       if (response.success) {
-        console.log('✅ Sequential adaptive assessment started:', response.data);
+        console.log('✅ Assessment started:', response.data);
         
         // Set sequential state
         setSessionId(response.data.sessionId);
@@ -90,7 +90,7 @@ export const useAssessmentSession = () => {
       }
 
     } catch (error: any) {
-      console.error('❌ Error starting sequential adaptive assessment:', error);
+      console.error('❌ Error starting assessment:', error);
       setError(error.message || 'Failed to start assessment');
       throw error;
     } finally {
@@ -250,7 +250,8 @@ export const useAssessmentSession = () => {
     isAssessmentActive,
 
     // Actions
-    startAdaptiveSession,
+    startAssessmentSession,
+    startAdaptiveSession: startAssessmentSession, // Legacy alias for backward compatibility
     saveAnswer,
     nextQuestion,
     previousQuestion,
