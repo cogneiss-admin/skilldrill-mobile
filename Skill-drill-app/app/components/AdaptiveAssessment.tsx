@@ -304,7 +304,7 @@ const AdaptiveAssessment: React.FC<AdaptiveAssessmentProps> = ({
                 marginBottom: 24,
               }}>
 
-                {/* Scenario */}
+                {/* Scenario Only */}
                 <Text style={{
                   fontSize: 16,
                   fontWeight: '600',
@@ -318,27 +318,8 @@ const AdaptiveAssessment: React.FC<AdaptiveAssessmentProps> = ({
                   fontSize: 15,
                   color: '#666',
                   lineHeight: 22,
-                  marginBottom: 20,
                 }}>
                   {currentQuestion?.scenario || 'Loading scenario...'}
-                </Text>
-
-                {/* Question */}
-                <Text style={{
-                  fontSize: 16,
-                  fontWeight: '600',
-                  color: '#333',
-                  marginBottom: 12,
-                  lineHeight: 24,
-                }}>
-                  Question:
-                </Text>
-                <Text style={{
-                  fontSize: 15,
-                  color: '#666',
-                  lineHeight: 22,
-                }}>
-                  {currentQuestion?.instruction || 'Loading question...'}
                 </Text>
               </Surface>
             </MotiView>

@@ -26,6 +26,16 @@ const initialState: SkillsState = {
   lastUpdated: null,
 };
 
+// Normalize tier values from backend to frontend format
+const normalizeTier = (tier: string): string => {
+  const tierMapping: Record<string, string> = {
+    'TIER_1_CORE_SURVIVAL': 'TIER_1',
+    'TIER_2_PROGRESSION': 'TIER_2', 
+    'TIER_3_EXECUTIVE': 'TIER_3'
+  };
+  return tierMapping[tier] || tier;
+};
+
 // Async thunk for fetching skills
 export const fetchSkills = createAsyncThunk(
   'skills/fetchSkills',
@@ -55,7 +65,7 @@ export const fetchSkills = createAsyncThunk(
                 description: skill.description,
                 icon: icon,
                 category: group.title || 'Personal Effectiveness',
-                tier: skill.tier || 'TIER_1',
+                tier: normalizeTier(skill.tier || 'TIER_1'),
                 skill_id: skill.skill_id,
                 mongo_id: skill.id // Keep MongoDB id for backend operations
               };
