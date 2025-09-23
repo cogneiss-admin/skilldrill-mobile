@@ -213,7 +213,7 @@ export default function MyActivity() {
   // Get assessment progress for a specific skill
   const getSkillProgress = (skillId: string) => {
     // Check if this skill is part of the active session
-    if (activeSession && activeSession.selectedSkills.includes(skillId)) {
+    if (activeSession && activeSession.selectedSkills && activeSession.selectedSkills.includes(skillId)) {
       return activeSession.progress;
     }
 
