@@ -109,6 +109,27 @@ export default function SkillsScreen() {
     }
   }, [selected]);
 
+  // Check which skills already have assessments
+  const checkSkillsWithAssessments = useCallback(async () => {
+    try {
+      // Use unified results endpoint used elsewhere in the app
+      const response = await apiService.get('/assessment/results');
+      if (response.success && Array.isArray(response.data)) {
+        const ids = new Set(
+          response.data
+            .map((r) => r?.skillId)
+            .filter((id) => typeof id === 'string' && id.length > 0)
+        );
+        setSkillsWithAssessments(ids);
+        console.log('📊 Skills with existing assessments:', Array.from(ids));
+      } else {
+        setSkillsWithAssessments(new Set());
+      }
+    } catch (error) {
+      console.log('ℹ️ Could not fetch assessments:', error.message);
+    }
+  }, []);
+
   // Check for skills with existing assessments
   useEffect(() => {
     checkSkillsWithAssessments();
@@ -135,27 +156,6 @@ export default function SkillsScreen() {
       }
     });
   }, [router]);
-
-  // Check which skills already have assessments
-  const checkSkillsWithAssessments = useCallback(async () => {
-    try {
-      // Use unified results endpoint used elsewhere in the app
-      const response = await apiService.get('/assessment/results');
-      if (response.success && Array.isArray(response.data)) {
-        const ids = new Set(
-          response.data
-            .map((r) => r?.skillId)
-            .filter((id) => typeof id === 'string' && id.length > 0)
-        );
-        setSkillsWithAssessments(ids);
-        console.log('📊 Skills with existing assessments:', Array.from(ids));
-      } else {
-        setSkillsWithAssessments(new Set());
-      }
-    } catch (error) {
-      console.log('ℹ️ Could not fetch assessments:', error.message);
-    }
-  }, []);
 
   const handleContinue = async () => {
     if (!canContinue || busy) return;
