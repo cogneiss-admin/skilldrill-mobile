@@ -274,7 +274,7 @@ const AdaptiveAssessment: React.FC<AdaptiveAssessmentProps> = ({
         
         <ProgressIndicator 
           currentQuestion={safeNumber(progress?.currentQuestion, 1)}
-          totalQuestions={safeNumber(progress?.totalQuestions, 3)}
+          totalQuestions={safeNumber(progress?.totalQuestions, 4)}
         />
       </View>
 

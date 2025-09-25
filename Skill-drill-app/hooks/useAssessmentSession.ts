@@ -10,7 +10,7 @@ export const useAssessmentSession = () => {
   // State (Updated for sequential flow)
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<any>(null);
-  const [progress, setProgress] = useState<any>({ currentQuestion: 1, totalQuestions: 0, currentTier: 'L1' }); // Will be updated from backend
+  const [progress, setProgress] = useState<any>({ currentQuestion: 1, totalQuestions: 4, currentTier: 'L1' }); // Will be updated from backend
   const [skillName, setSkillName] = useState<string | null>(null);
   const [userResponses, setUserResponses] = useState<Array<{
     questionId: string;
@@ -35,7 +35,7 @@ export const useAssessmentSession = () => {
       setIsAssessmentActive(false);
       setSessionId(null);
       setCurrentQuestion(null);
-      setProgress({ currentQuestion: 1, totalQuestions: 0, currentTier: 'L1' }); // Will be updated from backend
+      setProgress({ currentQuestion: 1, totalQuestions: 4, currentTier: 'L1' }); // Will be updated from backend
       setSkillName(null);
       setUserResponses([]);
       
