@@ -131,22 +131,22 @@ export const useAuth = () => {
     if (!user) return false;
     
     console.log('🔍 isOnboardingComplete: Checking user:', {
-      onboarding_step: user.onboarding_step,
-      career_stage: user.career_stage,
-      role_type: user.role_type
+      onboardingStep: user.onboardingStep,
+      careerStage: user.careerStage,
+      roleType: user.roleType
     });
     
     // Check if user has completed onboarding
-    if (user.onboarding_step === 'COMPLETED' || user.onboarding_step === 'SKILLS_SELECTED') {
+    if (user.onboardingStep === 'Completed') {
       console.log('✅ isOnboardingComplete: User has completed onboarding');
       return true;
     }
     
-    // For legacy users without onboarding_step, check if they have all required info
-    if (!user.onboarding_step) {
+    // For legacy users without onboardingStep, check if they have all required info
+    if (!user.onboardingStep) {
       // Legacy users need career info and skills to be considered complete
       // Since we can't check skills here, we'll assume they need to go through the flow
-      console.log('⚠️ isOnboardingComplete: Legacy user without onboarding_step, assuming incomplete');
+      console.log('⚠️ isOnboardingComplete: Legacy user without onboardingStep, assuming incomplete');
       return false;
     }
     
@@ -158,35 +158,27 @@ export const useAuth = () => {
     if (!user) return null;
     
     console.log('🔄 getOnboardingNextStep: Checking user onboarding state:', {
-      onboarding_step: user.onboarding_step,
-      career_stage: user.career_stage,
-      role_type: user.role_type
+      onboardingStep: user.onboardingStep,
+      careerStage: user.careerStage,
+      roleType: user.roleType
     });
     
     // Check onboarding step progression
-    switch (user.onboarding_step) {
+    switch (user.onboardingStep) {
       case 'EMAIL_VERIFIED':
         // User just signed up, needs to complete career role
         console.log('🔄 getOnboardingNextStep: User at EMAIL_VERIFIED, directing to career-role');
         return '/auth/career-role';
-      case 'CAREER_ROLE_COMPLETED':
-        // User completed career role, needs to select skills
-        console.log('🔄 getOnboardingNextStep: User at CAREER_ROLE_COMPLETED, directing to skills');
-        return '/auth/skills';
-      case 'SKILLS_SELECTED':
-        // User completed skills selection, can go to dashboard
-        console.log('🔄 getOnboardingNextStep: User at SKILLS_SELECTED, directing to dashboard');
-        return '/dashboard';
-      case 'COMPLETED':
+      case 'Completed':
         // User completed full onboarding
         console.log('🔄 getOnboardingNextStep: User at COMPLETED, directing to dashboard');
         return '/dashboard';
       default:
-        // Legacy users or new users without onboarding_step
+        // Legacy users or new users without onboardingStep
         // Need to determine their progress manually
         
         // First check: Do they have career/role info?
-        if (!user.career_stage || !user.role_type) {
+        if (!user.careerStage || !user.roleType) {
           console.log('🔄 getOnboardingNextStep: User missing career/role info, directing to career-role');
           return '/auth/career-role';
         }
@@ -316,8 +308,9 @@ export const useAuth = () => {
         userData: response.data.user ? {
           id: response.data.user.id,
           name: response.data.user.name,
-          career_stage: response.data.user.career_stage,
-          role_type: response.data.user.role_type
+          careerStage: response.data.user.careerStage,
+          roleType: response.data.user.roleType,
+          onboardingStep: response.data.user.onboardingStep
         } : null
       });
       
@@ -395,9 +388,9 @@ export const useAuth = () => {
         }));
         console.log('✅ useAuth: Local state updated with new user data');
         console.log('📊 useAuth: Updated user data:', {
-          career_stage: response.data.career_stage,
-          role_type: response.data.role_type,
-          onboarding_step: response.data.onboarding_step,
+          careerStage: response.data.careerStage,
+          roleType: response.data.roleType,
+          onboardingStep: response.data.onboardingStep,
           onboardingComplete: isOnboardingComplete(response.data)
         });
       } else {

@@ -63,7 +63,7 @@ export default function CareerRoleScreen() {
           
           // User already has career info, but let's check what they should do next
           // If they have onboarding_step set, follow that logic
-          if (userData.onboarding_step === 'CAREER_ROLE_COMPLETED' || userData.onboarding_step === 'SKILLS_SELECTED') {
+          if (userData.onboarding_step === 'Completed') {
             console.log('📋 Career-role: User has proper onboarding step, redirecting to skills');
             router.replace("/auth/skills");
           } else {
@@ -73,7 +73,7 @@ export default function CareerRoleScreen() {
               hasUpdatedProfile.current = true;
               try {
                 await updateProfile({
-                  onboarding_step: 'CAREER_ROLE_COMPLETED'
+                  onboarding_step: 'Pending'
                 });
                 router.replace("/auth/skills");
               } catch (error) {
@@ -124,7 +124,7 @@ export default function CareerRoleScreen() {
       await updateProfile({
         career_stage: careerStage,
         role_type: roleType,
-        onboarding_step: 'CAREER_ROLE_COMPLETED'
+        onboarding_step: 'Pending'
       });
       console.log('✅ Career-role: Profile update successful');
 

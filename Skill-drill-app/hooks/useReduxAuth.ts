@@ -41,7 +41,7 @@ export const useReduxAuth = () => {
   const isOnboardingComplete = useCallback((user: User | null): boolean => {
     if (!user) return false;
     
-    if (user.onboarding_step === 'COMPLETED' || user.onboarding_step === 'SKILLS_SELECTED') {
+    if (user.onboarding_step === 'Completed') {
       return true;
     }
     
@@ -58,11 +58,7 @@ export const useReduxAuth = () => {
     switch (user.onboarding_step) {
       case 'EMAIL_VERIFIED':
         return '/auth/career-role';
-      case 'CAREER_ROLE_COMPLETED':
-        return '/auth/skills';
-      case 'SKILLS_SELECTED':
-        return '/dashboard';
-      case 'COMPLETED':
+      case 'Completed':
         return '/dashboard';
       default:
         if (!user.career_stage || !user.role_type) {

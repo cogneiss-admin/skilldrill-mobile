@@ -51,14 +51,17 @@ export interface User {
   id: string;
   name: string;
   email?: string;
-  phone_no?: string;
-  is_verified: boolean;
-  auth_provider?: string;
-  avatar_url?: string;
-  career_stage?: 'ENTRY_LEVEL' | 'MID_LEVEL' | 'EXPERIENCED';
-  role_type?: 'INDIVIDUAL_CONTRIBUTOR' | 'TEAM_LEADER_MANAGER' | 'SENIOR_LEADER_EXECUTIVE';
-  onboarding_step?: string;
-  onboarding_completed_at?: string;
+  phoneNo?: string;
+  isVerified: boolean;
+  authProvider?: string;
+  avatarUrl?: string;
+  careerStage?: 'ENTRY_LEVEL' | 'MID_LEVEL' | 'EXPERIENCED';
+  roleType?: 'INDIVIDUAL_CONTRIBUTOR' | 'TEAM_LEADER_MANAGER' | 'SENIOR_LEADER_EXECUTIVE';
+  onboardingStep?: string;
+  onboardingCompletedAt?: string;
+  countryCode?: string;
+  countryName?: string;
+  phoneCountryCode?: string;
 }
 
 // API Error class

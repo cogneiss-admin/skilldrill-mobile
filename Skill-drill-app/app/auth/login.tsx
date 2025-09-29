@@ -16,14 +16,21 @@ import { detectInputType, isValidEmail, isValidPhone, validationMessageFor } fro
 import { useSocialAuth } from "../../hooks/useSocialAuth";
 import { useResponsive } from "../../utils/responsive";
 import { BRAND } from "../components/Brand";
+import PhoneInput from 'react-native-international-phone-number';
 
 const logoSrc = require("../../assets/images/logo.png");
-const COUNTRY_CODE = "+91";
 
 export default function LoginScreen() {
   const router = useRouter();
   const responsive = useResponsive();
   const [emailOrPhone, setEmailOrPhone] = useState("");
+  const [selectedCountry, setSelectedCountry] = useState<any>({
+    cca2: 'IN',
+    callingCode: ['91'],
+    name: 'India'
+  });
+  const [phoneCountryCode, setPhoneCountryCode] = useState('IN');
+  const [showPhoneInput, setShowPhoneInput] = useState(false);
   const [busy, setBusy] = useState(false);
   const [validationMessage, setValidationMessage] = useState("");
   const [showSignupSuggestion, setShowSignupSuggestion] = useState(false);
@@ -32,15 +39,30 @@ export default function LoginScreen() {
 
   // Detect if input is email or phone number (simple, user-friendly heuristic)
   const inputType = useMemo(() => detectInputType(emailOrPhone), [emailOrPhone]);
+  
+  // Get international phone number if it's a phone input
+  const internationalPhone = useMemo(() => {
+    return emailOrPhone.trim();
+  }, [emailOrPhone]);
 
   const isValidInput = useMemo(() => {
-    const msg = validationMessageFor(emailOrPhone);
-    setValidationMessage(msg);
-    if (!emailOrPhone.trim()) return false;
-    if (inputType === "email") return isValidEmail(emailOrPhone);
-    if (inputType === "phone") return isValidPhone(emailOrPhone);
-    return false;
-  }, [emailOrPhone, inputType]);
+    if (!emailOrPhone.trim()) {
+      setValidationMessage("");
+      return false;
+    }
+    
+    if (showPhoneInput) {
+      // Phone mode - validate as phone
+      const isValid = isValidPhone(emailOrPhone);
+      setValidationMessage(isValid ? "" : "Enter a valid phone number");
+      return isValid;
+    } else {
+      // Email mode - validate as email
+      const isValid = isValidEmail(emailOrPhone);
+      setValidationMessage(isValid ? "" : "Enter a valid email address");
+      return isValid;
+    }
+  }, [emailOrPhone, showPhoneInput]);
 
   const sendOtp = async () => {
     if (busy || !isValidInput) return;
@@ -60,12 +82,9 @@ export default function LoginScreen() {
         response = await authService.loginWithEmail({ email: emailOrPhone.trim() });
         console.log('📧 Email login response:', response);
       } else {
-        const raw = emailOrPhone;
-        const hasPlus = raw.includes("+");
-        const digits = raw.replace(/[^0-9]/g, "");
-        const phone_no = hasPlus ? `+${digits}` : `${COUNTRY_CODE}${digits}`;
+        const phone_no = internationalPhone;
         console.log('📱 Sending phone login request with:', phone_no);
-        response = await authService.loginWithPhone({ phone_no });
+        response = await authService.loginWithPhone({ phoneNo: phone_no });
         console.log('📱 Phone login response:', response);
       }
       
@@ -74,7 +93,7 @@ export default function LoginScreen() {
         // Pass the identifier to the OTP screen
         const params = inputType === "email" 
           ? { email: emailOrPhone.trim() }
-          : { phone: (() => { const raw = emailOrPhone; const hasPlus = raw.includes("+"); const digits = raw.replace(/[^0-9]/g, ""); return hasPlus ? `+${digits}` : `${COUNTRY_CODE}${digits}`; })() };
+          : { phone: internationalPhone };
           
         console.log('🚀 Navigating to OTP with params:', params);
         try {
@@ -240,92 +259,102 @@ export default function LoginScreen() {
           </Text>
         </View>
 
-        {/* Clean input field for email or phone */}
+        {/* Smart input field - email or phone */}
         <View style={{ width: "100%", marginBottom: responsive.spacing(16) }}>
           <View style={{ 
-            flexDirection: inputType === "phone" ? "row" : "column",
-            alignItems: inputType === "phone" ? "center" : "stretch",
-            justifyContent: "center",
             maxWidth: responsive.maxWidth.form,
             alignSelf: 'center',
             width: '100%'
           }}>
-            {/* Country code (only visible for phone input) */}
-            {inputType === "phone" && (
-              <View style={{
-                flexDirection: "row",
-                alignItems: "center",
-                backgroundColor: "#f8f9fa",
-                borderWidth: 1,
-                borderColor: "#e9ecef",
-                borderRadius: responsive.size(8),
-                paddingHorizontal: responsive.padding.sm,
-                paddingVertical: responsive.padding.sm,
-                marginRight: responsive.spacing(8),
-                minWidth: responsive.size(80),
-                justifyContent: "center",
-                gap: responsive.spacing(4),
-              }}>
-                <Text style={{ fontSize: responsive.fontSize(18) }}>🇮🇳</Text>
-                <Text style={{ 
-                  fontSize: responsive.typography.body2, 
-                  color: "#111827", 
-                  fontWeight: "700" 
-                }}>
-                  {COUNTRY_CODE}
-                </Text>
+            {!showPhoneInput ? (
+              // Default email/phone input
+              <View>
+                <TextInput
+                  mode="outlined"
+                  placeholder="Enter email or phone number"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  multiline={false}
+                  textContentType="emailAddress"
+                  autoComplete="email"
+                  value={emailOrPhone}
+                  maxLength={50}
+                  onChangeText={setEmailOrPhone}
+                  style={{ 
+                    backgroundColor: "#f8f9fa",
+                    height: responsive.input.height,
+                  }}
+                  textColor="#333333"
+                  placeholderTextColor="#999999"
+                  outlineColor="#e9ecef"
+                  activeOutlineColor={BRAND}
+                  contentStyle={{
+                    paddingVertical: 0,
+                    fontSize: responsive.input.fontSize,
+                    textAlign: "left",
+                  }}
+                  theme={{
+                    colors: {
+                      onSurfaceVariant: "#666666",
+                    },
+                    roundness: 12,
+                  }}
+                  left={<TextInput.Icon icon="email-outline" size={responsive.size(20)} />}
+                />
+                <Pressable 
+                  onPress={() => setShowPhoneInput(true)}
+                  style={{ alignSelf: 'center', marginTop: 8 }}
+                >
+                  <Text style={{ color: BRAND, fontSize: 14, fontWeight: "600" }}>
+                    Use phone number instead
+                  </Text>
+                </Pressable>
+              </View>
+            ) : (
+              // International phone input
+              <View>
+                <PhoneInput
+                  value={emailOrPhone}
+                  onChangePhoneNumber={(phoneNumber: string) => {
+                    setEmailOrPhone(phoneNumber);
+                  }}
+                  selectedCountry={selectedCountry}
+                  onChangeSelectedCountry={(country: any) => {
+                    setSelectedCountry(country);
+                    setPhoneCountryCode(country.cca2);
+                  }}
+                  defaultCountry="IN"
+                  placeholder="Enter phone number"
+                  phoneInputStyles={{
+                    container: {
+                      backgroundColor: "#f8f9fa",
+                      borderWidth: 1,
+                      borderColor: "#e9ecef",
+                      borderRadius: 12,
+                      minHeight: responsive.input.height
+                    },
+                    input: {
+                      fontSize: responsive.input.fontSize,
+                      color: "#333333"
+                    }
+                  }}
+                  modalStyles={{
+                    modal: {
+                      backgroundColor: "white"
+                    }
+                  }}
+                />
+                <Pressable 
+                  onPress={() => setShowPhoneInput(false)}
+                  style={{ alignSelf: 'center', marginTop: 8 }}
+                >
+                  <Text style={{ color: BRAND, fontSize: 14, fontWeight: "600" }}>
+                    Use email instead
+                  </Text>
+                </Pressable>
               </View>
             )}
-            
-            {/* Input field */}
-            <View style={{ flex: inputType === "phone" ? 1 : 0, width: inputType === "phone" ? undefined : '100%' }}>
-              <TextInput
-                mode="outlined"
-                placeholder="Enter email or phone number"
-                keyboardType={inputType === "phone" ? "number-pad" : "email-address"}
-                autoCapitalize="none"
-                autoCorrect={false}
-                multiline={false}
-                textContentType={inputType === "phone" ? "telephoneNumber" : "emailAddress"}
-                autoComplete={inputType === "phone" ? "tel" : "email"}
-                value={emailOrPhone}
-                maxLength={50}
-                onChangeText={(t) => {
-                  // Smart input handling - auto-detect phone vs email
-                  const isOnlyDigits = /^\d*$/.test(t);
-                  
-                  if (isOnlyDigits && t.length <= 10) {
-                    // Likely phone number - limit to 10 digits
-                    setEmailOrPhone(t);
-                  } else if (!isOnlyDigits) {
-                    // Contains non-digits, allow full email input
-                    setEmailOrPhone(t);
-                  }
-                }}
-                style={{ 
-                  backgroundColor: "#ffffff",
-                  height: responsive.input.height,
-                }}
-                textColor="#333333"
-                placeholderTextColor="#999999"
-                outlineColor="#e9ecef"
-                activeOutlineColor={BRAND}
-                contentStyle={{
-                  paddingVertical: 0,
-                  fontSize: responsive.input.fontSize,
-                  textAlign: "left",
-                }}
-                theme={{
-                  colors: {
-                    onSurfaceVariant: "#666666",
-                  }
-                }}
-                left={inputType === "email" ? 
-                  <TextInput.Icon icon="email-outline" size={responsive.size(20)} /> : 
-                  <TextInput.Icon icon="phone-outline" size={responsive.size(20)} />
-                }
-              />
-            </View>
           </View>
         </View>
 

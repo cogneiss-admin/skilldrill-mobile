@@ -270,7 +270,7 @@ export default function SkillsScreen() {
           // Only update onboarding step if NOT in assessment mode
           if (!isAssessmentMode) {
             try {
-              await updateOnboardingStep('SKILLS_SELECTED');
+              await updateOnboardingStep('Completed');
             } catch (error) {
               console.error('❌ Failed to update onboarding step:', error);
             }

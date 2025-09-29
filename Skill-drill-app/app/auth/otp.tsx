@@ -106,8 +106,8 @@ export default function OtpScreen() {
         setVerified(true);
 
         const userData = response.data.user;
-
-        if (userData?.career_stage && userData?.role_type) {
+        
+        if (userData?.onboarding_step === 'Completed' || userData?.onboardingStep === 'Completed') {
           setTimeout(() => {
             router.replace("/session-loading");
           }, 700);

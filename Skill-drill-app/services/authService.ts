@@ -4,35 +4,47 @@ import SessionManager from '../utils/sessionManager';
 
 // Types for auth requests
 export interface PhoneSignupRequest {
-  phone_no: string;
+  phoneNo: string;
   name: string;
   email?: string;
+  countryCode?: string;
+  countryName?: string;
+  phoneCountryCode?: string;
 }
 
 export interface EmailSignupRequest {
   email: string;
   name: string;
-  phone_no?: string;
+  phoneNo?: string;
+  countryCode?: string;
+  countryName?: string;
+  phoneCountryCode?: string;
 }
 
 export interface PasswordSignupRequest {
   email: string;
   name: string;
   password: string;
-  phone_no?: string;
+  phoneNo?: string;
+  countryCode?: string;
+  countryName?: string;
+  phoneCountryCode?: string;
 }
 
 export interface SocialSignupRequest {
-  social_id: string;
+  socialId: string;
   email: string;
   name: string;
-  auth_provider: 'GOOGLE' | 'LINKEDIN';
-  avatar_url?: string;
-  phone_no?: string;
+  authProvider: 'GOOGLE' | 'LINKEDIN';
+  avatarUrl?: string;
+  phoneNo?: string;
+  countryCode?: string;
+  countryName?: string;
+  phoneCountryCode?: string;
 }
 
 export interface PhoneLoginRequest {
-  phone_no: string;
+  phoneNo: string;
 }
 
 export interface EmailLoginRequest {
@@ -64,17 +76,20 @@ export interface LogoutRequest {
 // Response types
 export interface SignupResponse {
   user_id: string;
-  phone_no?: string;
+  phoneNo?: string;
   email?: string;
-  auth_provider: string;
+  authProvider: string;
   has_email?: boolean;
   has_phone?: boolean;
+  countryCode?: string;
+  countryName?: string;
+  phoneCountryCode?: string;
   otp?: string; // Only in development
 }
 
 export interface LoginResponse {
   user_id?: string;
-  phone_no?: string;
+  phoneNo?: string;
   email?: string;
   otp?: string; // Only in development
 }

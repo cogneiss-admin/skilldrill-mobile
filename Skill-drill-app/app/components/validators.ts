@@ -3,8 +3,11 @@ export function isValidEmail(value: string): boolean {
 }
 
 export function isValidPhone(value: string): boolean {
+  if (!value) return false;
+  
+  // Generic phone validation - 5 to 15 digits
   const digitsOnly = value.trim().replace(/[^0-9+]/g, "");
-  return /^\+?\d{10,15}$/.test(digitsOnly);
+  return /^\+?\d{5,15}$/.test(digitsOnly);
 }
 
 export type InputType = "email" | "phone" | "unknown";
@@ -21,7 +24,9 @@ export function detectInputType(value: string): InputType {
 export function validationMessageFor(value: string): string {
   const type = detectInputType(value);
   if (type === "email") return isValidEmail(value) ? "" : "Enter a valid email address";
-  if (type === "phone") return isValidPhone(value) ? "" : "Enter a valid phone number";
+  if (type === "phone") {
+    return isValidPhone(value) ? "" : "Enter a valid phone number";
+  }
   if (/^[A-Za-z]/.test(value.trim())) return "Enter a valid email address";
   if (value.trim().length > 0) return "Enter a valid phone number";
   return "";

@@ -6,7 +6,7 @@ import { Button, TextInput } from "react-native-paper";
 import ErrorBanner from "../../components/ErrorBanner";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
-import { isValidEmail, isValidPhone } from "../components/validators";
+import { isValidEmail } from "../components/validators";
 import { useSocialAuth } from "../../hooks/useSocialAuth";
 import { StatusBar } from "expo-status-bar";
 import { AntDesign } from "@expo/vector-icons";
@@ -14,15 +14,38 @@ import GoogleGIcon from "../../components/GoogleGIcon";
 import LinkedInIcon from "../../components/LinkedInIcon";
 import CodeBoxes from "../../components/CodeBoxes";
 import { BRAND } from "../components/Brand";
+import PhoneInput from 'react-native-international-phone-number';
 
 const logoSrc = require("../../assets/images/logo.png");
-const COUNTRY_CODE = "+91";
+
+// Convert country code to flag emoji
+const getCountryFlag = (countryCode: string): string => {
+  if (!countryCode) return "🇮🇳";
+  const codePoints = countryCode
+    .toUpperCase()
+    .split('')
+    .map(char => 127397 + char.charCodeAt(0));
+  return String.fromCodePoint(...codePoints);
+};
 
 export default function SignupScreen() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [selectedCountry, setSelectedCountry] = useState<any>({
+    cca2: 'IN',
+    callingCode: ['91'],
+    name: 'India'
+  });
+  const [residenceCountry, setResidenceCountry] = useState<any>({
+    cca2: 'IN',
+    callingCode: ['91'],
+    name: 'India'
+  });
+  const [phoneCountryCode, setPhoneCountryCode] = useState('IN');
+  const [residenceCountryCode, setResidenceCountryCode] = useState('IN');
+  const [formattedPhoneNumber, setFormattedPhoneNumber] = useState('');
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [emailVerified, setEmailVerified] = useState(false);
@@ -39,11 +62,24 @@ export default function SignupScreen() {
   const [otpSentPhone, setOtpSentPhone] = useState(false);
   const [resendRemaining, setResendRemaining] = useState(0);
   const { signInWithGoogle, signInWithLinkedIn, isLoading: socialLoading, isProviderAvailable } = useSocialAuth();
+  
+  // Updated validation with country support
   const nameOk = useMemo(() => name.trim().length >= 2, [name]);
   const emailOk = useMemo(() => (email.trim() ? isValidEmail(email.trim()) : false), [email]);
-  const phoneOk = useMemo(() => (phone.trim() ? isValidPhone(phone.trim()) : false), [phone]);
+  const phoneOk = useMemo(() => {
+    if (!formattedPhoneNumber.trim()) return false;
+    // Basic phone validation - at least 5 digits, max 15 digits
+    const digitsOnly = formattedPhoneNumber.trim().replace(/[^0-9+]/g, "");
+    return digitsOnly.length >= 7 && digitsOnly.length <= 17;
+  }, [formattedPhoneNumber]);
   const verifiedOk = emailVerified || phoneVerified; // verifying either is sufficient
   const canContinue = useMemo(() => nameOk && (emailOk || phoneOk), [nameOk, emailOk, phoneOk]);
+  
+  // Get international phone number
+  const internationalPhone = useMemo(() => {
+    if (!formattedPhoneNumber.trim()) return "";
+    return formattedPhoneNumber.trim();
+  }, [formattedPhoneNumber]);
 
   const handleContinue = async () => {
     if (!canContinue || busy) return;
@@ -60,14 +96,16 @@ export default function SignupScreen() {
 
       const { authService } = await import("../../services/authService");
 
-      const digits = phone.replace(/\D/g, "");
-      const fullPhone = phoneOk && digits ? `${COUNTRY_CODE}${digits}` : undefined;
-
       // Save locally and check if career info is needed
       await authService.updateUserProfile({
         name: name.trim(),
         email: emailOk ? email.trim() : undefined,
-        phone_no: fullPhone,
+        phoneNo: phoneOk ? internationalPhone : undefined,
+        countryCode: selectedCountry?.cca2,
+        countryName: selectedCountry?.name?.common || selectedCountry?.name,
+        phoneCountryCode: selectedCountry?.callingCode?.[0],
+        residenceCountryCode: residenceCountry?.cca2,
+        residenceCountryName: residenceCountry?.name?.common || residenceCountry?.name,
       });
 
       // Check if user already has career info
@@ -97,11 +135,11 @@ export default function SignupScreen() {
   const maskPhone = (value: string) => {
     const clean = String(value).replace(/\D/g, '');
     if (clean.length < 4) return value;
-    return `+${clean.slice(0, -4).replace(/\d/g, '•')} ${clean.slice(-4)}`;
+    return `${clean.slice(0, -4).replace(/\d/g, '•')}${clean.slice(-4)}`;
   };
   const buildOtpSentMessage = () => {
     const parts: string[] = [];
-    if (phoneOk) parts.push(`phone number ${maskPhone(phone)}`);
+    if (phoneOk) parts.push(`phone number ${maskPhone(formattedPhoneNumber)}`);
     if (emailOk) parts.push(`email ${maskEmail(email.trim())}`);
     if (parts.length === 0) return '';
     return `We have sent OTP to your ${parts.join(' and ')}.`;
@@ -118,9 +156,7 @@ export default function SignupScreen() {
     if (mode === "email" && !emailOk) return;
     if (mode === "phone" && !phoneOk) return;
     
-    const digits = phone.replace(/\D/g, "");
-    const fullPhone = phoneOk && digits ? `${COUNTRY_CODE}${digits}` : undefined;
-    const target = mode === "email" ? email.trim() : String(fullPhone || "");
+    const target = mode === "email" ? email.trim() : internationalPhone;
     
     try {
       const { authService } = await import("../../services/authService");
@@ -131,7 +167,12 @@ export default function SignupScreen() {
           const resSignup = await authService.signupWithEmail({ 
             email: target, 
             name: name.trim(), 
-            phone_no: fullPhone 
+            phoneNo: phoneOk ? internationalPhone : undefined,
+            countryCode: selectedCountry?.cca2,
+            countryName: selectedCountry?.name?.common || selectedCountry?.name,
+            phoneCountryCode: selectedCountry?.callingCode[0],
+            residenceCountryCode: residenceCountry?.cca2,
+            residenceCountryName: residenceCountry?.name?.common || residenceCountry?.name,
           });
           if (resSignup?.success) { 
             // Success - open OTP sheet
@@ -161,9 +202,14 @@ export default function SignupScreen() {
         try {
           // Call signup endpoint directly for phone
           const resSignup = await authService.signupWithPhone({ 
-            phone_no: target, 
+            phoneNo: target, 
             name: name.trim(), 
-            email: emailOk ? email.trim() : undefined 
+            email: emailOk ? email.trim() : undefined,
+            countryCode: selectedCountry?.cca2,
+            countryName: selectedCountry?.name?.common || selectedCountry?.name,
+            phoneCountryCode: selectedCountry?.callingCode[0],
+            residenceCountryCode: residenceCountry?.cca2,
+            residenceCountryName: residenceCountry?.name?.common || residenceCountry?.name,
           });
           if (resSignup?.success) { 
             // Success - open OTP sheet
@@ -203,8 +249,6 @@ export default function SignupScreen() {
       setBulkVerifyMode('both');
       setErrorMessage("");
       const { authService } = await import("../../services/authService");
-      const digits = phone.replace(/\D/g, "");
-      const fullPhone = phoneOk && digits ? `${COUNTRY_CODE}${digits}` : undefined;
       
       // Try signup first for both email and phone
       let signupSuccess = false;
@@ -213,7 +257,16 @@ export default function SignupScreen() {
       // Try email signup first
       if (emailOk) {
         try {
-          const resSignupE = await authService.signupWithEmail({ email: email.trim(), name: name.trim(), phone_no: fullPhone });
+          const resSignupE = await authService.signupWithEmail({ 
+            email: email.trim(), 
+            name: name.trim(), 
+            phoneNo: phoneOk ? internationalPhone : undefined,
+            countryCode: selectedCountry?.cca2,
+            countryName: selectedCountry?.name?.common || selectedCountry?.name,
+            phoneCountryCode: selectedCountry?.callingCode?.[0],
+            residenceCountryCode: residenceCountry?.cca2,
+            residenceCountryName: residenceCountry?.name?.common || residenceCountry?.name,
+          });
           if (resSignupE?.success) { 
             signupSuccess = true;
             // Open sheet for email OTP
@@ -226,10 +279,10 @@ export default function SignupScreen() {
             setOtpSentEmail(true);
             setResendRemaining(30);
           }
-        } catch (signupError: any) {
-          if (signupError?.code === 'USER_EXISTS' || signupError?.code === 'USER_PENDING_VERIFICATION') {
+        } catch (signupErrorCaught: any) {
+          if (signupErrorCaught?.code === 'USER_EXISTS' || signupErrorCaught?.code === 'USER_PENDING_VERIFICATION') {
             // User already exists - show error and redirect to login
-            setErrorMessage(authService.handleAuthError(signupError));
+            setErrorMessage(authService.handleAuthError(signupErrorCaught));
             setOtpSheetVisible(false);
             // Redirect to login after a short delay
             setTimeout(() => {
@@ -238,20 +291,29 @@ export default function SignupScreen() {
             return;
           } else {
             // Other signup error - try phone signup if available
-            signupError = signupError;
+            signupError = signupErrorCaught;
           }
         }
       }
 
       // If email signup failed, try phone signup
-      if (!signupSuccess && fullPhone) {
+      if (!signupSuccess && phoneOk) {
         try {
-          const resSignupP = await authService.signupWithPhone({ phone_no: fullPhone, name: name.trim(), email: emailOk ? email.trim() : undefined });
+          const resSignupP = await authService.signupWithPhone({ 
+            phoneNo: internationalPhone, 
+            name: name.trim(), 
+            email: emailOk ? email.trim() : undefined,
+            countryCode: selectedCountry?.cca2,
+            countryName: selectedCountry?.name?.common || selectedCountry?.name,
+            phoneCountryCode: selectedCountry?.callingCode?.[0],
+            residenceCountryCode: residenceCountry?.cca2,
+            residenceCountryName: residenceCountry?.name?.common || residenceCountry?.name,
+          });
           if (resSignupP?.success) { 
             signupSuccess = true;
             // Open sheet for phone OTP
             setOtpMode('phone');
-            setOtpTarget(String(fullPhone));
+            setOtpTarget(internationalPhone);
             setOtpDigits(["", "", "", "", "", ""]);
             setOtpError("");
             setOtpVerified(false);
@@ -291,13 +353,11 @@ export default function SignupScreen() {
     if (otpBusy || resendRemaining > 0) return;
     try {
       const { authService } = await import("../../services/authService");
-      const digits = phone.replace(/\D/g, "");
-      const fullPhone = phoneOk && digits ? `${COUNTRY_CODE}${digits}` : undefined;
       const tasks: Promise<any>[] = [];
 
       // If both are available, resend to both; else fallback to current otpTarget
       if (emailOk) tasks.push(authService.resendOtp({ identifier: email.trim() }));
-      if (fullPhone) tasks.push(authService.resendOtp({ identifier: fullPhone }));
+      if (phoneOk) tasks.push(authService.resendOtp({ identifier: internationalPhone }));
       if (tasks.length === 0 && otpTarget) tasks.push(authService.resendOtp({ identifier: otpTarget }));
 
       const results = await Promise.allSettled(tasks);
@@ -477,7 +537,7 @@ export default function SignupScreen() {
               value={name}
               onChangeText={setName}
               autoCapitalize="words"
-              style={{ backgroundColor: "#ffffff" }}
+              style={{ backgroundColor: "#f8f9fa" }}
               textColor="#333333"
               outlineColor="#e9ecef"
               activeOutlineColor={BRAND}
@@ -497,7 +557,7 @@ export default function SignupScreen() {
               textContentType="emailAddress"
               value={email}
               onChangeText={setEmail}
-              style={{ backgroundColor: "#ffffff" }}
+              style={{ backgroundColor: "#f8f9fa" }}
               textColor="#333333"
               outlineColor="#e9ecef"
               activeOutlineColor={BRAND}
@@ -506,54 +566,159 @@ export default function SignupScreen() {
             />
           </View>
 
-          {/* Phone */}
-          <View style={{ width: "100%", marginBottom: 6 }}>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
+          {/* Phone Number with International Picker */}
+          <View style={{ width: "100%", marginBottom: 12 }}>
+            <Text style={{ 
+              fontSize: 14, 
+              color: "#666666", 
+              marginBottom: 8,
+              fontWeight: "500"
+            }}>
+              Phone Number
+            </Text>
+            <PhoneInput
+              value={formattedPhoneNumber}
+              onChangePhoneNumber={(phoneNumber: string) => {
+                setFormattedPhoneNumber(phoneNumber);
+              }}
+              selectedCountry={selectedCountry}
+              onChangeSelectedCountry={(country: any) => {
+                setSelectedCountry(country);
+                setPhoneCountryCode(country.cca2);
+              }}
+              defaultCountry="IN"
+              placeholder="Enter phone number"
+              phoneInputStyles={{
+                container: {
+                  backgroundColor: "#f8f9fa",
+                  borderWidth: 1,
+                  borderColor: "#e9ecef",
+                  borderRadius: 12,
+                  minHeight: 56
+                },
+                input: {
+                  fontSize: 16,
+                  color: "#333333"
+                }
+              }}
+              modalStyles={{
+                modal: {
+                  backgroundColor: "white"
+                }
+              }}
+            />
+          </View>
+
+          {/* Country of Residence - Custom styled PhoneInput */}
+          <View style={{ width: "100%", marginBottom: 12 }}>
+            <Text style={{ 
+              fontSize: 14, 
+              color: "#666666", 
+              marginBottom: 8,
+              fontWeight: "500"
+            }}>
+              Country of Residence
+            </Text>
+            <View style={{ position: 'relative' }}>
+              <PhoneInput
+                value=""
+                onChangePhoneNumber={() => {}}
+                selectedCountry={residenceCountry}
+                onChangeSelectedCountry={(country: any) => {
+                  setResidenceCountry(country);
+                  setResidenceCountryCode(country.cca2);
+                }}
+                defaultCountry="IN"
+                placeholder=""
+                phoneInputStyles={{
+                  container: {
+                    backgroundColor: "#f8f9fa",
+                    borderWidth: 1,
+                    borderColor: "#e9ecef",
+                    borderRadius: 12,
+                    minHeight: 56,
+                    paddingHorizontal: 0, // Remove padding to let flagContainer take full width
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    width: '100%'
+                  },
+                  input: {
+                    display: 'none'
+                  },
+                  callingCode: {
+                    display: 'none'
+                  },
+                  divider: {
+                    display: 'none'
+                  },
+                  flagContainer: {
+                    width: '100%',
+                    height: '100%',
+                    paddingHorizontal: 16,
+                    backgroundColor: 'transparent',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  },
+                  countryName: {
+                    display: 'none'
+                  }
+                }}
+                modalStyles={{
+                  modal: {
+                    backgroundColor: "white"
+                  },
+                  countryButton: {
+                    paddingHorizontal: 16,
+                    paddingVertical: 12
+                  },
+                  callingCode: {
+                    display: 'none' // Hide calling codes in modal
+                  },
+                  countryName: {
+                    fontSize: 16,
+                    color: '#333333'
+                  }
+                }}
+              />
+              
+              {/* Custom overlay showing flag and country name */}
               <View style={{
-                flexDirection: "row",
-                alignItems: "center",
-                backgroundColor: "#f8f9fa",
-                borderWidth: 1,
-                borderColor: "#e9ecef",
-                borderRadius: 8,
-                paddingHorizontal: 12,
-                paddingVertical: 14,
-                marginRight: 8,
-                minWidth: 80,
-                justifyContent: "center",
-                gap: 6,
+                position: 'absolute',
+                left: 16,
+                top: 0,
+                bottom: 0,
+                flexDirection: 'row',
+                alignItems: 'center',
+                pointerEvents: 'none'
               }}>
-                <Text style={{ fontSize: 20 }}>🇮🇳</Text>
-                <Text style={{ fontSize: 16, color: "#111827", fontWeight: "700" }}>{COUNTRY_CODE}</Text>
+                <Text style={{ fontSize: 20, marginRight: 8 }}>
+                  {getCountryFlag(residenceCountry?.cca2 || "IN")}
+                </Text>
+                <Text style={{
+                  fontSize: 16,
+                  color: "#333333"
+                }}>
+                  {residenceCountry?.name?.common || residenceCountry?.name || "India"}
+                </Text>
               </View>
-              <View style={{ flex: 1 }}>
-                <TextInput
-                  mode="outlined"
-                  label="Mobile number"
-                  placeholder="Enter mobile number"
-                  keyboardType="number-pad"
-                  textContentType="telephoneNumber"
-                  value={phone}
-                  maxLength={10}
-                  onChangeText={(t) => {
-                    const digits = String(t || '').replace(/\D/g, '').slice(0, 10);
-                    setPhone(digits);
-                  }}
-                  style={{ backgroundColor: "#ffffff", height: 50 }}
-                  textColor="#333333"
-                  placeholderTextColor="#999999"
-                  outlineColor="#e9ecef"
-                  activeOutlineColor={BRAND}
-                  contentStyle={{ paddingVertical: 0, fontSize: 16 }}
-                  right={undefined}
-                  theme={{ colors: { onSurfaceVariant: "#666666" } }}
-                />
+              
+              {/* Dropdown arrow */}
+              <View style={{
+                position: 'absolute',
+                right: 16,
+                top: 0,
+                bottom: 0,
+                justifyContent: 'center',
+                pointerEvents: 'none'
+              }}>
+                <Text style={{ fontSize: 12, color: "#999999" }}>▼</Text>
               </View>
             </View>
           </View>
 
           {/* Contact method validation message */}
-          {!emailOk && !phoneOk && (email.trim() || phone.trim()) && (
+          {!emailOk && !phoneOk && (email.trim() || formattedPhoneNumber.trim()) && (
             <View style={{ width: "100%", marginBottom: 8 }}>
               <Text style={{ color: "#DC2626", fontSize: 12, marginTop: 4 }}>
                 Please provide a valid email address or phone number
