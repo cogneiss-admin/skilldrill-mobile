@@ -65,7 +65,8 @@ const AdaptiveResultsScreen = () => {
   }
 
   const handleBack = () => {
-    router.back();
+    // Navigate to dashboard instead of going back to assessment
+    router.push('/dashboard');
   };
 
   return (

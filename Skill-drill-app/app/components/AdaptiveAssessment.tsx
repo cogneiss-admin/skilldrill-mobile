@@ -91,10 +91,13 @@ const AdaptiveAssessment: React.FC<AdaptiveAssessmentProps> = ({
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
   const [assessmentResults, setAssessmentResults] = useState(null);
   const [isLoadingResults, setIsLoadingResults] = useState(false);
+  const [completedSessionId, setCompletedSessionId] = useState<string | null>(null);
 
-  // Initialize adaptive session
+  // Initialize adaptive session only if no session exists
   useEffect(() => {
-    initializeSession();
+    if (!sessionId && !completedSessionId) {
+      initializeSession();
+    }
   }, []);
 
   // Clear response field when question changes
@@ -144,12 +147,14 @@ const AdaptiveAssessment: React.FC<AdaptiveAssessmentProps> = ({
       setUserResponse('');
       
       if (result.isComplete || result.completed) {
-        // Assessment completed - show dialog instead of navigating
-        console.log('🎉 Assessment completed:', result.results);
+        // Assessment completed - show completion dialog
+        console.log('🎉 Assessment completed! SessionId:', result.sessionId);
         showToast('success', 'Assessment Complete', 'Generating your personalized feedback...');
         
-        // Store results and show completion dialog
-        setAssessmentResults(result.results);
+        // Store the completed session ID for results fetching
+        setCompletedSessionId(result.sessionId || sessionId);
+        
+        // Show completion dialog (results will be fetched when user clicks "See Results")
         setShowCompletionDialog(true);
       } else {
         // Got next question
@@ -192,6 +197,10 @@ const AdaptiveAssessment: React.FC<AdaptiveAssessmentProps> = ({
       if (onComplete && assessmentResults) {
         onComplete(assessmentResults);
       } else {
+        // Clear assessment data now that user is viewing results
+        clearAssessmentData();
+        setCompletedSessionId(null);
+        
         router.push({
           pathname: "/adaptive-results",
           params: {
@@ -206,8 +215,9 @@ const AdaptiveAssessment: React.FC<AdaptiveAssessmentProps> = ({
     // If no results yet, fetch them with loading spinner
     setIsLoadingResults(true);
     try {
-      console.log('🔍 Fetching assessment results for session:', sessionId);
-      const response = await apiService.get(`/assessment/results/${sessionId}`);
+      const targetSessionId = completedSessionId || sessionId;
+      console.log('🔍 Fetching assessment results for session:', targetSessionId);
+      const response = await apiService.getAdaptiveResults(targetSessionId);
       
       if (response.success) {
         console.log('✅ Assessment results fetched:', response.data);
@@ -218,6 +228,10 @@ const AdaptiveAssessment: React.FC<AdaptiveAssessmentProps> = ({
         if (onComplete) {
           onComplete(response.data);
         } else {
+          // Clear assessment data now that user is viewing results
+          clearAssessmentData();
+          setCompletedSessionId(null);
+          
           router.push({
             pathname: "/adaptive-results",
             params: {
@@ -241,6 +255,10 @@ const AdaptiveAssessment: React.FC<AdaptiveAssessmentProps> = ({
   const handleContinueNext = () => {
     console.log('Continue to Next Assessment pressed');
     setShowCompletionDialog(false);
+    
+    // Clear assessment data now that user is done
+    clearAssessmentData();
+    setCompletedSessionId(null);
     
     // Navigate to skills selection page
     router.push("/dashboard");

@@ -440,27 +440,13 @@ class ApiService {
     });
   }
 
-  /**
-   * Submit all assessment responses (Legacy - for backwards compatibility)
-   */
-  public async submitAssessmentResponses(assessmentId: string, responses: Array<{
-    questionId: string;
-    answer: string;
-    timeTaken?: number;
-  }>): Promise<ApiResponse> {
-    console.log('📝 Submitting all assessment responses for:', assessmentId);
-    return this.post('/assessment/adaptive/submit', {
-      assessmentId,
-      responses
-    });
-  }
 
   /**
    * Get adaptive assessment results
    */
   public async getAdaptiveResults(sessionId: string): Promise<ApiResponse> {
     console.log('📊 Getting adaptive results for session:', sessionId);
-    return this.get(`/assessment/adaptive/results/${sessionId}`);
+    return this.get(`/assessment/results/${sessionId}`);
   }
 
 }

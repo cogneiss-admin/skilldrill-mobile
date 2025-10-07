@@ -113,11 +113,11 @@ export const useAssessmentSession = () => {
       const response = await apiService.submitAnswerAndGetNext(sessionId, answer.trim());
 
       if (response.success) {
-        if (response.data.completed) {
+        if (response.data.isComplete) {
           // Assessment is complete
           console.log('🎉 Sequential assessment completed!');
-          await clearAssessmentData();
-          return { completed: true, results: response.data.results };
+          // Don't clear data yet - we need sessionId for results fetching
+          return { completed: true, isComplete: true, sessionId: response.data.sessionId };
         } else {
           // Got next question
           console.log('✅ Answer submitted, got next question');
@@ -194,41 +194,6 @@ export const useAssessmentSession = () => {
     return false; // Already at first question
   }, [currentQuestionIndex]);
 
-  // Submit all responses
-  const submitAllResponses = useCallback(async () => {
-    if (!assessmentId) {
-      throw new Error('No active assessment');
-    }
-
-    if (userResponses.length !== progress.totalQuestions) {
-      throw new Error(`All ${progress.totalQuestions} questions must be answered before submission`);
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      console.log(`🔍 Submitting all ${progress.totalQuestions} responses for assessment:`, assessmentId);
-
-      const response = await apiService.submitAssessmentResponses(assessmentId, userResponses);
-
-      if (response.success) {
-        console.log('🎉 Assessment completed successfully!');
-        await clearAssessmentData();
-        showToast('success', 'Assessment Complete!', 'Your results are ready.');
-        return { completed: true, results: response.data };
-      } else {
-        throw new Error(response.message || 'Failed to submit assessment');
-      }
-
-    } catch (error: any) {
-      console.error('❌ Error submitting assessment:', error);
-      setError(error.message || 'Failed to submit assessment');
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  }, [assessmentId, userResponses, clearAssessmentData, showToast]);
 
   return {
     // Sequential state (NEW)
@@ -255,7 +220,6 @@ export const useAssessmentSession = () => {
     saveAnswer,
     nextQuestion,
     previousQuestion,
-    submitAllResponses,
     clearAssessmentData
   };
 };
