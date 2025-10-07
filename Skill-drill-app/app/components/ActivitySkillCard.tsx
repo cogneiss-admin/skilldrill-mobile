@@ -343,13 +343,9 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
                     console.log('✅ DEBUG: Calling onViewFeedback()');
                     onViewFeedback();
                   } else {
-                    console.log('❌ DEBUG: No onViewFeedback handler - redirecting to fallback');
-                    console.log('❌ DEBUG: Redirecting to /assessment-results with assessmentId:', id);
-                    // Fallback to results screen if feedback handler not provided
-                    router.push({
-                      pathname: '/assessment-results',
-                      params: { assessmentId: id }
-                    });
+                    console.log('❌ DEBUG: No onViewFeedback handler - this should not happen for COMPLETED assessments');
+                    // This should not happen for COMPLETED assessments, but log it for debugging
+                    console.error('⚠️ COMPLETED assessment without onViewFeedback handler - check data flow');
                   }
                 }}
                                   style={{

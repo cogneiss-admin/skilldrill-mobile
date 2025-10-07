@@ -5,6 +5,7 @@ import {
   Modal,
   TouchableOpacity,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -16,6 +17,7 @@ interface AssessmentCompletionDialogProps {
   skillName: string;
   onSeeResults: () => void;
   onContinueNext: () => void;
+  isLoadingResults?: boolean;
 }
 
 export const AssessmentCompletionDialog: React.FC<AssessmentCompletionDialogProps> = ({
@@ -23,6 +25,7 @@ export const AssessmentCompletionDialog: React.FC<AssessmentCompletionDialogProp
   skillName,
   onSeeResults,
   onContinueNext,
+  isLoadingResults = false,
 }) => {
   return (
     <Modal
@@ -99,8 +102,9 @@ export const AssessmentCompletionDialog: React.FC<AssessmentCompletionDialogProp
             {/* See Results Now button */}
             <TouchableOpacity
               onPress={onSeeResults}
+              disabled={isLoadingResults}
               style={{
-                backgroundColor: '#1380EC',
+                backgroundColor: isLoadingResults ? '#9CA3AF' : '#1380EC',
                 paddingVertical: 14,
                 paddingHorizontal: 20,
                 borderRadius: 12,
@@ -111,14 +115,22 @@ export const AssessmentCompletionDialog: React.FC<AssessmentCompletionDialogProp
                 shadowOpacity: 0.1,
                 shadowRadius: 4,
                 elevation: 2,
+                flexDirection: 'row',
+                gap: 8,
               }}
             >
+              {isLoadingResults && (
+                <ActivityIndicator 
+                  size="small" 
+                  color="white" 
+                />
+              )}
               <Text style={{
                 color: 'white',
                 fontSize: 16,
                 fontWeight: '600',
               }}>
-                See Results Now
+                {isLoadingResults ? 'Loading Results...' : 'See Results Now'}
               </Text>
             </TouchableOpacity>
 

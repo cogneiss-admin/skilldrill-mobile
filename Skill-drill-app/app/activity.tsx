@@ -130,6 +130,7 @@ export default function MyActivity() {
       }
       if (assessmentsResponse.success) {
         console.log('📊 Raw assessments response:', assessmentsResponse.data);
+        console.log('📊 First assessment sample:', assessmentsResponse.data?.[0]);
         setCompletedAssessments(assessmentsResponse.data || []);
       }
       if (sessionResponse.success && sessionResponse.data.hasActiveSession) {
@@ -283,6 +284,8 @@ export default function MyActivity() {
       // Check if we have completed assessment data
       if (skill.assessment_status === 'COMPLETED' && !completedAssessment) {
         console.log('⚠️ COMPLETED skill without assessment data:', skill.skill.name);
+        console.log('🔍 Looking for skillId:', skill.skill.id);
+        console.log('🔍 Available assessments:', completedAssessments.map(a => ({ id: a.id, skillId: a.skillId, skillName: a.skillName })));
       }
       
       const aiTag = getAITag(skill, completedAssessment);

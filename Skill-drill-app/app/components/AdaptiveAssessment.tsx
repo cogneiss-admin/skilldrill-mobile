@@ -10,6 +10,7 @@ import { useRouter } from "expo-router";
 import { useAssessmentSession } from "../../hooks/useAssessmentSession";
 import { useToast } from "../../hooks/useToast";
 import { useResponsive } from "../../utils/responsive";
+import { apiService } from "../../services/api";
 import { AntDesign } from '@expo/vector-icons';
 import AIGenerationLoader from './AIGenerationLoader';
 import AssessmentCompletionDialog from './AssessmentCompletionDialog';
@@ -89,6 +90,7 @@ const AdaptiveAssessment: React.FC<AdaptiveAssessmentProps> = ({
   const [isInitializing, setIsInitializing] = useState(true);
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
   const [assessmentResults, setAssessmentResults] = useState(null);
+  const [isLoadingResults, setIsLoadingResults] = useState(false);
 
   // Initialize adaptive session
   useEffect(() => {
@@ -141,7 +143,7 @@ const AdaptiveAssessment: React.FC<AdaptiveAssessmentProps> = ({
       // Clear response field
       setUserResponse('');
       
-      if (result.completed) {
+      if (result.isComplete || result.completed) {
         // Assessment completed - show dialog instead of navigating
         console.log('🎉 Assessment completed:', result.results);
         showToast('success', 'Assessment Complete', 'Generating your personalized feedback...');
@@ -181,21 +183,58 @@ const AdaptiveAssessment: React.FC<AdaptiveAssessmentProps> = ({
   };
 
   // Handle dialog actions
-  const handleSeeResults = () => {
+  const handleSeeResults = async () => {
     console.log('See Results pressed');
-    setShowCompletionDialog(false);
     
-    // Navigate to feedback/results page
-    if (onComplete && assessmentResults) {
-      onComplete(assessmentResults);
-    } else if (assessmentResults) {
-      router.push({
-        pathname: "/adaptive-results",
-        params: {
-          results: JSON.stringify(assessmentResults),
-          skillName: apiSkillName || skillName,
+    // If we already have results, navigate immediately
+    if (assessmentResults) {
+      setShowCompletionDialog(false);
+      if (onComplete && assessmentResults) {
+        onComplete(assessmentResults);
+      } else {
+        router.push({
+          pathname: "/adaptive-results",
+          params: {
+            results: JSON.stringify(assessmentResults),
+            skillName: apiSkillName || skillName,
+          }
+        });
+      }
+      return;
+    }
+
+    // If no results yet, fetch them with loading spinner
+    setIsLoadingResults(true);
+    try {
+      console.log('🔍 Fetching assessment results for session:', sessionId);
+      const response = await apiService.get(`/assessment/results/${sessionId}`);
+      
+      if (response.success) {
+        console.log('✅ Assessment results fetched:', response.data);
+        setAssessmentResults(response.data);
+        setShowCompletionDialog(false);
+        
+        // Navigate with fetched results
+        if (onComplete) {
+          onComplete(response.data);
+        } else {
+          router.push({
+            pathname: "/adaptive-results",
+            params: {
+              results: JSON.stringify(response.data),
+              skillName: apiSkillName || skillName,
+            }
+          });
         }
-      });
+      } else {
+        console.error('❌ Failed to fetch results:', response.message);
+        showToast('error', 'Error', 'Failed to load assessment results');
+      }
+    } catch (error) {
+      console.error('❌ Error fetching results:', error);
+      showToast('error', 'Error', 'Failed to load assessment results');
+    } finally {
+      setIsLoadingResults(false);
     }
   };
 
@@ -411,6 +450,7 @@ const AdaptiveAssessment: React.FC<AdaptiveAssessmentProps> = ({
         skillName={apiSkillName || skillName || "Communication"}
         onSeeResults={handleSeeResults}
         onContinueNext={handleContinueNext}
+        isLoadingResults={isLoadingResults}
       />
     </SafeAreaView>
   );

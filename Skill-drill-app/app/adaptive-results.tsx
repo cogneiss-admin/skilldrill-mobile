@@ -46,30 +46,6 @@ const GoldenStarRating = ({ score }: { score: number }) => {
   );
 };
 
-// Style Chip Component
-const StyleChip = ({ style }: { style: string }) => {
-  return (
-    <View style={{
-      backgroundColor: '#E3F2FD',
-      borderRadius: 20,
-      paddingHorizontal: 16,
-      paddingVertical: 8,
-      alignSelf: 'center',
-      marginVertical: 16,
-      borderWidth: 1,
-      borderColor: '#BBDEFB',
-    }}>
-      <Text style={{
-        color: '#1976D2',
-        fontSize: 14,
-        fontWeight: '600',
-        textAlign: 'center',
-      }}>
-        {style}
-      </Text>
-    </View>
-  );
-};
 
 const AdaptiveResultsScreen = () => {
   const { results, skillName } = useLocalSearchParams<{
@@ -188,10 +164,31 @@ const AdaptiveResultsScreen = () => {
 
           {/* Golden Star Rating */}
           {parsedResults.finalScore && <GoldenStarRating score={parsedResults.finalScore} />}
+          
+          {/* Numeric Score Display */}
+          {parsedResults.finalScore && (
+            <View style={{ alignItems: 'center', marginTop: 16 }}>
+              <Text style={{
+                fontSize: 18,
+                color: '#111827',
+                fontWeight: '600',
+                marginBottom: 4,
+              }}>
+                Your Score
+              </Text>
+              <Text style={{
+                fontSize: 32,
+                color: '#0A66C2',
+                fontWeight: 'bold',
+              }}>
+                {parsedResults.finalScore.toFixed(1)}/10
+              </Text>
+            </View>
+          )}
         </View>
 
-        {/* Card 2: Identified Style and Personalized Feedback */}
-        {(parsedResults.identifiedStyle || parsedResults.improvementFeedback) && (
+        {/* Card 2: Comprehensive Feedback */}
+        {(parsedResults.feedbackGood || parsedResults.feedbackImprove || parsedResults.feedbackSummary) && (
           <View style={{
             backgroundColor: '#FFFFFF',
             borderRadius: 16,
@@ -203,160 +200,80 @@ const AdaptiveResultsScreen = () => {
             shadowRadius: 8,
             elevation: 2,
           }}>
-            {/* Identified Style Section */}
-            {parsedResults.identifiedStyle && (
-              <View style={{ marginBottom: parsedResults.improvementFeedback ? 24 : 0 }}>
-                <Text style={{
-                  fontSize: 16,
-                  color: '#111827',
-                  fontWeight: '600',
-                  textAlign: 'center',
-                  marginBottom: 16,
-                }}>
-                  Identified Style
-                </Text>
+            <Text style={{
+              fontSize: 16,
+              color: '#111827',
+              fontWeight: '600',
+              textAlign: 'center',
+              marginBottom: 20,
+            }}>
+              Assessment Feedback
+            </Text>
 
-                <StyleChip style={parsedResults.identifiedStyle} />
+            {/* What You Did Well */}
+            {parsedResults.feedbackGood && (
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{
+                  fontSize: 14,
+                  color: '#059669',
+                  fontWeight: '600',
+                  marginBottom: 8,
+                }}>
+                  ✅ What You Did Well
+                </Text>
+                <Text style={{
+                  fontSize: 14,
+                  color: '#4B5563',
+                  lineHeight: 20,
+                }}>
+                  {parsedResults.feedbackGood}
+                </Text>
               </View>
             )}
 
-            {/* Personalized Feedback Section */}
-            {parsedResults.improvementFeedback && (
+            {/* Areas for Improvement */}
+            {parsedResults.feedbackImprove && (
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{
+                  fontSize: 14,
+                  color: '#DC2626',
+                  fontWeight: '600',
+                  marginBottom: 8,
+                }}>
+                  🎯 Areas for Improvement
+                </Text>
+                <Text style={{
+                  fontSize: 14,
+                  color: '#4B5563',
+                  lineHeight: 20,
+                }}>
+                  {parsedResults.feedbackImprove}
+                </Text>
+              </View>
+            )}
+
+            {/* Overall Summary */}
+            {parsedResults.feedbackSummary && (
               <View>
                 <Text style={{
-                  fontSize: 16,
-                  color: '#111827',
+                  fontSize: 14,
+                  color: '#1F2937',
                   fontWeight: '600',
-                  textAlign: 'center',
-                  marginBottom: 16,
+                  marginBottom: 8,
                 }}>
-                  Personalized Feedback
+                  📝 Overall Assessment
                 </Text>
-
                 <Text style={{
-                  fontSize: 15,
+                  fontSize: 14,
                   color: '#4B5563',
-                  lineHeight: 24,
-                  textAlign: 'center',
+                  lineHeight: 20,
                 }}>
-                  {parsedResults.improvementFeedback}
+                  {parsedResults.feedbackSummary}
                 </Text>
               </View>
             )}
           </View>
         )}
-
-        {/* Card 3: Recommended Next Steps */}
-        <View style={{
-          backgroundColor: '#FFFFFF',
-          borderRadius: 16,
-          padding: 24,
-          marginBottom: 16,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.05,
-          shadowRadius: 8,
-          elevation: 2,
-        }}>
-          {/* Main Card Header */}
-          <Text style={{
-            fontSize: 16,
-            color: '#111827',
-            fontWeight: '600',
-            textAlign: 'center',
-            marginBottom: 20,
-          }}>
-            Recommended Next Steps
-          </Text>
-
-          {/* Sub-Card 1: Flaws Identification */}
-          {parsedResults.identifiedFlaws && parsedResults.identifiedFlaws.length > 0 && (
-            <View style={{
-              backgroundColor: '#F8FAFC',
-              borderRadius: 12,
-              padding: 16,
-              marginBottom: 16,
-              borderWidth: 1,
-              borderColor: '#E2E8F0',
-            }}>
-              <Text style={{
-                fontSize: 15,
-                color: '#4B5563',
-                lineHeight: 24,
-                textAlign: 'center',
-                marginBottom: 16,
-              }}>
-                Currently from the responses given by you, the flaws identified are{' '}
-                <Text style={{ fontWeight: '600', color: '#111827' }}>
-                  {parsedResults.identifiedFlaws.join(', ')}
-                </Text>
-                . We recommend to work on improving this in order to grow.
-              </Text>
-
-              <TouchableOpacity
-                onPress={() => router.push('/dashboard')}
-                style={{
-                  backgroundColor: '#0A66C2',
-                  paddingVertical: 12,
-                  paddingHorizontal: 24,
-                  borderRadius: 8,
-                  alignSelf: 'center',
-                }}
-              >
-                <Text style={{
-                  color: '#FFFFFF',
-                  fontSize: 16,
-                  fontWeight: '600',
-                }}>
-                  Continue
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Sub-Card 2: Performance Level */}
-          {parsedResults.finalScore && (
-            <View style={{
-              backgroundColor: '#F8FAFC',
-              borderRadius: 12,
-              padding: 16,
-              borderWidth: 1,
-              borderColor: '#E2E8F0',
-            }}>
-              <Text style={{
-                fontSize: 15,
-                color: '#4B5563',
-                lineHeight: 24,
-                textAlign: 'center',
-                marginBottom: 16,
-              }}>
-                {parsedResults.finalScore >= 7 ? 
-                  'Excellent! Your assessment shows Thriving performance. You are demonstrating strong capabilities in this skill area and meeting professional expectations.' :
-                  `Your assessment shows Stabilizing performance. But in order to Thrive, we recommend to take these drills to improve your skills and reach the next level.`
-                }
-              </Text>
-
-              <TouchableOpacity
-                onPress={() => router.push('/dashboard')}
-                style={{
-                  backgroundColor: '#0A66C2',
-                  paddingVertical: 12,
-                  paddingHorizontal: 24,
-                  borderRadius: 8,
-                  alignSelf: 'center',
-                }}
-              >
-                <Text style={{
-                  color: '#FFFFFF',
-                  fontSize: 16,
-                  fontWeight: '600',
-                }}>
-                  Continue
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
 
       </ScrollView>
     </SafeAreaView>
