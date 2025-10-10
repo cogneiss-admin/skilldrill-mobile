@@ -16,7 +16,7 @@ import { detectInputType, isValidEmail, isValidPhone, validationMessageFor } fro
 import { useSocialAuth } from "../../hooks/useSocialAuth";
 import { useResponsive } from "../../utils/responsive";
 import { BRAND } from "../components/Brand";
-import PhoneInput from 'react-native-international-phone-number';
+import { useCountries } from "../../hooks/useCountries";
 
 const logoSrc = require("../../assets/images/logo.png");
 
@@ -24,18 +24,16 @@ export default function LoginScreen() {
   const router = useRouter();
   const responsive = useResponsive();
   const [emailOrPhone, setEmailOrPhone] = useState("");
-  const [selectedCountry, setSelectedCountry] = useState<any>({
-    cca2: 'IN',
-    callingCode: ['91'],
-    name: 'India'
-  });
-  const [phoneCountryCode, setPhoneCountryCode] = useState('IN');
   const [showPhoneInput, setShowPhoneInput] = useState(false);
   const [busy, setBusy] = useState(false);
   const [validationMessage, setValidationMessage] = useState("");
   const [showSignupSuggestion, setShowSignupSuggestion] = useState(false);
+  const [selectedCountryCode, setSelectedCountryCode] = useState("IN");
+  const [countryPickerVisible, setCountryPickerVisible] = useState(false);
+  const [countrySearchQuery, setCountrySearchQuery] = useState("");
   const { signInWithGoogle, signInWithLinkedIn, isLoading: socialLoading, isProviderAvailable } = useSocialAuth();
   const { showError, showSuccess } = useToast();
+  const { countries, loading: countriesLoading } = useCountries();
 
   // Detect if input is email or phone number (simple, user-friendly heuristic)
   const inputType = useMemo(() => detectInputType(emailOrPhone), [emailOrPhone]);
@@ -44,6 +42,27 @@ export default function LoginScreen() {
   const internationalPhone = useMemo(() => {
     return emailOrPhone.trim();
   }, [emailOrPhone]);
+
+  // Get selected country data
+  const selectedPhoneCountry = useMemo(() => {
+    return countries.find(c => c.code === selectedCountryCode) || { 
+      code: "IN", 
+      name: "India", 
+      phoneCode: "+91", 
+      flag: "https://flagcdn.com/w320/in.png" 
+    };
+  }, [countries, selectedCountryCode]);
+
+  // Filter countries based on search query
+  const filteredCountries = useMemo(() => {
+    if (!countrySearchQuery.trim()) return countries;
+    const query = countrySearchQuery.toLowerCase().trim();
+    return countries.filter(country => 
+      country.name.toLowerCase().includes(query) || 
+      country.phoneCode.includes(query) ||
+      country.code.toLowerCase().includes(query)
+    );
+  }, [countries, countrySearchQuery]);
 
   const isValidInput = useMemo(() => {
     if (!emailOrPhone.trim()) {
@@ -312,39 +331,58 @@ export default function LoginScreen() {
                 </Pressable>
               </View>
             ) : (
-              // International phone input
               <View>
-                <PhoneInput
-                  value={emailOrPhone}
-                  onChangePhoneNumber={(phoneNumber: string) => {
-                    setEmailOrPhone(phoneNumber);
-                  }}
-                  selectedCountry={selectedCountry}
-                  onChangeSelectedCountry={(country: any) => {
-                    setSelectedCountry(country);
-                    setPhoneCountryCode(country.cca2);
-                  }}
-                  defaultCountry="IN"
-                  placeholder="Enter phone number"
-                  phoneInputStyles={{
-                    container: {
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <Pressable 
+                    style={{ width: 100 }}
+                    onPress={() => setCountryPickerVisible(true)}
+                  >
+                    <View style={{
                       backgroundColor: "#f8f9fa",
                       borderWidth: 1,
                       borderColor: "#e9ecef",
                       borderRadius: 12,
-                      minHeight: responsive.input.height
-                    },
-                    input: {
+                      minHeight: responsive.input.height,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      paddingHorizontal: 8
+                    }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        {selectedPhoneCountry.flag ? (
+                          <Image 
+                            source={{ uri: selectedPhoneCountry.flag }}
+                            style={{ width: 16, height: 12, marginRight: 4 }}
+                          />
+                        ) : (
+                          <View style={{ width: 16, height: 12, marginRight: 4, backgroundColor: '#f0f0f0' }} />
+                        )}
+                        <Text style={{
+                          fontSize: responsive.input.fontSize - 2,
+                          color: "#333333"
+                        }}>
+                          {selectedPhoneCountry.phoneCode}
+                        </Text>
+                      </View>
+                    </View>
+                  </Pressable>
+                  <TextInput
+                    style={{
+                      backgroundColor: "#f8f9fa",
+                      borderWidth: 1,
+                      borderColor: "#e9ecef",
+                      borderRadius: 12,
+                      minHeight: responsive.input.height,
                       fontSize: responsive.input.fontSize,
-                      color: "#333333"
-                    }
-                  }}
-                  modalStyles={{
-                    modal: {
-                      backgroundColor: "white"
-                    }
-                  }}
-                />
+                      color: "#333333",
+                      paddingHorizontal: 16,
+                      flex: 1
+                    }}
+                    placeholder="Enter phone number"
+                    value={emailOrPhone}
+                    onChangeText={setEmailOrPhone}
+                    keyboardType="phone-pad"
+                  />
+                </View>
                 <Pressable 
                   onPress={() => setShowPhoneInput(false)}
                   style={{ alignSelf: 'center', marginTop: 8 }}
@@ -574,6 +612,88 @@ export default function LoginScreen() {
           </Pressable>
         </View>
       </View>
+
+      {/* Country Code Picker Modal */}
+      {countryPickerVisible && (
+        <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'flex-end' }}>
+          <Pressable
+            onPress={() => {
+              setCountryPickerVisible(false);
+              setCountrySearchQuery("");
+            }}
+            style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)' }}
+          />
+          <View style={{ backgroundColor: '#ffffff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24, maxHeight: '70%' }}>
+            <View style={{ alignItems: 'center' }}>
+              <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: '#E5E7EB', marginBottom: 12 }} />
+            </View>
+            <Text style={{ fontSize: 18, fontWeight: '900', color: '#0f172a', marginBottom: 16 }}>Select Country Code</Text>
+            
+            {/* Search Input */}
+            <TextInput
+              mode="outlined"
+              placeholder="Search country..."
+              value={countrySearchQuery}
+              onChangeText={setCountrySearchQuery}
+              style={{ 
+                backgroundColor: "#f8f9fa",
+                marginBottom: 12,
+              }}
+              textColor="#333333"
+              placeholderTextColor="#999999"
+              outlineColor="#e9ecef"
+              activeOutlineColor={BRAND}
+              contentStyle={{
+                fontSize: 14,
+              }}
+              theme={{
+                colors: {
+                  onSurfaceVariant: "#666666",
+                },
+                roundness: 8,
+              }}
+              left={<TextInput.Icon icon="magnify" size={20} />}
+            />
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {countriesLoading ? (
+                <View style={{ padding: 20, alignItems: 'center' }}>
+                  <Text style={{ color: '#666666' }}>Loading countries...</Text>
+                </View>
+              ) : filteredCountries.length > 0 ? (
+                filteredCountries.map((country) => (
+                <Pressable
+                  key={country.code}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingVertical: 12,
+                    paddingHorizontal: 16,
+                    backgroundColor: pressed ? '#f3f4f6' : 'transparent',
+                    borderRadius: 8
+                  })}
+                  onPress={() => {
+                    setSelectedCountryCode(country.code);
+                    setCountryPickerVisible(false);
+                    setCountrySearchQuery("");
+                  }}
+                >
+                  <Image 
+                    source={{ uri: country.flag }}
+                    style={{ width: 24, height: 18, marginRight: 12 }}
+                  />
+                  <Text style={{ fontSize: 16, color: '#333333', flex: 1 }}>{country.name}</Text>
+                  <Text style={{ fontSize: 16, color: '#666666' }}>{country.phoneCode}</Text>
+                </Pressable>
+              ))) : (
+                <View style={{ padding: 20, alignItems: 'center' }}>
+                  <Text style={{ color: '#666666' }}>No countries found</Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }

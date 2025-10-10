@@ -14,39 +14,23 @@ import GoogleGIcon from "../../components/GoogleGIcon";
 import LinkedInIcon from "../../components/LinkedInIcon";
 import CodeBoxes from "../../components/CodeBoxes";
 import { BRAND } from "../components/Brand";
-import PhoneInput from 'react-native-international-phone-number';
-
+import { useCountries } from "../../hooks/useCountries";
 const logoSrc = require("../../assets/images/logo.png");
-
-// Convert country code to flag emoji
-const getCountryFlag = (countryCode: string): string => {
-  if (!countryCode) return "🇮🇳";
-  const codePoints = countryCode
-    .toUpperCase()
-    .split('')
-    .map(char => 127397 + char.charCodeAt(0));
-  return String.fromCodePoint(...codePoints);
-};
 
 export default function SignupScreen() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [selectedCountry, setSelectedCountry] = useState<any>({
-    cca2: 'IN',
-    callingCode: ['91'],
-    name: 'India'
-  });
-  const [residenceCountry, setResidenceCountry] = useState<any>({
-    cca2: 'IN',
-    callingCode: ['91'],
-    name: 'India'
-  });
-  const [phoneCountryCode, setPhoneCountryCode] = useState('IN');
-  const [residenceCountryCode, setResidenceCountryCode] = useState('IN');
   const [formattedPhoneNumber, setFormattedPhoneNumber] = useState('');
+  const [selectedCountryCode, setSelectedCountryCode] = useState("IN");
+  const [selectedResidenceCountry, setSelectedResidenceCountry] = useState("IN");
+  const [countryPickerVisible, setCountryPickerVisible] = useState(false);
+  const [residencePickerVisible, setResidencePickerVisible] = useState(false);
+  const [countrySearchQuery, setCountrySearchQuery] = useState("");
+  const [residenceSearchQuery, setResidenceSearchQuery] = useState("");
   const [busy, setBusy] = useState(false);
+  const { countries, loading: countriesLoading } = useCountries();
   const [errorMessage, setErrorMessage] = useState("");
   const [emailVerified, setEmailVerified] = useState(false);
   const [phoneVerified, setPhoneVerified] = useState(false);
@@ -78,8 +62,44 @@ export default function SignupScreen() {
   // Get international phone number
   const internationalPhone = useMemo(() => {
     if (!formattedPhoneNumber.trim()) return "";
-    return formattedPhoneNumber.trim();
-  }, [formattedPhoneNumber]);
+    const selectedCountry = countries.find(c => c.code === selectedCountryCode);
+    const phoneCode = selectedCountry?.phoneCode || "+91";
+    return `${phoneCode}${formattedPhoneNumber.trim()}`;
+  }, [formattedPhoneNumber, selectedCountryCode, countries]);
+
+  // Get selected country data
+  const selectedPhoneCountry = useMemo(() => {
+    return countries.find(c => c.code === selectedCountryCode) || { 
+      code: "IN", 
+      name: "India", 
+      phoneCode: "+91", 
+      flag: "https://flagcdn.com/w320/in.png" 
+    };
+  }, [countries, selectedCountryCode]);
+
+  const selectedResidenceCountryData = useMemo(() => {
+    return countries.find(c => c.code === selectedResidenceCountry);
+  }, [countries, selectedResidenceCountry]);
+
+  // Filter countries based on search queries
+  const filteredPhoneCountries = useMemo(() => {
+    if (!countrySearchQuery.trim()) return countries;
+    const query = countrySearchQuery.toLowerCase().trim();
+    return countries.filter(country => 
+      country.name.toLowerCase().includes(query) || 
+      country.phoneCode.includes(query) ||
+      country.code.toLowerCase().includes(query)
+    );
+  }, [countries, countrySearchQuery]);
+
+  const filteredResidenceCountries = useMemo(() => {
+    if (!residenceSearchQuery.trim()) return countries;
+    const query = residenceSearchQuery.toLowerCase().trim();
+    return countries.filter(country => 
+      country.name.toLowerCase().includes(query) || 
+      country.code.toLowerCase().includes(query)
+    );
+  }, [countries, residenceSearchQuery]);
 
   const handleContinue = async () => {
     if (!canContinue || busy) return;
@@ -101,11 +121,9 @@ export default function SignupScreen() {
         name: name.trim(),
         email: emailOk ? email.trim() : undefined,
         phoneNo: phoneOk ? internationalPhone : undefined,
-        countryCode: selectedCountry?.cca2,
-        countryName: selectedCountry?.name?.common || selectedCountry?.name,
-        phoneCountryCode: selectedCountry?.callingCode?.[0],
-        residenceCountryCode: residenceCountry?.cca2,
-        residenceCountryName: residenceCountry?.name?.common || residenceCountry?.name,
+        residenceCountryCode: selectedResidenceCountry,
+        residenceCountryName: selectedResidenceCountryData?.name,
+        region: selectedResidenceCountryData?.region,
       });
 
       // Check if user already has career info
@@ -168,12 +186,10 @@ export default function SignupScreen() {
             email: target, 
             name: name.trim(), 
             phoneNo: phoneOk ? internationalPhone : undefined,
-            countryCode: selectedCountry?.cca2,
-            countryName: selectedCountry?.name?.common || selectedCountry?.name,
-            phoneCountryCode: selectedCountry?.callingCode[0],
-            residenceCountryCode: residenceCountry?.cca2,
-            residenceCountryName: residenceCountry?.name?.common || residenceCountry?.name,
-          });
+            residenceCountryCode: selectedResidenceCountry,
+            residenceCountryName: selectedResidenceCountryData?.name,
+            region: selectedResidenceCountryData?.region,
+              });
           if (resSignup?.success) { 
             // Success - open OTP sheet
             setOtpMode(mode);
@@ -205,12 +221,10 @@ export default function SignupScreen() {
             phoneNo: target, 
             name: name.trim(), 
             email: emailOk ? email.trim() : undefined,
-            countryCode: selectedCountry?.cca2,
-            countryName: selectedCountry?.name?.common || selectedCountry?.name,
-            phoneCountryCode: selectedCountry?.callingCode[0],
-            residenceCountryCode: residenceCountry?.cca2,
-            residenceCountryName: residenceCountry?.name?.common || residenceCountry?.name,
-          });
+            residenceCountryCode: selectedResidenceCountry,
+            residenceCountryName: selectedResidenceCountryData?.name,
+            region: selectedResidenceCountryData?.region,
+              });
           if (resSignup?.success) { 
             // Success - open OTP sheet
             setOtpMode(mode);
@@ -261,12 +275,10 @@ export default function SignupScreen() {
             email: email.trim(), 
             name: name.trim(), 
             phoneNo: phoneOk ? internationalPhone : undefined,
-            countryCode: selectedCountry?.cca2,
-            countryName: selectedCountry?.name?.common || selectedCountry?.name,
-            phoneCountryCode: selectedCountry?.callingCode?.[0],
-            residenceCountryCode: residenceCountry?.cca2,
-            residenceCountryName: residenceCountry?.name?.common || residenceCountry?.name,
-          });
+            residenceCountryCode: selectedResidenceCountry,
+            residenceCountryName: selectedResidenceCountryData?.name,
+            region: selectedResidenceCountryData?.region,
+              });
           if (resSignupE?.success) { 
             signupSuccess = true;
             // Open sheet for email OTP
@@ -303,12 +315,10 @@ export default function SignupScreen() {
             phoneNo: internationalPhone, 
             name: name.trim(), 
             email: emailOk ? email.trim() : undefined,
-            countryCode: selectedCountry?.cca2,
-            countryName: selectedCountry?.name?.common || selectedCountry?.name,
-            phoneCountryCode: selectedCountry?.callingCode?.[0],
-            residenceCountryCode: residenceCountry?.cca2,
-            residenceCountryName: residenceCountry?.name?.common || residenceCountry?.name,
-          });
+            residenceCountryCode: selectedResidenceCountry,
+            residenceCountryName: selectedResidenceCountryData?.name,
+            region: selectedResidenceCountryData?.region,
+              });
           if (resSignupP?.success) { 
             signupSuccess = true;
             // Open sheet for phone OTP
@@ -576,40 +586,60 @@ export default function SignupScreen() {
             }}>
               Phone Number
             </Text>
-            <PhoneInput
-              value={formattedPhoneNumber}
-              onChangePhoneNumber={(phoneNumber: string) => {
-                setFormattedPhoneNumber(phoneNumber);
-              }}
-              selectedCountry={selectedCountry}
-              onChangeSelectedCountry={(country: any) => {
-                setSelectedCountry(country);
-                setPhoneCountryCode(country.cca2);
-              }}
-              defaultCountry="IN"
-              placeholder="Enter phone number"
-              phoneInputStyles={{
-                container: {
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Pressable 
+                style={{ width: 100 }}
+                onPress={() => setCountryPickerVisible(true)}
+              >
+                <View style={{
                   backgroundColor: "#f8f9fa",
                   borderWidth: 1,
                   borderColor: "#e9ecef",
                   borderRadius: 12,
-                  minHeight: 56
-                },
-                input: {
+                  minHeight: 56,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  paddingHorizontal: 8
+                }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    {selectedPhoneCountry.flag ? (
+                      <Image 
+                        source={{ uri: selectedPhoneCountry.flag }}
+                        style={{ width: 16, height: 12, marginRight: 4 }}
+                      />
+                    ) : (
+                      <View style={{ width: 16, height: 12, marginRight: 4, backgroundColor: '#f0f0f0' }} />
+                    )}
+                    <Text style={{
+                      fontSize: 14,
+                      color: "#333333"
+                    }}>
+                      {selectedPhoneCountry.phoneCode}
+                    </Text>
+                  </View>
+                </View>
+              </Pressable>
+              <TextInput
+                style={{
+                  backgroundColor: "#f8f9fa",
+                  borderWidth: 1,
+                  borderColor: "#e9ecef", 
+                  borderRadius: 12,
+                  minHeight: 56,
                   fontSize: 16,
-                  color: "#333333"
-                }
-              }}
-              modalStyles={{
-                modal: {
-                  backgroundColor: "white"
-                }
-              }}
-            />
+                  color: "#333333",
+                  paddingHorizontal: 16,
+                  flex: 1
+                }}
+                placeholder="Enter phone number"
+                value={formattedPhoneNumber}
+                onChangeText={setFormattedPhoneNumber}
+                keyboardType="phone-pad"
+              />
+            </View>
           </View>
 
-          {/* Country of Residence - Custom styled PhoneInput */}
+          {/* Country of Residence */}
           <View style={{ width: "100%", marginBottom: 12 }}>
             <Text style={{ 
               fontSize: 14, 
@@ -619,102 +649,29 @@ export default function SignupScreen() {
             }}>
               Country of Residence
             </Text>
-            <View style={{ position: 'relative' }}>
-              <PhoneInput
-                value=""
-                onChangePhoneNumber={() => {}}
-                selectedCountry={residenceCountry}
-                onChangeSelectedCountry={(country: any) => {
-                  setResidenceCountry(country);
-                  setResidenceCountryCode(country.cca2);
-                }}
-                defaultCountry="IN"
-                placeholder=""
-                phoneInputStyles={{
-                  container: {
-                    backgroundColor: "#f8f9fa",
-                    borderWidth: 1,
-                    borderColor: "#e9ecef",
-                    borderRadius: 12,
-                    minHeight: 56,
-                    paddingHorizontal: 0, // Remove padding to let flagContainer take full width
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    width: '100%'
-                  },
-                  input: {
-                    display: 'none'
-                  },
-                  callingCode: {
-                    display: 'none'
-                  },
-                  divider: {
-                    display: 'none'
-                  },
-                  flagContainer: {
-                    width: '100%',
-                    height: '100%',
-                    paddingHorizontal: 16,
-                    backgroundColor: 'transparent',
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between'
-                  },
-                  countryName: {
-                    display: 'none'
-                  }
-                }}
-                modalStyles={{
-                  modal: {
-                    backgroundColor: "white"
-                  },
-                  countryButton: {
-                    paddingHorizontal: 16,
-                    paddingVertical: 12
-                  },
-                  callingCode: {
-                    display: 'none' // Hide calling codes in modal
-                  },
-                  countryName: {
-                    fontSize: 16,
-                    color: '#333333'
-                  }
-                }}
-              />
-              
-              {/* Custom overlay showing flag and country name */}
-              <View style={{
-                position: 'absolute',
-                left: 16,
-                top: 0,
-                bottom: 0,
+            <Pressable 
+              style={{
+                backgroundColor: "#f8f9fa",
+                borderWidth: 1,
+                borderColor: "#e9ecef",
+                borderRadius: 12,
+                minHeight: 56,
+                justifyContent: 'center',
+                paddingHorizontal: 16,
                 flexDirection: 'row',
                 alignItems: 'center',
-                pointerEvents: 'none'
+                justifyContent: 'space-between'
+              }}
+              onPress={() => setResidencePickerVisible(true)}
+            >
+              <Text style={{
+                fontSize: 16,
+                color: "#333333"
               }}>
-                <Text style={{ fontSize: 20, marginRight: 8 }}>
-                  {getCountryFlag(residenceCountry?.cca2 || "IN")}
-                </Text>
-                <Text style={{
-                  fontSize: 16,
-                  color: "#333333"
-                }}>
-                  {residenceCountry?.name?.common || residenceCountry?.name || "India"}
-                </Text>
-              </View>
-              
-              {/* Dropdown arrow */}
-              <View style={{
-                position: 'absolute',
-                right: 16,
-                top: 0,
-                bottom: 0,
-                justifyContent: 'center',
-                pointerEvents: 'none'
-              }}>
-                <Text style={{ fontSize: 12, color: "#999999" }}>▼</Text>
-              </View>
-            </View>
+                {selectedResidenceCountryData?.name || "Select Country"}
+              </Text>
+              <Text style={{ fontSize: 12, color: "#999999" }}>▼</Text>
+            </Pressable>
           </View>
 
           {/* Contact method validation message */}
@@ -810,7 +767,7 @@ export default function SignupScreen() {
                     shadowOffset: { width: 0, height: 3 },
                     shadowOpacity: 0.12,
                     shadowRadius: 10,
-                  elevation: 5,
+                    elevation: 5,
                     opacity: socialLoading ? 0.6 : 1,
                   }
                 ]}
@@ -886,6 +843,165 @@ export default function SignupScreen() {
             </View>
 
             {/* No submit button; auto-verifies on 6th digit */}
+          </View>
+        </View>
+      )}
+
+      {/* Country Code Picker Modal */}
+      {countryPickerVisible && (
+        <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'flex-end' }}>
+          <Pressable
+            onPress={() => {
+              setCountryPickerVisible(false);
+              setCountrySearchQuery("");
+            }}
+            style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)' }}
+          />
+          <View style={{ backgroundColor: '#ffffff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24, maxHeight: '70%' }}>
+            <View style={{ alignItems: 'center' }}>
+              <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: '#E5E7EB', marginBottom: 12 }} />
+            </View>
+            <Text style={{ fontSize: 18, fontWeight: '900', color: '#0f172a', marginBottom: 16 }}>Select Country Code</Text>
+            
+            {/* Search Input */}
+            <TextInput
+              mode="outlined"
+              placeholder="Search country..."
+              value={countrySearchQuery}
+              onChangeText={setCountrySearchQuery}
+              style={{ 
+                backgroundColor: "#f8f9fa",
+                marginBottom: 12,
+              }}
+              textColor="#333333"
+              placeholderTextColor="#999999"
+              outlineColor="#e9ecef"
+              activeOutlineColor={BRAND}
+              contentStyle={{
+                fontSize: 14,
+              }}
+              theme={{
+                colors: {
+                  onSurfaceVariant: "#666666",
+                },
+                roundness: 8,
+              }}
+              left={<TextInput.Icon icon="magnify" size={20} />}
+            />
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {countriesLoading ? (
+                <View style={{ padding: 20, alignItems: 'center' }}>
+                  <Text style={{ color: '#666666' }}>Loading countries...</Text>
+                </View>
+              ) : filteredPhoneCountries.length > 0 ? (
+                filteredPhoneCountries.map((country) => (
+                <Pressable
+                  key={country.code}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingVertical: 12,
+                    paddingHorizontal: 16,
+                    backgroundColor: pressed ? '#f3f4f6' : 'transparent',
+                    borderRadius: 8
+                  })}
+                  onPress={() => {
+                    setSelectedCountryCode(country.code);
+                    setCountryPickerVisible(false);
+                    setCountrySearchQuery("");
+                  }}
+                >
+                  <Image 
+                    source={{ uri: country.flag }}
+                    style={{ width: 24, height: 18, marginRight: 12 }}
+                  />
+                  <Text style={{ fontSize: 16, color: '#333333', flex: 1 }}>{country.name}</Text>
+                  <Text style={{ fontSize: 16, color: '#666666' }}>{country.phoneCode}</Text>
+                </Pressable>
+              ))) : (
+                <View style={{ padding: 20, alignItems: 'center' }}>
+                  <Text style={{ color: '#666666' }}>No countries found</Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      )}
+
+      {/* Country of Residence Picker Modal */}
+      {residencePickerVisible && (
+        <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'flex-end' }}>
+          <Pressable
+            onPress={() => {
+              setResidencePickerVisible(false);
+              setResidenceSearchQuery("");
+            }}
+            style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)' }}
+          />
+          <View style={{ backgroundColor: '#ffffff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24, maxHeight: '70%' }}>
+            <View style={{ alignItems: 'center' }}>
+              <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: '#E5E7EB', marginBottom: 12 }} />
+            </View>
+            <Text style={{ fontSize: 18, fontWeight: '900', color: '#0f172a', marginBottom: 16 }}>Select Country of Residence</Text>
+            
+            {/* Search Input */}
+            <TextInput
+              mode="outlined"
+              placeholder="Search country..."
+              value={residenceSearchQuery}
+              onChangeText={setResidenceSearchQuery}
+              style={{ 
+                backgroundColor: "#f8f9fa",
+                marginBottom: 12,
+              }}
+              textColor="#333333"
+              placeholderTextColor="#999999"
+              outlineColor="#e9ecef"
+              activeOutlineColor={BRAND}
+              contentStyle={{
+                fontSize: 14,
+              }}
+              theme={{
+                colors: {
+                  onSurfaceVariant: "#666666",
+                },
+                roundness: 8,
+              }}
+              left={<TextInput.Icon icon="magnify" size={20} />}
+            />
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {countriesLoading ? (
+                <View style={{ padding: 20, alignItems: 'center' }}>
+                  <Text style={{ color: '#666666' }}>Loading countries...</Text>
+                </View>
+              ) : filteredResidenceCountries.length > 0 ? (
+                filteredResidenceCountries.map((country) => (
+                <Pressable
+                  key={country.code}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingVertical: 12,
+                    paddingHorizontal: 16,
+                    backgroundColor: pressed ? '#f3f4f6' : 'transparent',
+                    borderRadius: 8
+                  })}
+                  onPress={() => {
+                    setSelectedResidenceCountry(country.code);
+                    setResidencePickerVisible(false);
+                    setResidenceSearchQuery("");
+                  }}
+                >
+                  <Text style={{ fontSize: 16, color: '#333333' }}>{country.name}</Text>
+                </Pressable>
+              ))) : (
+                <View style={{ padding: 20, alignItems: 'center' }}>
+                  <Text style={{ color: '#666666' }}>No countries found</Text>
+                </View>
+              )}
+            </ScrollView>
           </View>
         </View>
       )}

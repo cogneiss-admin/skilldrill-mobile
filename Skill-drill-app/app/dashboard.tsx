@@ -11,7 +11,8 @@ import {
   AppState,
   RefreshControl,
   Alert,
-  StyleSheet
+  StyleSheet,
+  Platform
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../hooks/useAuth';
@@ -266,27 +267,36 @@ export default function DashboardImproved() {
 
   // Handle logout
   const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await logout();
-              showToast('success', 'Logged Out', 'You have been successfully logged out');
-              router.replace('/auth/login');
-            } catch (error) {
-              console.error('❌ Logout error:', error);
-              showToast('error', 'Logout Failed', 'Failed to logout. Please try again.');
-            }
+    const performLogout = async () => {
+      try {
+        await logout();
+        showToast('success', 'Logged Out', 'You have been successfully logged out');
+        router.replace('/auth/login');
+      } catch (error) {
+        console.error('❌ Logout error:', error);
+        showToast('error', 'Logout Failed', 'Failed to logout. Please try again.');
+      }
+    };
+
+    // Use window.confirm for web, Alert.alert for mobile
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to logout?')) {
+        performLogout();
+      }
+    } else {
+      Alert.alert(
+        'Logout',
+        'Are you sure you want to logout?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Logout',
+            style: 'destructive',
+            onPress: performLogout
           }
-        }
-      ]
-    );
+        ]
+      );
+    }
   };
 
   // Load data on mount
