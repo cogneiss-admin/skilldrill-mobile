@@ -297,7 +297,7 @@ class AuthService {
 
   // Update user profile via API
   public async updateProfileViaAPI(profileData: { 
-    career_stage?: string; 
+    careerLevelId?: string; 
     role_type?: string; 
     onboarding_step?: string 
   }): Promise<ApiResponse<User>> {

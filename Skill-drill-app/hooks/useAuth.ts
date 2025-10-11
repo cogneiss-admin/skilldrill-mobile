@@ -132,7 +132,8 @@ export const useAuth = () => {
     
     console.log('🔍 isOnboardingComplete: Checking user:', {
       onboardingStep: user.onboardingStep,
-      careerStage: user.careerStage,
+      careerLevelId: user.careerLevelId,
+      roleTypeId: user.roleTypeId,
       roleType: user.roleType
     });
     
@@ -159,7 +160,8 @@ export const useAuth = () => {
     
     console.log('🔄 getOnboardingNextStep: Checking user onboarding state:', {
       onboardingStep: user.onboardingStep,
-      careerStage: user.careerStage,
+      careerLevelId: user.careerLevelId,
+      roleTypeId: user.roleTypeId,
       roleType: user.roleType
     });
     
@@ -178,7 +180,7 @@ export const useAuth = () => {
         // Need to determine their progress manually
         
         // First check: Do they have career/role info?
-        if (!user.careerStage || !user.roleType) {
+        if (!user.careerLevelId || !user.roleTypeId) {
           console.log('🔄 getOnboardingNextStep: User missing career/role info, directing to career-role');
           return '/auth/career-role';
         }
@@ -308,7 +310,8 @@ export const useAuth = () => {
         userData: response.data.user ? {
           id: response.data.user.id,
           name: response.data.user.name,
-          careerStage: response.data.user.careerStage,
+          careerLevelId: response.data.user.careerLevelId,
+          roleTypeId: response.data.user.roleTypeId,
           roleType: response.data.user.roleType,
           onboardingStep: response.data.user.onboardingStep
         } : null
@@ -373,7 +376,7 @@ export const useAuth = () => {
       
       // Use the API method to update profile on backend
       const response = await authService.updateProfileViaAPI(userData as { 
-        career_stage?: string; 
+        careerLevelId?: string; 
         role_type?: string; 
         onboarding_step?: string 
       });
@@ -388,7 +391,8 @@ export const useAuth = () => {
         }));
         console.log('✅ useAuth: Local state updated with new user data');
         console.log('📊 useAuth: Updated user data:', {
-          careerStage: response.data.careerStage,
+          careerLevelId: response.data.careerLevelId,
+          roleTypeId: response.data.roleTypeId,
           roleType: response.data.roleType,
           onboardingStep: response.data.onboardingStep,
           onboardingComplete: isOnboardingComplete(response.data)

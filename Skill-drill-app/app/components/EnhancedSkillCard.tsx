@@ -13,18 +13,6 @@ interface EnhancedSkillCardProps {
 
 const DEFAULT_BRAND = '#0A66C2';
 
-const getTierLabel = (tier?: string) => {
-  switch (tier) {
-    case 'TIER_1_CORE_SURVIVAL':
-      return 'Core Survival';
-    case 'TIER_2_PROGRESSION':
-      return 'Progression';
-    case 'TIER_3_EXECUTIVE':
-      return 'Executive';
-    default:
-      return 'General';
-  }
-};
 
 const EnhancedSkillCard: React.FC<EnhancedSkillCardProps> = ({ 
   skill,
@@ -34,9 +22,9 @@ const EnhancedSkillCard: React.FC<EnhancedSkillCardProps> = ({
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
   
-  const name = skill?.name || skill?.skill_name || 'Unknown Skill';
-  const category = skill?.category || '';
-  const tier = getTierLabel(skill?.tier);
+  const name = skill?.name;
+  const category = skill?.category;
+  const tier = skill?.skillTier?.name;
   const skillId = skill?.id || skill?.skill_id;
 
   const handleAdaptiveAssessment = () => {

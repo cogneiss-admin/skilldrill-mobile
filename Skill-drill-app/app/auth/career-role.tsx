@@ -12,30 +12,49 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "../../hooks/useAuth";
 import CareerSkeleton from "../components/CareerSkeleton";
 
+// Get API base URL (same logic as in api.ts)
+const getApiBaseUrl = () => {
+  return process.env.EXPO_PUBLIC_API_URL || 'http://10.236.176.234:3000';
+};
+const API_BASE_URL = getApiBaseUrl();
+
 const BRAND = "#0A66C2";
 const APP_NAME = "Skill Drill";
 const logoSrc = require("../../assets/images/logo.png");
 
-type CareerStage = "ENTRY_LEVEL" | "MID_LEVEL" | "EXPERIENCED";
-type RoleType = "INDIVIDUAL_CONTRIBUTOR" | "TEAM_LEADER_MANAGER" | "SENIOR_LEADER_EXECUTIVE";
+type CareerLevel = {
+  id: string;
+  name: string;
+  description?: string;
+  order: number;
+};
 
-const careerOptions: { key: CareerStage; label: string; sub?: string; emoji: string }[] = [
-  { key: "ENTRY_LEVEL", label: "Entry-Level (0-3 Years)", sub: "Starting out, learning and growing", emoji: "🌱" },
-  { key: "MID_LEVEL", label: "Mid-Level (4-10 Years)", sub: "Building expertise and impact", emoji: "🚀" },
-  { key: "EXPERIENCED", label: "Experienced (11+ Years)", sub: "Leading with depth and vision", emoji: "🏆" },
+type RoleType = {
+  id: string;
+  name: string;
+  description?: string;
+  order: number;
+};
+
+const defaultCareerOptions = [
+  { name: "Entry Level", description: "0-2 years experience", sub: "Starting out, learning and growing" },
+  { name: "Mid Level", description: "2-5 years experience", sub: "Building expertise and impact" },
+  { name: "Senior Level", description: "5+ years experience", sub: "Leading with depth and vision" },
 ];
 
-const roleOptions: { key: RoleType; label: string; sub?: string; emoji: string }[] = [
-  { key: "INDIVIDUAL_CONTRIBUTOR", label: "Individual Contributor", sub: "Hands-on, craft-focused", emoji: "🎯" },
-  { key: "TEAM_LEADER_MANAGER", label: "Team Leader / Manager", sub: "Leads people and delivery", emoji: "🧑‍🤝‍🧑" },
-  { key: "SENIOR_LEADER_EXECUTIVE", label: "Senior Leader / Executive", sub: "Owns strategy and outcomes", emoji: "👑" },
+const defaultRoleOptions = [
+  { name: "Individual Contributor", description: "Hands-on, craft-focused" },
+  { name: "Team Leader / Manager", description: "Leads people and delivery" },
+  { name: "Senior Leader / Executive", description: "Owns strategy and outcomes" },
 ];
 
 export default function CareerRoleScreen() {
   const router = useRouter();
   const { updateProfile, checkAuthStatus } = useAuth();
-  const [careerStage, setCareerStage] = useState<CareerStage | null>(null);
-  const [roleType, setRoleType] = useState<RoleType | null>(null);
+  const [careerLevels, setCareerLevels] = useState<CareerLevel[]>([]);
+  const [selectedCareerLevel, setSelectedCareerLevel] = useState<CareerLevel | null>(null);
+  const [roleTypes, setRoleTypes] = useState<RoleType[]>([]);
+  const [selectedRoleType, setSelectedRoleType] = useState<RoleType | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -43,7 +62,62 @@ export default function CareerRoleScreen() {
   const hasCheckedCareerInfo = useRef(false);
   const hasUpdatedProfile = useRef(false);
 
-  const canContinue = useMemo(() => !!careerStage && !!roleType, [careerStage, roleType]);
+  // Fetch career levels from API
+  const fetchCareerLevels = async (): Promise<CareerLevel[]> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/career-levels`);
+      if (response.ok) {
+        const data = await response.json();
+        return data.data || [];
+      }
+    } catch (error) {
+      console.warn('Failed to fetch career levels, using defaults:', error);
+    }
+    
+    // Return default career levels if API fails
+    return defaultCareerOptions.map((option, index) => ({
+      id: `default-${index}`,
+      name: option.name,
+      description: option.description,
+      order: index + 1
+    }));
+  };
+
+  // Fetch role types from API
+  const fetchRoleTypes = async (): Promise<RoleType[]> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/role-types`);
+      if (response.ok) {
+        const data = await response.json();
+        return data.data || [];
+      }
+    } catch (error) {
+      console.warn('Failed to fetch role types, using defaults:', error);
+    }
+    
+    // Return default role types if API fails
+    return defaultRoleOptions.map((option, index) => ({
+      id: `default-${index}`,
+      name: option.name,
+      description: option.description,
+      order: index + 1
+    }));
+  };
+
+  const canContinue = useMemo(() => !!selectedCareerLevel && !!selectedRoleType, [selectedCareerLevel, selectedRoleType]);
+
+  // Fetch career levels and role types on component mount
+  useEffect(() => {
+    const loadData = async () => {
+      const [levels, types] = await Promise.all([
+        fetchCareerLevels(),
+        fetchRoleTypes()
+      ]);
+      setCareerLevels(levels);
+      setRoleTypes(types);
+    };
+    loadData();
+  }, []);
 
   // Check if user already has career info set
   useEffect(() => {
@@ -58,7 +132,7 @@ export default function CareerRoleScreen() {
         const { authService } = await import("../../services/authService");
         const userData = await authService.getUserData();
         
-        if (userData?.career_stage && userData?.role_type) {
+        if (userData?.careerLevelId && userData?.roleTypeId) {
           console.log('✅ Career-role: User already has career info, checking next step...');
           
           // User already has career info, but let's check what they should do next
@@ -87,11 +161,11 @@ export default function CareerRoleScreen() {
         
         // Only pre-populate if user has completed onboarding and has career info
         // For new users, don't pre-populate anything
-        if (userData?.onboarding_step && userData?.career_stage) {
-          setCareerStage(userData.career_stage as CareerStage);
+        if (userData?.onboarding_step && userData?.careerLevel) {
+          setSelectedCareerLevel(userData.careerLevel);
         }
-        if (userData?.onboarding_step && userData?.role_type) {
-          setRoleType(userData.role_type as RoleType);
+        if (userData?.onboarding_step && userData?.roleType) {
+          setSelectedRoleType(userData.roleType);
         }
       } catch (error) {
         console.error('Error checking career info:', error);
@@ -114,7 +188,7 @@ export default function CareerRoleScreen() {
     
     try {
       console.log('🎯 Career-role: Starting profile update...');
-      console.log('📊 Career-role: Selected values:', { careerStage, roleType });
+      console.log('📊 Career-role: Selected values:', { selectedCareerLevel: selectedCareerLevel?.name, selectedRoleType: selectedRoleType?.name });
       
       setBusy(true);
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -122,8 +196,8 @@ export default function CareerRoleScreen() {
       // Update profile using AuthContext with onboarding step
       console.log('🔄 Career-role: Calling updateProfile...');
       await updateProfile({
-        career_stage: careerStage,
-        role_type: roleType,
+        careerLevelId: selectedCareerLevel?.id,
+        role_type: selectedRoleType?.id,
         onboarding_step: 'Pending'
       });
       console.log('✅ Career-role: Profile update successful');
@@ -192,14 +266,15 @@ export default function CareerRoleScreen() {
             {/* Career Stage - vertical cards */}
             <MotiView from={{ opacity: 0, translateY: 8 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: "timing", duration: 420 }}>
               <Text style={{ fontSize: 15, fontWeight: "900", color: "#0f172a", marginBottom: 10 }}>Career Stage</Text>
-              {careerOptions.map((o, idx) => {
-                const selected = careerStage === o.key;
+              {careerLevels.map((level, idx) => {
+                const defaultOption = defaultCareerOptions.find(opt => opt.name === level.name) || { sub: level.description || "" };
+                const selected = selectedCareerLevel?.id === level.id;
                 return (
-                  <MotiView key={o.key} from={{ opacity: 0, translateY: 8 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: "timing", duration: 350, delay: idx * 60 }} style={{ marginBottom: 12 }}>
+                  <MotiView key={level.id} from={{ opacity: 0, translateY: 8 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: "timing", duration: 350, delay: idx * 60 }} style={{ marginBottom: 12 }}>
                     <Pressable
                       accessibilityRole="radio"
                       accessibilityState={{ selected }}
-                      onPress={async () => { setCareerStage(o.key); try { await Haptics.selectionAsync(); } catch {} }}
+                      onPress={async () => { setSelectedCareerLevel(level); try { await Haptics.selectionAsync(); } catch {} }}
                       style={({ pressed }) => ({
                         width: '100%',
                         paddingVertical: 16,
@@ -218,10 +293,9 @@ export default function CareerRoleScreen() {
                         <LinearGradient colors={["#E6F2FF", "#ffffff"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: "absolute", inset: 0, borderRadius: 16 }} />
                       ) : null}
                       <View style={{ flexDirection: "row", alignItems: "center" }}>
-                        <Text style={{ fontSize: 22, marginRight: 10 }}>{o.emoji}</Text>
                         <View style={{ flex: 1 }}>
-                          <Text style={{ color: "#0f172a", fontSize: 15, fontWeight: "900" }}>{o.label}</Text>
-                          {o.sub ? <Text style={{ color: "#64748b", marginTop: 4 }}>{o.sub}</Text> : null}
+                          <Text style={{ color: "#0f172a", fontSize: 15, fontWeight: "900" }}>{level.name}</Text>
+                          {(level?.description || defaultOption?.sub) ? <Text style={{ color: "#64748b", marginTop: 4 }}>{level?.description || defaultOption?.sub}</Text> : null}
                         </View>
                         {selected ? <AntDesign name="checkcircle" size={22} color="#16A34A" /> : null}
                       </View>
@@ -235,14 +309,14 @@ export default function CareerRoleScreen() {
             <View style={{ height: 18 }} />
             <MotiView from={{ opacity: 0, translateY: 8 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: "timing", duration: 420, delay: 100 }}>
               <Text style={{ fontSize: 15, fontWeight: "900", color: "#0f172a", marginBottom: 10 }}>Current Role Type</Text>
-              {roleOptions.map((o, idx) => {
-                const selected = roleType === o.key;
+              {roleTypes.map((role, idx) => {
+                const selected = selectedRoleType?.id === role.id;
                 return (
-                  <MotiView key={o.key} from={{ opacity: 0, translateY: 8 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: "timing", duration: 340, delay: idx * 70 }} style={{ marginBottom: 12 }}>
+                  <MotiView key={role.id} from={{ opacity: 0, translateY: 8 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: "timing", duration: 340, delay: idx * 70 }} style={{ marginBottom: 12 }}>
                     <Pressable
                       accessibilityRole="radio"
                       accessibilityState={{ selected }}
-                      onPress={async () => { setRoleType(o.key); try { await Haptics.selectionAsync(); } catch {} }}
+                      onPress={async () => { setSelectedRoleType(role); try { await Haptics.selectionAsync(); } catch {} }}
                       style={({ pressed }) => ({
                         width: '100%',
                         paddingVertical: 16,
@@ -261,10 +335,9 @@ export default function CareerRoleScreen() {
                         <LinearGradient colors={["#E6F2FF", "#ffffff"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: "absolute", inset: 0, borderRadius: 16 }} />
                       ) : null}
                       <View style={{ flexDirection: "row", alignItems: "center" }}>
-                        <Text style={{ fontSize: 22, marginRight: 10 }}>{o.emoji}</Text>
                         <View style={{ flex: 1 }}>
-                          <Text style={{ color: "#0f172a", fontSize: 15, fontWeight: "900" }}>{o.label}</Text>
-                          {o.sub ? <Text style={{ color: "#64748b", marginTop: 4 }}>{o.sub}</Text> : null}
+                          <Text style={{ color: "#0f172a", fontSize: 15, fontWeight: "900" }}>{role.name}</Text>
+                          {role?.description ? <Text style={{ color: "#64748b", marginTop: 4 }}>{role.description}</Text> : null}
                         </View>
                         {selected ? <AntDesign name="checkcircle" size={22} color="#16A34A" /> : null}
                       </View>

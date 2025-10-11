@@ -152,7 +152,7 @@ export default function SkillsScreen() {
       pathname: '/adaptive-assessment',
       params: {
         skillId: skill.mongo_id,
-        skillName: skill.name || skill.skill_name
+        skillName: skill.name
       }
     });
   }, [router]);
@@ -335,46 +335,44 @@ export default function SkillsScreen() {
           <ScrollView contentContainerStyle={{ paddingHorizontal: PADDING.md, paddingBottom: 100, maxWidth: 560, width: '100%', alignSelf: 'center' }} showsVerticalScrollIndicator={false}>
             
                         {/* Skills organized by tier */}
-            {(() => {
-              const tierConfig = {
-                'TIER_1': { name: 'Core Survival Skills', icon: '🛡️', color: '#3B82F6' },
-                'TIER_2': { name: 'Progression Enabler Skills', icon: '🚀', color: '#1D4ED8' },
-                'TIER_3': { name: 'Executive & Strategic Multipliers', icon: '👑', color: '#1E3A8A' }
-              } as const;
-              const tierOrder = ['TIER_1', 'TIER_2', 'TIER_3'] as const;
-              return tierOrder.map((tierKey) => {
-                const tierSkills = skillsByTier[tierKey as keyof typeof skillsByTier];
-                if (!tierSkills || tierSkills.length === 0) return null;
-                const config = tierConfig[tierKey];
-                return isAssessmentMode ? (
-                  <AdaptiveTierSection
-                    key={tierKey}
-                    tierKey={tierKey}
-                    title={config.name}
-                    icon={config.icon}
-                    skills={tierSkills}
-                    selectedIds={selected}
-                    onToggle={handleToggleSkill}
-                    brand={BRAND}
-                    skillsWithAssessments={skillsWithAssessments}
-                    isAssessmentMode={true}
-                    onTraditionalAssessment={handleTraditionalAssessment}
-                  />
-                ) : (
-                  <TierSection
-                    key={tierKey}
-                    tierKey={tierKey}
-                    title={config.name}
-                    icon={config.icon}
-                    skills={tierSkills}
-                    selectedIds={selected}
-                    onToggle={handleToggleSkill}
-                    brand={BRAND}
-                    skillsWithAssessments={skillsWithAssessments}
-                  />
-                );
-              });
-            })()}
+            {Object.entries(skillsByTier).map(([tierKey, tierSkills]) => {
+              if (!tierSkills || tierSkills.length === 0) return null;
+              
+              // Get tier info from first skill in group
+              const firstSkill = tierSkills[0];
+              const tierName = firstSkill?.skillTier?.name;
+              // Default icon based on tier order for now
+              const tierOrder = firstSkill?.skillTier?.order || 1;
+              const tierIcon = tierOrder === 1 ? '🛡️' : tierOrder === 2 ? '🚀' : '👑';
+              
+              return isAssessmentMode ? (
+                <AdaptiveTierSection
+                  key={tierKey}
+                  tierKey={tierKey}
+                  title={tierName}
+                  icon={tierIcon}
+                  skills={tierSkills}
+                  selectedIds={selected}
+                  onToggle={handleToggleSkill}
+                  brand={BRAND}
+                  skillsWithAssessments={skillsWithAssessments}
+                  isAssessmentMode={true}
+                  onTraditionalAssessment={handleTraditionalAssessment}
+                />
+              ) : (
+                <TierSection
+                  key={tierKey}
+                  tierKey={tierKey}
+                  title={tierName}
+                  icon={tierIcon}
+                  skills={tierSkills}
+                  selectedIds={selected}
+                  onToggle={handleToggleSkill}
+                  brand={BRAND}
+                  skillsWithAssessments={skillsWithAssessments}
+                />
+              );
+            })
         
                 {/* Skills Summary removed per UX update */}
 

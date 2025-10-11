@@ -7,7 +7,8 @@ export interface Skill {
   description?: string;
   icon?: string;
   category: string;
-  tier: string;
+  skillTierId?: string;
+  tier?: string; // Legacy field, will be removed
   skill_id: string;
   mongo_id?: string;
 }
@@ -26,15 +27,6 @@ const initialState: SkillsState = {
   lastUpdated: null,
 };
 
-// Normalize tier values from backend to frontend format
-const normalizeTier = (tier: string): string => {
-  const tierMapping: Record<string, string> = {
-    'TIER_1_CORE_SURVIVAL': 'TIER_1',
-    'TIER_2_PROGRESSION': 'TIER_2', 
-    'TIER_3_EXECUTIVE': 'TIER_3'
-  };
-  return tierMapping[tier] || tier;
-};
 
 // Async thunk for fetching skills
 export const fetchSkills = createAsyncThunk(
@@ -56,16 +48,17 @@ export const fetchSkills = createAsyncThunk(
         response.data.forEach((group: any) => {
           if (group.skills && Array.isArray(group.skills)) {
             group.skills.forEach((skill: any) => {
-              const skillName = skill.name || skill.skill_name || 'Unknown Skill';
-              const icon = skill.icon || 'brain'; // Default icon
+              const skillName = skill.name;
+              const icon = skill.icon;
 
               const skillData: Skill = {
                 id: skill.skill_id, // Use skill_id for selection
                 name: skillName,
                 description: skill.description,
                 icon: icon,
-                category: group.title || 'Personal Effectiveness',
-                tier: normalizeTier(skill.tier || 'TIER_1'),
+                category: group.title,
+                skillTierId: skill.skillTierId,
+                tier: skill.tier
                 skill_id: skill.skill_id,
                 mongo_id: skill.id // Keep MongoDB id for backend operations
               };

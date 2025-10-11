@@ -16,15 +16,6 @@ export function useSkillsData(params: {
 
   const canContinue = useMemo(() => selected.length > 0, [selected]);
 
-  // Normalize tier values from backend to frontend format
-  const normalizeTier = (tier: string): string => {
-    const tierMapping: Record<string, string> = {
-      'TIER_1_CORE_SURVIVAL': 'TIER_1',
-      'TIER_2_PROGRESSION': 'TIER_2', 
-      'TIER_3_EXECUTIVE': 'TIER_3'
-    };
-    return tierMapping[tier] || tier;
-  };
 
   const loadSkills = useCallback(async () => {
     try {
@@ -37,13 +28,14 @@ export function useSkillsData(params: {
           if (group.skills && Array.isArray(group.skills)) {
             group.skills.forEach((skill: any) => {
               allSkills.push({
-                id: skill.skill_id || skill.id,
-                skill_id: skill.skill_id || skill.id,
-                name: skill.name || skill.skill_name || 'Unknown Skill',
-                description: skill.description || '',
-                category: skill.category || 'Personal Effectiveness',
-                tier: normalizeTier(skill.tier || 'TIER_1'),
-                mongo_id: skill.mongo_id || skill.id
+                id: skill.skill_id,
+                skill_id: skill.skill_id,
+                name: skill.name,
+                description: skill.description,
+                category: skill.category,
+                skillTierId: skill.skillTierId,
+                tier: skill.tier
+                mongo_id: skill.mongo_id
               });
             });
           }
@@ -110,8 +102,9 @@ export function useSkillsData(params: {
   const skillsByTier = useMemo(() => {
     const groups: Record<string, any[]> = {};
     for (const skill of skillsData) {
-      const tierName = normalizeTier(skill.tier || 'TIER_1');
-      (groups[tierName] ||= []).push({ ...skill });
+      // Use skillTier data for grouping
+      const tierKey = skill.skillTier?.key
+      (groups[tierKey] ||= []).push({ ...skill });
     }
     return groups;
   }, [skillsData]);

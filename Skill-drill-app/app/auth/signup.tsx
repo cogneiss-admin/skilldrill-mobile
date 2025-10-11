@@ -128,7 +128,7 @@ export default function SignupScreen() {
 
       // Check if user already has career info
       const userData = await authService.getUserData();
-      if (userData?.career_stage && userData?.role_type) {
+      if (userData?.careerLevelId && userData?.role_type) {
         // User already has career info, go directly to dashboard
         try { await Haptics.selectionAsync(); } catch {}
         router.replace("/dashboard");
@@ -412,7 +412,7 @@ export default function SignupScreen() {
         
         // Check if user already has career info
         const userData = res.data.user;
-        if (userData?.career_stage && userData?.role_type) {
+        if (userData?.careerLevelId && userData?.role_type) {
           // User already has career info, go directly to dashboard
           setTimeout(() => {
             setOtpSheetVisible(false);

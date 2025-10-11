@@ -55,8 +55,20 @@ export interface User {
   isVerified: boolean;
   authProvider?: string;
   avatarUrl?: string;
-  careerStage?: 'ENTRY_LEVEL' | 'MID_LEVEL' | 'EXPERIENCED';
-  roleType?: 'INDIVIDUAL_CONTRIBUTOR' | 'TEAM_LEADER_MANAGER' | 'SENIOR_LEADER_EXECUTIVE';
+  careerLevelId?: string;
+  careerLevel?: {
+    id: string;
+    name: string;
+    description?: string;
+    order: number;
+  };
+  roleTypeId?: string;
+  roleType?: {
+    id: string;
+    name: string;
+    description?: string;
+    order: number;
+  };
   onboardingStep?: string;
   onboardingCompletedAt?: string;
   countryCode?: string;
@@ -415,6 +427,18 @@ class ApiService {
   // Health check
   public async healthCheck(): Promise<ApiResponse> {
     return this.get('/auth/health');
+  }
+
+  // ===========================================
+  // ROLE TYPES METHODS
+  // ===========================================
+
+  /**
+   * Fetch all active role types
+   */
+  public async fetchRoleTypes(): Promise<ApiResponse> {
+    console.log('📋 Fetching role types');
+    return this.get('/role-types');
   }
 
   // ===========================================

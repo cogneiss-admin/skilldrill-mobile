@@ -67,7 +67,7 @@ const AuthMiddleware = React.memo(({ children }: { children: React.ReactNode }) 
     
     console.log('🔍 AuthMiddleware: Current state:', {
       isAuthenticated,
-      user: user ? { id: user.id, name: user.name, career_stage: user.career_stage, role_type: user.role_type } : null,
+      user: user ? { id: user.id, name: user.name, careerLevelId: user.careerLevelId, role_type: user.role_type } : null,
       segments,
       isRootPath
     });
@@ -178,7 +178,7 @@ const AuthMiddleware = React.memo(({ children }: { children: React.ReactNode }) 
       console.log('📊 AuthMiddleware: User onboarding status:', {
         user_id: user?.id,
         onboarding_step: user?.onboarding_step,
-        career_stage: user?.career_stage,
+        careerLevelId: user?.careerLevelId,
         role_type: user?.role_type,
         onboardingComplete,
         nextStep

@@ -14,26 +14,11 @@ interface SkillCardProps {
 
 const DEFAULT_BRAND = '#0A66C2';
 
-const getTierLabel = (tier?: string) => {
-  switch (tier) {
-    case 'TIER_1_CORE_SURVIVAL':
-    case 'TIER_1':
-      return 'Core Survival';
-    case 'TIER_2_PROGRESSION':
-    case 'TIER_2':
-      return 'Progression';
-    case 'TIER_3_EXECUTIVE':
-    case 'TIER_3':
-      return 'Executive';
-    default:
-      return 'General';
-  }
-};
 
 const SkillCard: React.FC<SkillCardProps> = ({ skill, isSelected, onPress, index, brand = DEFAULT_BRAND, hasAssessment = false }) => {
-  const name = skill?.name || skill?.skill_name || 'Unknown Skill';
-  const category = skill?.category || '';
-  const tier = getTierLabel(skill?.tier);
+  const name = skill?.name;
+  const category = skill?.category;
+  const tier = skill?.skillTier?.name;
 
   return (
     <MotiView

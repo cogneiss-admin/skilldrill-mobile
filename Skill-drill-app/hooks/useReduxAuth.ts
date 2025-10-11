@@ -61,7 +61,7 @@ export const useReduxAuth = () => {
       case 'Completed':
         return '/dashboard';
       default:
-        if (!user.career_stage || !user.role_type) {
+        if (!user.careerLevelId || !user.role_type) {
           return '/auth/career-role';
         }
         return '/auth/skills';
