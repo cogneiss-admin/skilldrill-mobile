@@ -10,13 +10,10 @@ import { StatusBar } from "expo-status-bar";
 import { AntDesign } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "../../hooks/useAuth";
+import { apiService } from "../../services/api";
 import CareerSkeleton from "../components/CareerSkeleton";
 
-// Get API base URL (same logic as in api.ts)
-const getApiBaseUrl = () => {
-  return process.env.EXPO_PUBLIC_API_URL || 'http://10.236.176.234:3000';
-};
-const API_BASE_URL = getApiBaseUrl();
+// Use centralized API service (avoids base URL mismatches)
 
 const BRAND = "#0A66C2";
 const APP_NAME = "Skill Drill";
@@ -62,47 +59,43 @@ export default function CareerRoleScreen() {
   const hasCheckedCareerInfo = useRef(false);
   const hasUpdatedProfile = useRef(false);
 
-  // Fetch career levels from API
-  const fetchCareerLevels = async (): Promise<CareerLevel[]> => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/career-levels`);
-      if (response.ok) {
-        const data = await response.json();
-        return data.data || [];
-      }
-    } catch (error) {
-      console.warn('Failed to fetch career levels, using defaults:', error);
-    }
-    
-    // Return default career levels if API fails
-    return defaultCareerOptions.map((option, index) => ({
-      id: `default-${index}`,
-      name: option.name,
-      description: option.description,
-      order: index + 1
-    }));
-  };
+// Fetch career levels via centralized API client
+const fetchCareerLevels = async (): Promise<CareerLevel[]> => {
+  try {
+    const res = await apiService.get<CareerLevel[]>(`/career-levels`);
+    return (res?.data as unknown as CareerLevel[]) || [];
+  } catch (error) {
+    console.warn('Failed to fetch career levels, using defaults:', (error as any)?.message || error);
+  }
+  // Fallback defaults
+  return defaultCareerOptions.map((option, index) => ({
+    id: `default-${index}`,
+    name: option.name,
+    description: option.description,
+    order: index + 1
+  }));
+};
 
-  // Fetch role types from API
-  const fetchRoleTypes = async (): Promise<RoleType[]> => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/role-types`);
-      if (response.ok) {
-        const data = await response.json();
-        return data.data || [];
-      }
-    } catch (error) {
-      console.warn('Failed to fetch role types, using defaults:', error);
+// Fetch role types via centralized API client
+const fetchRoleTypes = async (): Promise<RoleType[]> => {
+  try {
+    if ((apiService as any).fetchRoleTypes) {
+      const res = await (apiService as any).fetchRoleTypes();
+      return (res?.data as unknown as RoleType[]) || [];
     }
-    
-    // Return default role types if API fails
-    return defaultRoleOptions.map((option, index) => ({
-      id: `default-${index}`,
-      name: option.name,
-      description: option.description,
-      order: index + 1
-    }));
-  };
+    const res = await apiService.get<RoleType[]>(`/role-types`);
+    return (res?.data as unknown as RoleType[]) || [];
+  } catch (error) {
+    console.warn('Failed to fetch role types, using defaults:', (error as any)?.message || error);
+  }
+  // Fallback defaults
+  return defaultRoleOptions.map((option, index) => ({
+    id: `default-${index}`,
+    name: option.name,
+    description: option.description,
+    order: index + 1
+  }));
+};
 
   const canContinue = useMemo(() => !!selectedCareerLevel && !!selectedRoleType, [selectedCareerLevel, selectedRoleType]);
 
@@ -136,8 +129,8 @@ export default function CareerRoleScreen() {
           console.log('✅ Career-role: User already has career info, checking next step...');
           
           // User already has career info, but let's check what they should do next
-          // If they have onboarding_step set, follow that logic
-          if (userData.onboarding_step === 'Completed') {
+          // If they have onboardingStep set, follow that logic
+          if (userData.onboardingStep === 'Completed') {
             console.log('📋 Career-role: User has proper onboarding step, redirecting to skills');
             router.replace("/auth/skills");
           } else {
@@ -147,7 +140,7 @@ export default function CareerRoleScreen() {
               hasUpdatedProfile.current = true;
               try {
                 await updateProfile({
-                  onboarding_step: 'Pending'
+                  onboardingStep: 'Pending'
                 });
                 router.replace("/auth/skills");
               } catch (error) {
@@ -161,10 +154,10 @@ export default function CareerRoleScreen() {
         
         // Only pre-populate if user has completed onboarding and has career info
         // For new users, don't pre-populate anything
-        if (userData?.onboarding_step && userData?.careerLevel) {
+        if (userData?.onboardingStep && userData?.careerLevel) {
           setSelectedCareerLevel(userData.careerLevel);
         }
-        if (userData?.onboarding_step && userData?.roleType) {
+        if (userData?.onboardingStep && userData?.roleType) {
           setSelectedRoleType(userData.roleType);
         }
       } catch (error) {
@@ -197,8 +190,8 @@ export default function CareerRoleScreen() {
       console.log('🔄 Career-role: Calling updateProfile...');
       await updateProfile({
         careerLevelId: selectedCareerLevel?.id,
-        role_type: selectedRoleType?.id,
-        onboarding_step: 'Pending'
+        roleType: selectedRoleType?.id,
+        onboardingStep: 'Pending'
       });
       console.log('✅ Career-role: Profile update successful');
 

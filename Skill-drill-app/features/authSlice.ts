@@ -60,7 +60,7 @@ export const loginUser = createAsyncThunk(
         if (inputType === 'email') {
           response = await authService.loginWithEmail({ email: emailOrPhone });
         } else {
-          response = await authService.loginWithPhone({ phone_no: emailOrPhone });
+          response = await authService.loginWithPhone({ phoneNo: emailOrPhone });
         }
       }
       

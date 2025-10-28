@@ -7,14 +7,18 @@ const { width } = Dimensions.get('window');
 const BRAND = "#0A66C2";
 
 interface AIGenerationLoaderProps {
-  visible: boolean;
-  progress: number; // 0-1
+  visible?: boolean;
+  progress?: number; // 0-1
+  message?: string;
+  subMessage?: string;
   onComplete?: () => void;
 }
 
 export default function AIGenerationLoader({ 
-  visible, 
+  visible = true, 
   progress = 0,
+  message,
+  subMessage,
   onComplete
 }: AIGenerationLoaderProps) {
   const brainPulseAnim = useRef(new Animated.Value(0)).current;
@@ -200,7 +204,7 @@ export default function AIGenerationLoader({
           textAlign: 'center',
           marginBottom: 8,
         }}>
-          🤖 AI Assessment Generation
+          {message || '🤖 AI Assessment Generation'}
         </Text>
 
         {/* Message */}
@@ -211,7 +215,7 @@ export default function AIGenerationLoader({
           marginBottom: 24,
           lineHeight: 22,
         }}>
-          Creating your personalized assessment...
+          {subMessage || 'Creating your personalized assessment...'}
         </Text>
 
         {/* Current Step */}

@@ -66,7 +66,7 @@ export default function SessionLoadingScreen() {
       
       // Compute completion from user skills (no separate endpoint required)
       const hasCompletedAssessments = Array.isArray(skillsData) && skillsData.length > 0
-        ? skillsData.every((s: any) => s.assessment_status === 'COMPLETED')
+        ? skillsData.every((s: any) => s.assessmentStatus === 'COMPLETED')
         : false;
       
       // User has skills but no active session - go to dashboard

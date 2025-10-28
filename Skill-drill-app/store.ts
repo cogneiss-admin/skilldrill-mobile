@@ -1,13 +1,11 @@
 import { configureStore } from "@reduxjs/toolkit";
 import appReducer from "./features/appSlice";
 import skillsReducer from "./features/skillsSlice";
-// import authReducer from "./features/authSlice";
 
 export const store = configureStore({
   reducer: {
     app: appReducer,
     skills: skillsReducer,
-    // auth: authReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

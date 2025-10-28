@@ -82,9 +82,9 @@ interface UserSkill {
     category: string;
     icon?: string;
   };
-  assessment_status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
-  current_score?: number;
-  last_assessed_at?: string;
+  assessmentStatus: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
+  currentScore?: number;
+  lastAssessedAt?: string;
 }
 
 
@@ -144,18 +144,18 @@ export default function DashboardImproved() {
 
     const totalSkills = unionSkillIds.size;
     const completedSkills = new Set<string>([
-      ...userSkills.filter(s => s.assessment_status === 'COMPLETED').map(s => s.skill.id),
+      ...userSkills.filter(s => s.assessmentStatus === 'COMPLETED').map(s => s.skill.id),
       ...Array.from(completedFromResults)
     ]).size;
 
-    const inProgressSkills = userSkills.filter(skill => skill.assessment_status === 'IN_PROGRESS').length;
+    const inProgressSkills = userSkills.filter(skill => skill.assessmentStatus === 'IN_PROGRESS').length;
     const notStartedSkills = Math.max(0, totalSkills - completedSkills - inProgressSkills);
     const completionRate = totalSkills > 0 ? Math.round((completedSkills / totalSkills) * 100) : 0;
 
     // Average score: prefer userSkills scores; fall back to recentResults scores
     const completedSkillScores = userSkills
-      .filter(s => s.assessment_status === 'COMPLETED' && s.current_score !== null && s.current_score !== undefined)
-      .map(s => s.current_score as number);
+      .filter(s => s.assessmentStatus === 'COMPLETED' && s.currentScore !== null && s.currentScore !== undefined)
+      .map(s => s.currentScore as number);
     const resultScores = recentResults.map(r => r.finalScore).filter(s => typeof s === 'number') as number[];
     const scorePool = completedSkillScores.length > 0 ? completedSkillScores : resultScores;
     const averageScore = scorePool.length > 0
@@ -218,11 +218,11 @@ export default function DashboardImproved() {
         setUserSkills(prevSkills => 
           prevSkills.map(skill => {
             const assessment = list.find(a => a.skillId === skill.skill.id);
-            if (assessment && skill.assessment_status !== 'COMPLETED') {
+            if (assessment && skill.assessmentStatus !== 'COMPLETED') {
               return {
                 ...skill,
-                assessment_status: 'COMPLETED' as const,
-                current_score: assessment.finalScore
+                assessmentStatus: 'COMPLETED' as const,
+                currentScore: assessment.finalScore
               };
             }
             return skill;
@@ -737,8 +737,8 @@ export default function DashboardImproved() {
                       
                       {/* Status Tag */}
                       <View style={{
-                        backgroundColor: userSkill.assessment_status === 'COMPLETED' ? '#E8F5E8' : 
-                                       userSkill.assessment_status === 'IN_PROGRESS' ? '#FEF3C7' : '#F3F4F6',
+                        backgroundColor: userSkill.assessmentStatus === 'COMPLETED' ? '#E8F5E8' : 
+                                       userSkill.assessmentStatus === 'IN_PROGRESS' ? '#FEF3C7' : '#F3F4F6',
                         paddingHorizontal: 12,
                         paddingVertical: 6,
                         borderRadius: 16,
@@ -746,21 +746,21 @@ export default function DashboardImproved() {
                       }}>
                         <Text style={[
                           TYPOGRAPHY.labelSmall,
-                          { color: userSkill.assessment_status === 'COMPLETED' ? SUCCESS : 
-                                   userSkill.assessment_status === 'IN_PROGRESS' ? '#D97706' : '#6B7280' }
+                          { color: userSkill.assessmentStatus === 'COMPLETED' ? SUCCESS : 
+                                   userSkill.assessmentStatus === 'IN_PROGRESS' ? '#D97706' : '#6B7280' }
                         ]}>
-                          {userSkill.assessment_status === 'COMPLETED' ? 'Completed' : 
-                           userSkill.assessment_status === 'IN_PROGRESS' ? 'In Progress' : 'Not Started'}
+                          {userSkill.assessmentStatus === 'COMPLETED' ? 'Completed' : 
+                           userSkill.assessmentStatus === 'IN_PROGRESS' ? 'In Progress' : 'Not Started'}
                         </Text>
                       </View>
                     </View>
                     
                     {/* Score Display for Completed Skills */}
-                    {userSkill.assessment_status === 'COMPLETED' && userSkill.current_score && (
+                    {userSkill.assessmentStatus === 'COMPLETED' && userSkill.currentScore && (
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <MaterialIcons name="star" size={16} color="#F59E0B" style={{ marginRight: 4 }} />
                         <Text style={[TYPOGRAPHY.score, { color: DARK_GRAY }]}>
-                          {userSkill.current_score}/10
+                          {userSkill.currentScore}/10
                         </Text>
                       </View>
                     )}

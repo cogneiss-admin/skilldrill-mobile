@@ -45,7 +45,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   extra: {
     // Backend API Configuration
     // Use environment variable or default based on platform
-    API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:3000/api', // Use environment variable or localhost fallback
+    // Do NOT default to localhost here. Leave empty so runtime picks platform-safe fallback
+    // Set EXPO_PUBLIC_API_BASE_URL to override (e.g., http://YOUR_LAN_IP:3000/api)
+    API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || '',
     API_TIMEOUT: parseInt(process.env.EXPO_PUBLIC_API_TIMEOUT || process.env.API_TIMEOUT || '10000'),
     
     // Authentication

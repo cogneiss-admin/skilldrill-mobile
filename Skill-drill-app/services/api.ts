@@ -43,8 +43,8 @@ export interface ApiResponse<T = any> {
 }
 
 export interface AuthTokens {
-  access_token: string;
-  refresh_token: string;
+  accessToken: string;
+  refreshToken: string;
 }
 
 export interface User {
@@ -187,13 +187,13 @@ class ApiService {
             // Import authService to handle token refresh
             const { default: authService } = await import('./authService');
             const response = await authService.refreshToken(refreshToken);
-            const { access_token } = response.data;
+            const { accessToken, refreshToken: newRefreshToken } = response.data as any;
 
-            await this.setAccessToken(access_token);
-            await this.setRefreshToken(response.data.refresh_token);
+            await this.setAccessToken(accessToken);
+            await this.setRefreshToken(newRefreshToken);
 
-            this.api.defaults.headers.common.Authorization = `Bearer ${access_token}`;
-            this.processQueue(null, access_token);
+            this.api.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+            this.processQueue(null, accessToken);
 
             return this.api(originalRequest);
           } catch (refreshError) {

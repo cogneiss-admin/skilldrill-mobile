@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { apiService } from '../services/api'
 
 interface Country {
   id: string
@@ -15,30 +16,28 @@ export function useCountries() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    let isMounted = true
+
     const fetchCountries = async () => {
       try {
         setLoading(true)
-        const response = await fetch('http://localhost:3000/api/countries')
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch countries')
-        }
-        
-        const data = await response.json()
-        
-        if (data.success) {
-          setCountries(data.data)
+        const res = await apiService.get<Country[]>('/countries')
+        if (!isMounted) return
+        if (res?.success) {
+          setCountries((res.data as unknown as Country[]) || [])
         } else {
-          throw new Error(data.message || 'Failed to fetch countries')
+          setError(res?.message || 'Failed to fetch countries')
         }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error occurred')
+      } catch (err: any) {
+        if (!isMounted) return
+        setError(err?.message || 'Unknown error occurred')
       } finally {
-        setLoading(false)
+        if (isMounted) setLoading(false)
       }
     }
 
     fetchCountries()
+    return () => { isMounted = false }
   }, [])
 
   return { countries, loading, error }

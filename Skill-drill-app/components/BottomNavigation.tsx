@@ -1,12 +1,11 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { AntDesign, Ionicons } from '@expo/vector-icons';
 import { BRAND } from '../app/components/Brand';
 
 // Define constants
 const GRAY = "#9CA3AF";
-const WHITE = "#FFFFFF";
 
 // Typography System
 const TYPOGRAPHY = {

@@ -209,7 +209,7 @@ export const useAuth = () => {
         if (inputType === 'email') {
           response = await authService.loginWithEmail({ email: emailOrPhone });
         } else {
-          response = await authService.loginWithPhone({ phone_no: emailOrPhone });
+          response = await authService.loginWithPhone({ phoneNo: emailOrPhone });
         }
       }
       
@@ -262,7 +262,7 @@ export const useAuth = () => {
           });
         } else {
           response = await authService.signupWithPhone({
-            phone_no: emailOrPhone,
+            phoneNo: emailOrPhone,
             name,
           });
         }
@@ -375,11 +375,14 @@ export const useAuth = () => {
       console.log('📊 useAuth: Profile data to update:', userData);
       
       // Use the API method to update profile on backend
-      const response = await authService.updateProfileViaAPI(userData as { 
-        careerLevelId?: string; 
-        role_type?: string; 
-        onboarding_step?: string 
-      });
+      const payload: any = {};
+      if (userData.careerLevelId) payload.careerLevelId = userData.careerLevelId;
+      if ((userData as any).roleType) payload.roleType = (userData as any).roleType;
+      if ((userData as any).onboardingStep) payload.onboardingStep = (userData as any).onboardingStep;
+      if (userData.name) payload.name = userData.name;
+      if ((userData as any).email) payload.email = (userData as any).email;
+
+      const response = await authService.updateProfileViaAPI(payload);
       
       console.log('✅ useAuth: Profile update API response:', response);
       

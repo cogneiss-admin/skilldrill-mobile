@@ -186,11 +186,11 @@ class SocialAuthService {
 
       // Send to backend for authentication
       return await authService.signupWithSocial({
-        social_id: socialUserData.id,
+        socialId: socialUserData.id,
         email: socialUserData.email,
         name: socialUserData.name,
-        auth_provider: 'GOOGLE',
-        avatar_url: socialUserData.avatar_url,
+        authProvider: 'GOOGLE',
+        avatarUrl: socialUserData.avatar_url,
       });
     } catch (error: any) {
       console.error('Google callback error:', error);
@@ -306,11 +306,11 @@ class SocialAuthService {
 
       // Send to backend for authentication
       return await authService.signupWithSocial({
-        social_id: socialUserData.id,
+        socialId: socialUserData.id,
         email: socialUserData.email,
         name: socialUserData.name,
-        auth_provider: 'LINKEDIN',
-        avatar_url: socialUserData.avatar_url,
+        authProvider: 'LINKEDIN',
+        avatarUrl: socialUserData.avatar_url,
       });
     } catch (error: any) {
       console.error('LinkedIn callback error:', error);

@@ -101,9 +101,9 @@ export default function LoginScreen() {
         response = await authService.loginWithEmail({ email: emailOrPhone.trim() });
         console.log('📧 Email login response:', response);
       } else {
-        const phone_no = internationalPhone;
-        console.log('📱 Sending phone login request with:', phone_no);
-        response = await authService.loginWithPhone({ phoneNo: phone_no });
+        const phoneNo = internationalPhone;
+        console.log('📱 Sending phone login request with:', phoneNo);
+        response = await authService.loginWithPhone({ phoneNo });
         console.log('📱 Phone login response:', response);
       }
       

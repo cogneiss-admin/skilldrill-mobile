@@ -9,7 +9,6 @@ import { isValidEmail, isValidPhone } from "../components/validators";
 import { LinearGradient } from "expo-linear-gradient";
 import { MotiView } from "moti";
 import { StatusBar } from "expo-status-bar";
-import { AntDesign } from "@expo/vector-icons";
 import { useAuth } from "../../hooks/useAuth";
 import { BRAND } from "../components/Brand";
 const APP_NAME = "Skill Drill";
@@ -55,13 +54,13 @@ export default function BasicInfoScreen() {
       await updateProfile({
         name: fullName,
         email: emailId || undefined,
-        phone_no: mobile || undefined,
+        phoneNo: mobile || undefined,
       });
 
       // Check if user already has career info
       const { authService } = await import("../../services/authService");
       const userData = await authService.getUserData();
-      if (userData?.careerLevelId && userData?.role_type) {
+      if (userData?.careerLevelId && userData?.roleTypeId) {
         // User already has career info, go directly to dashboard
         try { await Haptics.selectionAsync(); } catch {}
         router.replace("/dashboard");

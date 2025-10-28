@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, View, Pressable, Text, TextInput, KeyboardAvoidingView, Platform } from "react-native";
+import { Alert, View, Pressable, Text, KeyboardAvoidingView, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
@@ -107,7 +107,7 @@ export default function OtpScreen() {
 
         const userData = response.data.user;
         
-        if (userData?.onboarding_step === 'Completed' || userData?.onboardingStep === 'Completed') {
+        if (userData?.onboardingStep === 'Completed') {
           setTimeout(() => {
             router.replace("/session-loading");
           }, 700);

@@ -28,14 +28,14 @@ export function useSkillsData(params: {
           if (group.skills && Array.isArray(group.skills)) {
             group.skills.forEach((skill: any) => {
               allSkills.push({
-                id: skill.skill_id,
-                skill_id: skill.skill_id,
+                id: skill.id,
                 name: skill.name,
                 description: skill.description,
                 category: skill.category,
                 skillTierId: skill.skillTierId,
-                tier: skill.tier
-                mongo_id: skill.mongo_id
+                skillTier: skill.skillTier,
+                tier: skill.tier,
+                mongoId: skill.mongoId,
               });
             });
           }
@@ -62,7 +62,7 @@ export function useSkillsData(params: {
         try {
           const response = await apiService.get('/user/skills');
           if (response.success && response.data?.length > 0) {
-            const currentSkillIds = response.data.map((userSkill: any) => userSkill.skill?.id || userSkill.skill_id || userSkill.id);
+            const currentSkillIds = response.data.map((userSkill: any) => userSkill.skill?.id || userSkill.id);
             setSelected(currentSkillIds);
           }
         } catch {}
@@ -102,8 +102,8 @@ export function useSkillsData(params: {
   const skillsByTier = useMemo(() => {
     const groups: Record<string, any[]> = {};
     for (const skill of skillsData) {
-      // Use skillTier data for grouping
-      const tierKey = skill.skillTier?.key
+      // Use skillTier data for grouping; fall back to 'default'
+      const tierKey = (skill.skillTier && skill.skillTier.key) ? skill.skillTier.key : 'default';
       (groups[tierKey] ||= []).push({ ...skill });
     }
     return groups;

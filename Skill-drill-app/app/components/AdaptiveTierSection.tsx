@@ -67,7 +67,7 @@ export function AdaptiveTierSection({
                 skill={skill}
                 index={index}
                 brand={brand}
-                hasAssessment={skillsWithAssessments.has(skill.mongo_id)}
+                hasAssessment={skillsWithAssessments.has(skill.mongoId)}
                 onTraditionalAssessment={onTraditionalAssessment}
               />
             ) : (
@@ -77,7 +77,7 @@ export function AdaptiveTierSection({
                 brand={brand}
                 onPress={() => onToggle(skill.id)}
                 index={index}
-                hasAssessment={skillsWithAssessments.has(skill.mongo_id)}
+                hasAssessment={skillsWithAssessments.has(skill.mongoId)}
               />
             )}
           </MotiView>

@@ -12,7 +12,7 @@ import { MotiView } from "moti";
 import { StatusBar } from "expo-status-bar";
 import { useAuth } from "../hooks/useAuth";
 import { BRAND } from "./components/Brand";
-import "./home"; // pre-load home route to avoid router spinner during navigation
+// Removed pre-load of home route; screen no longer exists
 
 const logoSrc = require("../assets/images/logo.png");
 

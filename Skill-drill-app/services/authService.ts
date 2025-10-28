@@ -1,4 +1,4 @@
-import apiService, { ApiResponse, AuthTokens, User, ApiError } from './api';
+import apiService, { ApiResponse, User, ApiError } from './api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import SessionManager from '../utils/sessionManager';
 
@@ -66,21 +66,20 @@ export interface ResendOtpRequest {
 }
 
 export interface RefreshTokenRequest {
-  refresh_token: string;
+  refreshToken: string;
 }
 
 export interface LogoutRequest {
-  refresh_token: string;
+  refreshToken: string;
 }
 
 // Response types
 export interface SignupResponse {
-  user_id: string;
+  userId: string;
   phoneNo?: string;
   email?: string;
   authProvider: string;
-  has_email?: boolean;
-  has_phone?: boolean;
+  hasPhone?: boolean;
   countryCode?: string;
   countryName?: string;
   phoneCountryCode?: string;
@@ -88,7 +87,7 @@ export interface SignupResponse {
 }
 
 export interface LoginResponse {
-  user_id?: string;
+  userId?: string;
   phoneNo?: string;
   email?: string;
   otp?: string; // Only in development
@@ -96,9 +95,9 @@ export interface LoginResponse {
 
 export interface AuthSuccessResponse {
   user: User;
-  access_token: string;
-  refresh_token: string;
-  has_phone?: boolean;
+  accessToken: string;
+  refreshToken: string;
+  hasPhone?: boolean;
 }
 
 export interface OtpResponse {
@@ -107,8 +106,8 @@ export interface OtpResponse {
 }
 
 export interface TokenRefreshResponse {
-  access_token: string;
-  refresh_token: string;
+  accessToken: string;
+  refreshToken: string;
 }
 
 class AuthService {
@@ -127,6 +126,10 @@ class AuthService {
 
   public async setAccessToken(token: string): Promise<void> {
     try {
+      if (!token) {
+        await AsyncStorage.removeItem('skilldrill_access_token');
+        return;
+      }
       await AsyncStorage.setItem('skilldrill_access_token', token);
     } catch (error) {
       console.error('Error setting access token:', error);
@@ -144,6 +147,10 @@ class AuthService {
 
   public async setRefreshToken(token: string): Promise<void> {
     try {
+      if (!token) {
+        await AsyncStorage.removeItem('skilldrill_refresh_token');
+        return;
+      }
       await AsyncStorage.setItem('skilldrill_refresh_token', token);
     } catch (error) {
       console.error('Error setting refresh token:', error);
@@ -194,9 +201,11 @@ class AuthService {
     const response = await apiService.post<AuthSuccessResponse>('/multi-auth/signup/password', data);
     
     if (response.success) {
-      await this.setAccessToken(response.data.access_token);
-      await this.setRefreshToken(response.data.refresh_token);
-      await this.setUserData(response.data.user);
+      const at = (response.data as any)?.accessToken;
+      const rt = (response.data as any)?.refreshToken;
+      if (at) await this.setAccessToken(at);
+      if (rt) await this.setRefreshToken(rt);
+      if ((response.data as any)?.user) await this.setUserData((response.data as any).user);
     }
     
     return response;
@@ -206,9 +215,11 @@ class AuthService {
     const response = await apiService.post<AuthSuccessResponse>('/multi-auth/signup/social', data);
     
     if (response.success) {
-      await this.setAccessToken(response.data.access_token);
-      await this.setRefreshToken(response.data.refresh_token);
-      await this.setUserData(response.data.user);
+      const at = (response.data as any)?.accessToken;
+      const rt = (response.data as any)?.refreshToken;
+      if (at) await this.setAccessToken(at);
+      if (rt) await this.setRefreshToken(rt);
+      if ((response.data as any)?.user) await this.setUserData((response.data as any).user);
     }
     
     return response;
@@ -227,9 +238,11 @@ class AuthService {
     const response = await apiService.post<AuthSuccessResponse>('/multi-auth/login/password', data);
     
     if (response.success) {
-      await this.setAccessToken(response.data.access_token);
-      await this.setRefreshToken(response.data.refresh_token);
-      await this.setUserData(response.data.user);
+      const at = (response.data as any)?.accessToken;
+      const rt = (response.data as any)?.refreshToken;
+      if (at) await this.setAccessToken(at);
+      if (rt) await this.setRefreshToken(rt);
+      if ((response.data as any)?.user) await this.setUserData((response.data as any).user);
     }
     
     return response;
@@ -240,9 +253,11 @@ class AuthService {
     const response = await apiService.post<AuthSuccessResponse>('/multi-auth/verify-otp', data);
     
     if (response.success) {
-      await this.setAccessToken(response.data.access_token);
-      await this.setRefreshToken(response.data.refresh_token);
-      await this.setUserData(response.data.user);
+      const at = (response.data as any)?.accessToken;
+      const rt = (response.data as any)?.refreshToken;
+      if (at) await this.setAccessToken(at);
+      if (rt) await this.setRefreshToken(rt);
+      if ((response.data as any)?.user) await this.setUserData((response.data as any).user);
     }
     
     return response;
@@ -255,12 +270,14 @@ class AuthService {
   // Token management
   public async refreshToken(refreshToken: string): Promise<ApiResponse<TokenRefreshResponse>> {
     const response = await apiService.post<TokenRefreshResponse>('/multi-auth/refresh-token', {
-      refresh_token: refreshToken
+      refreshToken: refreshToken
     });
     
     if (response.success) {
-      await this.setAccessToken(response.data.access_token);
-      await this.setRefreshToken(response.data.refresh_token);
+      const at = (response.data as any)?.accessToken;
+      const rt = (response.data as any)?.refreshToken;
+      if (at) await this.setAccessToken(at);
+      if (rt) await this.setRefreshToken(rt);
     }
     
     return response;
@@ -273,7 +290,7 @@ class AuthService {
       
       const refreshToken = await this.getRefreshToken();
       if (refreshToken) {
-        await apiService.post('/multi-auth/logout', { refresh_token: refreshToken });
+        await apiService.post('/multi-auth/logout', { refreshToken });
       }
     } catch (error) {
       console.error('Error during logout:', error);
@@ -298,8 +315,10 @@ class AuthService {
   // Update user profile via API
   public async updateProfileViaAPI(profileData: { 
     careerLevelId?: string; 
-    role_type?: string; 
-    onboarding_step?: string 
+    roleType?: string; 
+    onboardingStep?: string; 
+    name?: string; 
+    email?: string; 
   }): Promise<ApiResponse<User>> {
     // Prevent multiple simultaneous profile updates
     if (this.isUpdatingProfile) {
@@ -310,7 +329,15 @@ class AuthService {
     this.isUpdatingProfile = true;
     
     try {
-      const response = await apiService.put<User>('/multi-auth/profile', profileData);
+      // Map fields to backend expected names
+      const payload: any = {};
+      if (profileData.careerLevelId) payload.careerLevelId = profileData.careerLevelId;
+      if (profileData.roleType) payload.roleType = profileData.roleType; // backend expects roleType → roleTypeId
+      if (profileData.onboardingStep) payload.onboardingStep = profileData.onboardingStep;
+      if (profileData.name) payload.name = profileData.name;
+      if (profileData.email) payload.email = profileData.email;
+
+      const response = await apiService.put<User>('/multi-auth/profile', payload);
       
       if (response.success && response.data) {
         // Update local user data
@@ -330,7 +357,7 @@ class AuthService {
   public async updateOnboardingStep(step: string): Promise<ApiResponse<User>> {
     try {
       console.log(`🎯 AuthService: Updating onboarding step to: ${step}`);
-      const response = await this.updateProfileViaAPI({ onboarding_step: step });
+      const response = await this.updateProfileViaAPI({ onboardingStep: step });
       console.log(`✅ AuthService: Onboarding step updated successfully`);
       return response;
     } catch (error) {

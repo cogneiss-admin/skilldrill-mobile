@@ -14,15 +14,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { MotiView } from "moti";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { AntDesign, MaterialIcons, Ionicons, FontAwesome5 } from '@expo/vector-icons';
+import { AntDesign, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { apiService } from "../services/api";
 import { useToast } from "../hooks/useToast";
 import ActivitySkillCard from "./components/ActivitySkillCard";
 import ActivitySkillCardSkeleton from "./components/ActivitySkillCardSkeleton";
 import { BRAND, GRADIENTS, BORDER_RADIUS, SHADOWS, PADDING } from "./components/Brand";
 import BottomNavigation from "../components/BottomNavigation";
-const GRAY = "#6B7280";
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface UserSkill {
   id: string;
@@ -33,12 +31,10 @@ interface UserSkill {
     description: string;
     icon?: string;
   };
-  assessment_status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED';
-  current_score?: number;
-  last_assessed_at?: string;
-  assessment_count?: number;
-  progression_layer?: string;
-  self_rating?: number;
+  assessmentStatus: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED';
+  currentScore?: number;
+  lastAssessedAt?: string;
+  assessmentCount?: number;
 }
 
 interface CompletedAssessment {
@@ -71,11 +67,11 @@ interface AssessmentSession {
 }
 
 interface AssessmentTemplate {
-  skill_id: string;
-  template_id: string;
-  template_name: string;
-  total_questions: number;
-  created_at: string;
+  skillId: string;
+  templateId?: string;
+  templateName?: string;
+  totalQuestions?: number;
+  createdAt?: string;
 }
 
 export default function MyActivity() {
@@ -162,7 +158,7 @@ export default function MyActivity() {
       if (response.success) {
         // Transform API response to match expected format
         const templates = response.data.map(item => ({
-          skill_id: item.skillId,
+          skillId: item.skillId,
           hasTemplate: item.hasTemplate,
           templateType: item.templateType
         }));
@@ -194,7 +190,7 @@ export default function MyActivity() {
 
   // Check if a skill has an assessment template
   const hasAssessmentTemplate = (skillId: string): boolean => {
-    return assessmentTemplates.some(template => template.skill_id === skillId);
+    return assessmentTemplates.some(template => template.skillId === skillId);
   };
 
   // Backend-only: return identifiedStyle or empty
@@ -282,7 +278,7 @@ export default function MyActivity() {
       const completedAssessment = completedAssessments.find(a => a.skillId === skill.skill.id);
       
       // Check if we have completed assessment data
-      if (skill.assessment_status === 'COMPLETED' && !completedAssessment) {
+      if (skill.assessmentStatus === 'COMPLETED' && !completedAssessment) {
         console.log('⚠️ COMPLETED skill without assessment data:', skill.skill.name);
         console.log('🔍 Looking for skillId:', skill.skill.id);
         console.log('🔍 Available assessments:', completedAssessments.map(a => ({ id: a.id, skillId: a.skillId, skillName: a.skillName })));
@@ -307,7 +303,7 @@ export default function MyActivity() {
           key={skill.id}
           id={skill.id}
           skillName={skill.skill.name}
-          assessmentStatus={skill.assessment_status}
+          assessmentStatus={skill.assessmentStatus}
           aiInsights={aiInsights}
           aiTag={aiTag}
           score={score}

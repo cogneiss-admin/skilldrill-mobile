@@ -9,8 +9,7 @@ export interface Skill {
   category: string;
   skillTierId?: string;
   tier?: string; // Legacy field, will be removed
-  skill_id: string;
-  mongo_id?: string;
+  mongoId?: string;
 }
 
 interface SkillsState {
@@ -52,15 +51,14 @@ export const fetchSkills = createAsyncThunk(
               const icon = skill.icon;
 
               const skillData: Skill = {
-                id: skill.skill_id, // Use skill_id for selection
+                id: skill.id,
                 name: skillName,
                 description: skill.description,
                 icon: icon,
                 category: group.title,
                 skillTierId: skill.skillTierId,
-                tier: skill.tier
-                skill_id: skill.skill_id,
-                mongo_id: skill.id // Keep MongoDB id for backend operations
+                tier: skill.tier,
+                mongoId: skill.id
               };
 
               allSkills.push(skillData);
@@ -81,15 +79,15 @@ export const fetchSkills = createAsyncThunk(
 // Async thunk for adding a new skill (for admin panel integration)
 export const addSkill = createAsyncThunk(
   'skills/addSkill',
-  async (skillData: Omit<Skill, 'id' | 'mongo_id'>, { rejectWithValue }) => {
+  async (skillData: Omit<Skill, 'id' | 'mongoId'>, { rejectWithValue }) => {
     try {
       const response = await apiService.post('/admin/skills', skillData);
       
       if (response.success) {
         return {
           ...skillData,
-          id: skillData.skill_id,
-          mongo_id: response.data.id || skillData.skill_id
+          id: response.data.id,
+          mongoId: response.data.id
         };
       } else {
         throw new Error(response.message || 'Failed to add skill');
@@ -160,7 +158,7 @@ const skillsSlice = createSlice({
     // Update a skill locally (for optimistic updates)
     updateSkillLocally: (state, action: PayloadAction<{ skillId: string; updates: Partial<Skill> }>) => {
       const { skillId, updates } = action.payload;
-      const skillIndex = state.skills.findIndex(skill => skill.id === skillId || skill.skill_id === skillId);
+      const skillIndex = state.skills.findIndex(skill => skill.id === skillId);
       
       if (skillIndex !== -1) {
         state.skills[skillIndex] = { ...state.skills[skillIndex], ...updates };
@@ -175,7 +173,7 @@ const skillsSlice = createSlice({
     // Remove a skill locally (for optimistic updates)
     removeSkillLocally: (state, action: PayloadAction<string>) => {
       const skillId = action.payload;
-      state.skills = state.skills.filter(skill => skill.id !== skillId && skill.skill_id !== skillId);
+      state.skills = state.skills.filter(skill => skill.id !== skillId);
     },
   },
   extraReducers: (builder) => {
@@ -222,7 +220,7 @@ const skillsSlice = createSlice({
       .addCase(updateSkill.fulfilled, (state, action) => {
         state.loading = false;
         const { skillId, updates } = action.payload;
-        const skillIndex = state.skills.findIndex(skill => skill.id === skillId || skill.skill_id === skillId);
+        const skillIndex = state.skills.findIndex(skill => skill.id === skillId);
         
         if (skillIndex !== -1) {
           state.skills[skillIndex] = { ...state.skills[skillIndex], ...updates };
@@ -244,7 +242,7 @@ const skillsSlice = createSlice({
       .addCase(removeSkill.fulfilled, (state, action) => {
         state.loading = false;
         const skillId = action.payload;
-        state.skills = state.skills.filter(skill => skill.id !== skillId && skill.skill_id !== skillId);
+        state.skills = state.skills.filter(skill => skill.id !== skillId);
         state.lastUpdated = Date.now();
         state.error = null;
       })
@@ -279,6 +277,6 @@ export const selectSkillsByCategory = (state: { skills: SkillsState }, category:
   state.skills.skills.filter(skill => skill.category === category);
 
 export const selectSkillById = (state: { skills: SkillsState }, id: string) => 
-  state.skills.skills.find(skill => skill.id === id || skill.skill_id === id || skill.mongo_id === id);
+  state.skills.skills.find(skill => skill.id === id || skill.mongoId === id);
 
 export default skillsSlice.reducer;

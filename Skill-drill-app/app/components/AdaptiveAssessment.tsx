@@ -17,8 +17,6 @@ import AssessmentCompletionDialog from './AssessmentCompletionDialog';
 import { safeProgress, safeNumber } from '../../utils/mathUtils';
 
 const BRAND = "#0A66C2";
-const APP_NAME = "Skill Drill";
-const logoSrc = require("../../assets/images/logo.png");
 
 interface AdaptiveAssessmentProps {
   skillId: string;
@@ -264,15 +262,18 @@ const AdaptiveAssessment: React.FC<AdaptiveAssessmentProps> = ({
     router.push("/dashboard");
   };
 
-  // Show loading state during initialization
-  if (isInitializing) {
-    return (
-      <AIGenerationLoader 
-        message="Initializing adaptive assessment..."
-        subMessage={`Preparing ${skillName} evaluation`}
-      />
-    );
-  }
+  // Determine loader visibility and messaging
+  const showLoader = isInitializing || loading || isLoadingResults;
+  const loaderMessage = isInitializing
+    ? 'Initializing adaptive assessment...'
+    : isLoadingResults
+      ? 'Finalizing your results...'
+      : 'Generating next question...';
+  const loaderSubMessage = isInitializing
+    ? `Preparing ${skillName} evaluation`
+    : isLoadingResults
+      ? 'Summarizing your performance'
+      : 'Analyzing your response';
 
   // Show error state if session failed to start
   if (error && !isAssessmentActive) {
@@ -303,6 +304,12 @@ const AdaptiveAssessment: React.FC<AdaptiveAssessmentProps> = ({
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: BRAND }}>
       <StatusBar style="light" />
+      {/* Full-screen loader overlay */}
+      <AIGenerationLoader 
+        visible={showLoader}
+        message={loaderMessage}
+        subMessage={loaderSubMessage}
+      />
       
       {/* Header with Progress */}
       <View style={{ 

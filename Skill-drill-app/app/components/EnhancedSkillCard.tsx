@@ -25,7 +25,7 @@ const EnhancedSkillCard: React.FC<EnhancedSkillCardProps> = ({
   const name = skill?.name;
   const category = skill?.category;
   const tier = skill?.skillTier?.name;
-  const skillId = skill?.id || skill?.skill_id;
+  const skillId = skill?.id;
 
   const handleAdaptiveAssessment = () => {
     if (!skillId) {

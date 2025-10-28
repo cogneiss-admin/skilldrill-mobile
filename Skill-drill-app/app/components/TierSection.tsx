@@ -54,7 +54,7 @@ export function TierSection({
               brand={brand}
               onPress={() => onToggle(skill.id)}
               index={index}
-              hasAssessment={skillsWithAssessments.has(skill.mongo_id)}
+              hasAssessment={skillsWithAssessments.has(skill.mongoId)}
             />
           </MotiView>
         ))}

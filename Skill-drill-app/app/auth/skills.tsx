@@ -16,8 +16,7 @@ import TierSection from "../components/TierSection";
 import AdaptiveTierSection from "../components/AdaptiveTierSection";
 import { useSkillsData } from "../../hooks/useSkillsData";
 import SkillsSkeleton from "../components/SkillsSkeleton";
-// Temporarily disabled Redux hook to fix import error
-// import { useSkillsRedux } from "../../hooks/useSkillsRedux";
+// Redux skills hook removed as part of code cleanup
 
 import { BRAND, GRADIENTS, BORDER_RADIUS, SHADOWS, PADDING } from "../components/Brand";
 const APP_NAME = "Skill Drill";
@@ -138,7 +137,7 @@ export default function SkillsScreen() {
   const handleToggleSkill = useCallback(async (skillId) => {
     // Check if skill already has an assessment
     const skill = skillsData.find(s => s.id === skillId);
-    if (skill && skillsWithAssessments.has(skill.mongo_id)) {
+    if (skill && skillsWithAssessments.has(skill.mongoId)) {
       showToast('info', 'Assessment Exists', 'You already have an assessment for this skill. Please select a different skill.');
       return;
     }
@@ -151,7 +150,7 @@ export default function SkillsScreen() {
     router.push({
       pathname: '/adaptive-assessment',
       params: {
-        skillId: skill.mongo_id,
+        skillId: skill.mongoId,
         skillName: skill.name
       }
     });
@@ -168,11 +167,11 @@ export default function SkillsScreen() {
         // For add-to-assessment mode, call the add skills API
         console.log('➕ Add-to-Assessment Mode: Adding skills to existing session...');
 
-        // Convert skill_id selections to MongoDB IDs for backend
+        // Map selected skills to backend skillIds
         const validSkillIds = selected
           .map(skillId => {
             const skill = skillsData.find(s => s.id === skillId);
-            return skill?.mongo_id;
+            return skill?.mongoId;
           })
           .filter(id => id && !id.startsWith('fallback_') && id.length > 10);
 
@@ -208,11 +207,11 @@ export default function SkillsScreen() {
         // because assessment creation requires skill IDs to exist
         console.log('🎯 Assessment Mode: Saving skills before assessment...');
 
-        // Convert skill_id selections to MongoDB IDs for backend
+        // Map selected skills to backend skillIds
         const validSkillIds = selected
           .map(skillId => {
             const skill = skillsData.find(s => s.id === skillId);
-            return skill?.mongo_id;
+            return skill?.mongoId;
           })
           .filter(id => id && !id.startsWith('fallback_') && id.length > 10);
 
@@ -226,7 +225,7 @@ export default function SkillsScreen() {
 
         // Save skills to backend (required for assessment)
         const response = await apiService.post('/user/skills', {
-          skill_ids: validSkillIds
+          skillIds: validSkillIds
         });
 
         if (response.success) {
@@ -243,11 +242,11 @@ export default function SkillsScreen() {
           showToast('error', 'Save Error', response.message || 'Failed to save skills');
         }
       } else {
-        // Convert skill_id selections to MongoDB IDs for backend
+        // Map selected skills to backend skillIds
         const validSkillIds = selected
           .map(skillId => {
             const skill = skillsData.find(s => s.id === skillId);
-            return skill?.mongo_id;
+            return skill?.mongoId;
           })
           .filter(id => id && !id.startsWith('fallback_') && id.length > 10);
         
@@ -258,7 +257,7 @@ export default function SkillsScreen() {
         }
         
         const response = await apiService.post('/user/skills', {
-          skill_ids: validSkillIds
+          skillIds: validSkillIds
         });
         
         if (response.success) {
@@ -373,8 +372,7 @@ export default function SkillsScreen() {
                 />
               );
             })
-        
-                {/* Skills Summary removed per UX update */}
+        }
 
             {/* Error Display */}
         {error && (
