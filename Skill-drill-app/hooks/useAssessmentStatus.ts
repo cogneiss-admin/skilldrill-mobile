@@ -7,8 +7,10 @@
 import { useMemo, useCallback } from 'react';
 import { Href, useRouter } from 'expo-router';
 
+import { AssessmentStatus } from '../types/assessment';
+
 export type UserSkillLite = {
-  assessmentStatus?: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | string;
+  assessmentStatus?: AssessmentStatus | 'NOT_STARTED' | string;
   currentScore?: number | null;
   // Keep it lite to avoid tight coupling; callers can pass richer objects
 };
@@ -44,7 +46,7 @@ export function useAssessmentStatus(args: UseAssessmentStatusArgs): UseAssessmen
   const { userSkills, activeSession, router, showToast, onStart, onResume, onAddSkills } = args;
 
   const allSkillsCompleted = useMemo(() => {
-    return userSkills.length > 0 && userSkills.every(s => s.assessmentStatus === 'COMPLETED');
+    return userSkills.length > 0 && userSkills.every(s => s.assessmentStatus === AssessmentStatus.COMPLETED);
   }, [userSkills]);
 
   const sessionCompleted = useMemo(() => {

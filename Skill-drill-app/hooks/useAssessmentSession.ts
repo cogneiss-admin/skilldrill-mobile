@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiService } from '../services/api';
 import { useToast } from './useToast';
+import { AssessmentProgress } from '../types/assessment';
+import { calculateAssessmentProgress, normalizeProgressData } from '../utils/assessmentUtils';
 
 // Constants
 const ASSESSMENT_SESSION_KEY = 'assessment_session_data';
@@ -10,7 +12,7 @@ export const useAssessmentSession = () => {
   // State (Updated for sequential flow)
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<any>(null);
-  const [progress, setProgress] = useState<any>({ currentQuestion: 1, totalQuestions: 4, currentTier: 'L1' }); // Will be updated from backend
+  const [progress, setProgress] = useState<AssessmentProgress | null>(null);
   const [skillName, setSkillName] = useState<string | null>(null);
   const [userResponses, setUserResponses] = useState<Array<{
     questionId: string;
@@ -35,7 +37,7 @@ export const useAssessmentSession = () => {
       setIsAssessmentActive(false);
       setSessionId(null);
       setCurrentQuestion(null);
-      setProgress({ currentQuestion: 1, totalQuestions: 4, currentTier: 'L1' }); // Will be updated from backend
+      setProgress(null);
       setSkillName(null);
       setUserResponses([]);
       
@@ -64,7 +66,8 @@ export const useAssessmentSession = () => {
         // Set sequential state
         setSessionId(response.data.sessionId);
         setCurrentQuestion(response.data.question);
-        setProgress(response.data.progress || { currentQuestion: 1, totalQuestions: response.data.totalQuestions || 0, currentTier: 'L1' });
+        setProgress(normalizeProgressData(response.data.progress) || 
+                   calculateAssessmentProgress(0, response.data.totalQuestions || 1));
         setSkillName(response.data.skillName);
         setIsAssessmentActive(true);
         
@@ -124,7 +127,7 @@ export const useAssessmentSession = () => {
           
           // Update state with next question
           setCurrentQuestion(response.data.question);
-          setProgress(response.data.progress);
+          setProgress(normalizeProgressData(response.data.progress));
           
           // Legacy compatibility - update questions array
           setQuestions(prev => [...prev, response.data.question]);

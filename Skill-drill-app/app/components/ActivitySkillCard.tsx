@@ -7,23 +7,32 @@ import { AntDesign } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { BRAND, GRADIENTS, BORDER_RADIUS, SHADOWS, SPACING, COLORS, TYPOGRAPHY } from '../components/Brand';
 import { useResponsive } from '../../utils/responsive';
-import { safePercentage, safeNumber } from '../../utils/mathUtils';
+import { 
+  AssessmentStatus, 
+  AssessmentActionType,
+  ActivityCardProgressData 
+} from '../../types/assessment';
+import { 
+  calculateAssessmentProgress,
+  determineAssessmentAction,
+  getActionButtonText,
+  getAssessmentStatusColor,
+  getAssessmentStatusLabel,
+  safeNumber,
+  safePercentage
+} from '../../utils/assessmentUtils';
 
 interface ActivitySkillCardProps {
   id: string;
   skillName: string;
-  assessmentStatus: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED';
+  assessmentStatus: AssessmentStatus;
   aiInsights: string;
   aiTag: string;
   score?: number;
   index: number;
   skillId?: string;
   // Progress data from backend session
-  progressData?: {
-    totalPrompts: number;
-    completedResponses: number;
-    status: string;
-  };
+  progressData?: ActivityCardProgressData;
   // Assessment template status
   templateExists?: boolean;
   isGenerating?: boolean;
@@ -32,26 +41,7 @@ interface ActivitySkillCardProps {
   onDeleteAssessment?: () => void; // Testing: Delete assessment progress
 }
 
-const getStatusColor = (status: string): string => {
-  switch (status) {
-    case 'COMPLETED': return '#10B981';
-    case 'IN_PROGRESS': return '#F59E0B';
-    case 'PENDING': return '#8B5CF6';
-    case 'SKIPPED': return '#6B7280';
-    default: return '#6B7280';
-  }
-};
-
-const getStatusLabel = (status: string): string => {
-  // Use the exact backend enum values
-  switch (status) {
-    case 'COMPLETED': return 'COMPLETED';
-    case 'IN_PROGRESS': return 'IN_PROGRESS';
-    case 'PENDING': return 'PENDING';
-    case 'SKIPPED': return 'SKIPPED';
-    default: return status; // Fallback to show actual backend value
-  }
-};
+// Removed: Using centralized functions from assessmentUtils
 
 const getScoreColor = (score: number): string => {
   if (score >= 9) return '#10B981';
@@ -105,16 +95,58 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
   const router = useRouter();
   const responsive = useResponsive();
   
-  const statusColor = getStatusColor(assessmentStatus);
-  const statusLabel = getStatusLabel(assessmentStatus);
+  const statusColor = getAssessmentStatusColor(assessmentStatus);
+  const statusLabel = getAssessmentStatusLabel(assessmentStatus);
   const skillIcon = getSkillIcon(skillName);
   const scoreColor = score ? getScoreColor(score) : '#6B7280';
   const levelLabel = score ? getLevelLabel(score) : 'Not Assessed';
 
-  // Calculate progress based on backend session data - bulletproof version
-  const totalPrompts = safeNumber(progressData?.totalPrompts);
-  const completedResponses = safeNumber(progressData?.completedResponses);
-  const progress = Math.round(safePercentage(completedResponses, totalPrompts, 0));
+  // Calculate progress using centralized utility
+  const progressCalc = calculateAssessmentProgress(
+    progressData?.completedResponses || 0,
+    progressData?.totalPrompts || 0
+  );
+  const progress = progressCalc.percentage;
+
+  // Determine what action button to show
+  const assessmentAction = determineAssessmentAction(assessmentStatus, progressData, templateExists);
+  const actionButtonText = getActionButtonText(assessmentAction, isGenerating, templateExists);
+
+  // Centralized action handler
+  const handleAssessmentAction = () => {
+    if (!skillId) return;
+
+    switch (assessmentAction) {
+      case AssessmentActionType.StartAssessment:
+        if (templateExists) {
+          // Start existing assessment
+          router.push({
+            pathname: '/adaptive-assessment',
+            params: { skillId }
+          });
+        } else {
+          // Generate new assessment
+          onGenerateAssessment?.();
+        }
+        break;
+      
+      case AssessmentActionType.ResumeAssessment:
+        // Resume with session ID for proper continuation
+        router.push({
+          pathname: '/adaptive-assessment',
+          params: { 
+            skillId,
+            sessionId: id,
+            resume: 'true'
+          }
+        });
+        break;
+      
+      case AssessmentActionType.ViewResults:
+        onViewFeedback?.();
+        break;
+    }
+  };
 
 
 
@@ -149,7 +181,7 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
 
             {/* Status Badge */}
             <View style={{
-              backgroundColor: assessmentStatus === 'COMPLETED' ? '#10B981' : '#EF4444',
+              backgroundColor: assessmentStatus === AssessmentStatus.COMPLETED ? '#10B981' : '#EF4444',
               paddingHorizontal: 8,
               paddingVertical: 4,
               borderRadius: 12,
@@ -170,7 +202,7 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
         {/* Card Body */}
         <View style={{ padding: SPACING.padding.md }}>
           {/* Content based on status */}
-          {assessmentStatus === 'COMPLETED' && score ? (
+          {assessmentStatus === AssessmentStatus.COMPLETED && score ? (
             // Completed assessment - show score and feedback
             <View style={{ marginBottom: 16 }}>
               <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
@@ -234,7 +266,7 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
                 )}
               </View>
             </View>
-          ) : assessmentStatus === 'IN_PROGRESS' || assessmentStatus === 'PENDING' ? (
+          ) : assessmentStatus === AssessmentStatus.PENDING ? (
             // In progress or pending - show progress bar based on backend data
             <View style={{ marginBottom: 16 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -279,14 +311,14 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
                   color: '#6B7280',
                   fontStyle: 'italic'
                 }}>
-                  {assessmentStatus === 'IN_PROGRESS' ? 'Continue your assessment' : 'Assessment ready to start'}
+                  {progressData ? 'Continue your assessment' : 'Assessment ready to start'}
                 </Text>
-                {(totalPrompts > 0) && (
+                {(progressCalc.totalQuestions > 0) && (
                   <Text style={{
                     fontSize: 11,
                     color: '#6B7280'
                   }}>
-                    {completedResponses}/{totalPrompts} questions
+                    {progressCalc.completedResponses}/{progressCalc.totalQuestions} questions
                   </Text>
                 )}
               </View>
@@ -327,177 +359,73 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
             </View>
           )}
 
-                     {/* Action Buttons */}
-           <View style={{ flexDirection: 'row', gap: SPACING.gap.sm }}>
-            {assessmentStatus === 'COMPLETED' ? (
-              <>
-              <TouchableOpacity
-                onPress={() => {
-                  console.log('🔍 DEBUG: View Details button pressed');
-                  console.log('🔍 DEBUG: onViewFeedback exists?', !!onViewFeedback);
-                  console.log('🔍 DEBUG: assessmentId (id):', id);
-                  console.log('🔍 DEBUG: skillId:', skillId);
-                  
-                  // Show detailed feedback if available
-                  if (onViewFeedback) {
-                    console.log('✅ DEBUG: Calling onViewFeedback()');
-                    onViewFeedback();
-                  } else {
-                    console.log('❌ DEBUG: No onViewFeedback handler - this should not happen for COMPLETED assessments');
-                    // This should not happen for COMPLETED assessments, but log it for debugging
-                    console.error('⚠️ COMPLETED assessment without onViewFeedback handler - check data flow');
-                  }
-                }}
-                                  style={{
-                    flex: 1,
-                    backgroundColor: '#F3F4F6',
-                                      paddingVertical: SPACING.padding.sm,
-                  paddingHorizontal: SPACING.padding.sm,
-                    borderRadius: BORDER_RADIUS.md,
-                    borderWidth: 1,
-                    borderColor: '#E5E7EB',
-                    alignItems: 'center'
-                  }}
-              >
+          {/* Centralized Action Buttons */}
+          <View style={{ flexDirection: 'row', gap: SPACING.gap.sm }}>
+            <TouchableOpacity
+              onPress={handleAssessmentAction}
+              disabled={isGenerating}
+              style={{
+                flex: 1,
+                backgroundColor: isGenerating ? '#9CA3AF' : 
+                  (assessmentAction === AssessmentActionType.ViewResults ? '#F3F4F6' : BRAND),
+                paddingVertical: SPACING.padding.sm,
+                paddingHorizontal: SPACING.padding.sm,
+                borderRadius: BORDER_RADIUS.md,
+                borderWidth: assessmentAction === AssessmentActionType.ViewResults ? 1 : 0,
+                borderColor: assessmentAction === AssessmentActionType.ViewResults ? '#E5E7EB' : 'transparent',
+                alignItems: 'center',
+                flexDirection: 'row',
+                justifyContent: 'center'
+              }}
+            >
+              {isGenerating && assessmentAction === AssessmentActionType.StartAssessment && !templateExists ? (
+                <>
+                  <AntDesign name="loading1" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={{
+                    fontSize: 14,
+                    fontWeight: '600',
+                    color: '#FFFFFF'
+                  }}>
+                    {actionButtonText}
+                  </Text>
+                </>
+              ) : assessmentAction === AssessmentActionType.StartAssessment && !templateExists ? (
+                <>
+                  <AntDesign name="plus" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={{
+                    fontSize: 14,
+                    fontWeight: '600',
+                    color: '#FFFFFF'
+                  }}>
+                    {actionButtonText}
+                  </Text>
+                </>
+              ) : (
                 <Text style={{
                   fontSize: 14,
                   fontWeight: '600',
-                  color: '#374151'
+                  color: assessmentAction === AssessmentActionType.ViewResults ? '#374151' : '#FFFFFF'
                 }}>
-                  View Details
+                  {actionButtonText}
                 </Text>
-              </TouchableOpacity>
-              
-              {/* Delete Button for Testing - COMPLETED status */}
-              {onDeleteAssessment && (
-                <TouchableOpacity
-                  onPress={onDeleteAssessment}
-                  style={{
-                    backgroundColor: '#EF4444',
-                    paddingVertical: SPACING.padding.sm,
-                    paddingHorizontal: 12,
-                    borderRadius: BORDER_RADIUS.md,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    minWidth: 50
-                  }}
-                >
-                  <AntDesign name="delete" size={16} color="#FFFFFF" />
-                </TouchableOpacity>
               )}
-              </>
-            ) : assessmentStatus === 'IN_PROGRESS' ? (
-              <>
+            </TouchableOpacity>
+            
+            {/* Delete Button for Testing */}
+            {onDeleteAssessment && (
               <TouchableOpacity
-                onPress={() => {
-                  if (skillId) {
-                    router.push({
-                      pathname: '/adaptive-assessment',
-                      params: { skillId }
-                    });
-                  }
-                }}
+                onPress={onDeleteAssessment}
                 style={{
-                  flex: 1,
-                  backgroundColor: BRAND,
+                  backgroundColor: '#EF4444',
                   paddingVertical: SPACING.padding.sm,
-                  paddingHorizontal: SPACING.padding.md,
-                  borderRadius: BORDER_RADIUS.md,
-                  alignItems: 'center'
-                }}
-              >
-                <Text style={{
-                  fontSize: 14,
-                  fontWeight: '600',
-                  color: '#FFFFFF'
-                }}>
-                  Resume Assessment
-                </Text>
-              </TouchableOpacity>
-              
-              {/* Delete Button for Testing - IN_PROGRESS status */}
-              {onDeleteAssessment && (
-                <TouchableOpacity
-                  onPress={onDeleteAssessment}
-                  style={{
-                    backgroundColor: '#EF4444',
-                    paddingVertical: SPACING.padding.sm,
-                    paddingHorizontal: 12,
-                    borderRadius: BORDER_RADIUS.md,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    minWidth: 50
-                  }}
-                >
-                  <AntDesign name="delete" size={16} color="#FFFFFF" />
-                </TouchableOpacity>
-              )}
-              </>
-            ) : templateExists ? (
-              <TouchableOpacity
-                onPress={() => {
-                  if (skillId) {
-                    router.push({
-                      pathname: '/adaptive-assessment',
-                      params: { skillId }
-                    });
-                  }
-                }}
-                style={{
-                  flex: 1,
-                  backgroundColor: BRAND,
-                  paddingVertical: SPACING.padding.sm,
-                  paddingHorizontal: SPACING.padding.sm,
-                  borderRadius: BORDER_RADIUS.md,
-                  alignItems: 'center'
-                }}
-              >
-                <Text style={{
-                  fontSize: 14,
-                  fontWeight: '600',
-                  color: '#FFFFFF'
-                }}>
-                                    Start Assessment
-                </Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                onPress={onGenerateAssessment}
-                disabled={isGenerating}
-                style={{
-                  flex: 1,
-                  backgroundColor: isGenerating ? '#9CA3AF' : BRAND,
-                  paddingVertical: SPACING.padding.sm,
-                  paddingHorizontal: SPACING.padding.sm,
+                  paddingHorizontal: 12,
                   borderRadius: BORDER_RADIUS.md,
                   alignItems: 'center',
-                  flexDirection: 'row',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  minWidth: 50
                 }}
               >
-                {isGenerating ? (
-                  <>
-                    <AntDesign name="loading1" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
-                    <Text style={{
-                      fontSize: 14,
-                      fontWeight: '600',
-                      color: '#FFFFFF'
-                    }}>
-                      Generating...
-                    </Text>
-                  </>
-                ) : (
-                  <>
-                    <AntDesign name="plus" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
-                    <Text style={{
-                      fontSize: 14,
-                      fontWeight: '600',
-                      color: '#FFFFFF'
-                    }}>
-                      Generate Assessment
-                    </Text>
-                  </>
-                )}
+                <AntDesign name="delete" size={16} color="#FFFFFF" />
               </TouchableOpacity>
             )}
           </View>

@@ -14,16 +14,10 @@ import { apiService } from "../../services/api";
 import { AntDesign } from '@expo/vector-icons';
 import AIGenerationLoader from './AIGenerationLoader';
 import AssessmentCompletionDialog from './AssessmentCompletionDialog';
-import { safeProgress, safeNumber } from '../../utils/mathUtils';
+import { AssessmentComponentProps } from '../../types/assessment';
+import { safeNumber } from '../../utils/assessmentUtils';
 
 const BRAND = "#0A66C2";
-
-interface AdaptiveAssessmentProps {
-  skillId: string;
-  skillName?: string;
-  onComplete?: (results: any) => void;
-  onExit?: () => void;
-}
 
 // Simple progress indicator without tier information
 
@@ -32,8 +26,10 @@ const ProgressIndicator = ({ currentQuestion, totalQuestions }: {
   currentQuestion: number;
   totalQuestions: number;
 }) => {
-  // Use bulletproof safe progress calculation
-  const progress = safeProgress(safeNumber(currentQuestion), safeNumber(totalQuestions, 1));
+  // Use safe progress calculation from centralized utilities
+  const current = safeNumber(currentQuestion);
+  const total = safeNumber(totalQuestions, 1);
+  const progress = total > 0 ? current / total : 0;
 
   return (
     <View style={{ marginBottom: 16 }}>
@@ -61,9 +57,10 @@ const ProgressIndicator = ({ currentQuestion, totalQuestions }: {
   );
 };
 
-const AdaptiveAssessment: React.FC<AdaptiveAssessmentProps> = ({
+const AdaptiveAssessment: React.FC<AssessmentComponentProps> = ({
   skillId,
-  skillName = "Communication",
+  sessionId: initialSessionId,
+  isResuming,
   onComplete,
   onExit
 }) => {
@@ -91,12 +88,17 @@ const AdaptiveAssessment: React.FC<AdaptiveAssessmentProps> = ({
   const [isLoadingResults, setIsLoadingResults] = useState(false);
   const [completedSessionId, setCompletedSessionId] = useState<string | null>(null);
 
-  // Initialize adaptive session only if no session exists
+  // Initialize adaptive session - handle both new and resume scenarios
   useEffect(() => {
-    if (!sessionId && !completedSessionId) {
+    if (isResuming && initialSessionId) {
+      // Resuming existing session - the backend will handle resume logic
+      console.log('🔄 Resuming assessment for skill:', skillId, 'with session:', initialSessionId);
+      initializeSession(); // Backend will detect existing session and resume
+    } else if (!sessionId && !completedSessionId) {
+      // Starting new session
       initializeSession();
     }
-  }, []);
+  }, [isResuming, initialSessionId]);
 
   // Clear response field when question changes
   useEffect(() => {
@@ -110,7 +112,7 @@ const AdaptiveAssessment: React.FC<AdaptiveAssessmentProps> = ({
       
       const sessionData = await startAdaptiveSession(skillId);
       
-      showToast('success', 'Assessment Started', `${skillName} assessment initialized`);
+      showToast('success', 'Assessment Started', `${apiSkillName || 'Assessment'} initialized`);
       
     } catch (error: any) {
       console.error('❌ Session initialization failed:', error);
@@ -203,7 +205,7 @@ const AdaptiveAssessment: React.FC<AdaptiveAssessmentProps> = ({
           pathname: "/adaptive-results",
           params: {
             results: JSON.stringify(assessmentResults),
-            skillName: apiSkillName || skillName,
+            skillName: apiSkillName || 'Assessment',
           }
         });
       }
@@ -234,7 +236,7 @@ const AdaptiveAssessment: React.FC<AdaptiveAssessmentProps> = ({
             pathname: "/adaptive-results",
             params: {
               results: JSON.stringify(response.data),
-              skillName: apiSkillName || skillName,
+              skillName: apiSkillName || 'Assessment',
             }
           });
         }
@@ -270,7 +272,7 @@ const AdaptiveAssessment: React.FC<AdaptiveAssessmentProps> = ({
       ? 'Finalizing your results...'
       : 'Generating next question...';
   const loaderSubMessage = isInitializing
-    ? `Preparing ${skillName} evaluation`
+    ? `Preparing ${apiSkillName || 'Assessment'} evaluation`
     : isLoadingResults
       ? 'Summarizing your performance'
       : 'Analyzing your response';
@@ -331,7 +333,7 @@ const AdaptiveAssessment: React.FC<AdaptiveAssessmentProps> = ({
             </Button>
           </View>
           <Text style={{ color: "white", fontSize: 18, fontWeight: "bold" }}>
-            {apiSkillName || skillName || "Unknown Skill"} Assessment
+            {apiSkillName || "Assessment"}
           </Text>
           <View style={{ width: 80 }} />
         </View>
@@ -472,7 +474,7 @@ const AdaptiveAssessment: React.FC<AdaptiveAssessmentProps> = ({
       {/* Assessment Completion Dialog */}
       <AssessmentCompletionDialog
         visible={showCompletionDialog}
-        skillName={apiSkillName || skillName || "Communication"}
+        skillName={apiSkillName || "Communication"}
         onSeeResults={handleSeeResults}
         onContinueNext={handleContinueNext}
         isLoadingResults={isLoadingResults}

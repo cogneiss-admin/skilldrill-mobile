@@ -21,6 +21,7 @@ import ActivitySkillCard from "./components/ActivitySkillCard";
 import ActivitySkillCardSkeleton from "./components/ActivitySkillCardSkeleton";
 import { BRAND, GRADIENTS, BORDER_RADIUS, SHADOWS, PADDING } from "./components/Brand";
 import BottomNavigation from "../components/BottomNavigation";
+import { AssessmentStatus } from '../types/assessment';
 
 interface UserSkill {
   id: string;
@@ -31,7 +32,7 @@ interface UserSkill {
     description: string;
     icon?: string;
   };
-  assessmentStatus: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED';
+  assessmentStatus: AssessmentStatus;
   currentScore?: number;
   lastAssessedAt?: string;
   assessmentCount?: number;
@@ -51,19 +52,21 @@ interface CompletedAssessment {
 }
 
 interface AssessmentSession {
-  sessionId: string;
-  currentSkillIndex: number;
-  selectedSkills: string[];
-  isActive: boolean;
-  progress?: {
-    totalPrompts: number;
-    completedResponses: number;
-    status: string;
-  };
-  currentSkill?: {
+  // New lightweight shape from /assessment/session/status
+  hasActiveSession?: boolean;
+  sessionId?: string | null;
+  skillId?: string | null;
+  skillName?: string | null;
+  status?: string | null;
+  totalQuestions?: number | null;
+  activeSessions?: Array<{
     id: string;
-    name: string; // Updated from skill_name
-  };
+    skillId: string;
+    skillName?: string | null;
+    status: string;
+    totalQuestions?: number;
+    responsesCount?: number;
+  }>;
 }
 
 interface AssessmentTemplate {
@@ -209,12 +212,17 @@ export default function MyActivity() {
 
   // Get assessment progress for a specific skill
   const getSkillProgress = (skillId: string) => {
-    // Check if this skill is part of the active session
-    if (activeSession && activeSession.selectedSkills && activeSession.selectedSkills.includes(skillId)) {
-      return activeSession.progress;
+    // New: derive progress from activeSessions list in session status
+    if (activeSession && Array.isArray((activeSession as any).activeSessions)) {
+      const session = (activeSession as any).activeSessions.find((s: any) => s.skillId === skillId);
+      if (session) {
+        return {
+          totalPrompts: session.totalQuestions || 0,
+          completedResponses: session.responsesCount || 0,
+          status: session.status || 'PENDING'
+        };
+      }
     }
-
-    // No default progress - return null if not in active session
     return null;
   };
 
