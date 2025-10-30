@@ -43,7 +43,11 @@ export function parseApiError(error: any): ApiError {
       message: data.message || data.error || 'An error occurred',
       code: data.code,
       status: error.response.status,
-      details: data.details,
+      // Preserve useful vendor-specific fields (like retry_after) inside details
+      details: {
+        ...(data.details || {}),
+        retryAfter: data.retry_after || data.retryAfter,
+      },
     };
   }
 
@@ -85,6 +89,15 @@ export function formatErrorMessage(error: ApiError | string): string {
         return 'Invalid OTP. Try again.';
       case 'OTP_EXPIRED':
         return 'OTP expired. Request new one.';
+      case 'OTP_RATE_LIMIT_EXCEEDED': {
+        // If backend provides retry-after seconds, format a friendlier message
+        const seconds = (error as any)?.details?.retryAfter || (error as any)?.details?.retry_after;
+        if (typeof seconds === 'number' && seconds > 0) {
+          const mins = Math.ceil(seconds / 60);
+          return `Too many OTP requests. Try again in ${mins} minute${mins > 1 ? 's' : ''}.`;
+        }
+        return 'Too many OTP requests. Please try again later.';
+      }
       case 'TOO_MANY_ATTEMPTS':
         return 'Too many attempts. Try later.';
       case 'INVALID_CREDENTIALS':

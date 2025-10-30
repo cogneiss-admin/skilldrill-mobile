@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiService } from '../services/api';
+import authService from '../services/authService';
 
 export function useSkillsData(params: {
   isAssessmentMode: boolean;
@@ -13,6 +14,7 @@ export function useSkillsData(params: {
   const [selected, setSelected] = useState<Array<string | number>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [eligibleSet, setEligibleSet] = useState<Set<string>>(new Set());
 
   const canContinue = useMemo(() => selected.length > 0, [selected]);
 
@@ -23,6 +25,12 @@ export function useSkillsData(params: {
       setError("");
       const response = await apiService.get('/skills/categories');
       if (response.success) {
+        try {
+          console.log('🧩 /skills/categories success:', {
+            groups: Array.isArray(response.data) ? response.data.length : 'n/a',
+            sampleGroup: Array.isArray(response.data) && response.data[0]?.title,
+          });
+        } catch {}
         const allSkills: any[] = [];
         response.data.forEach((group: any) => {
           if (group.skills && Array.isArray(group.skills)) {
@@ -41,10 +49,15 @@ export function useSkillsData(params: {
           }
         });
         setSkillsData(allSkills);
+        try {
+          const keys = Array.from(new Set(allSkills.map(s => s?.skillTier?.key).filter(Boolean)));
+          console.log('🧩 Flattened skills:', { count: allSkills.length, tierKeys: keys });
+        } catch {}
       } else {
         setError('Failed to load skills');
       }
     } catch (e) {
+      try { console.error('❌ /skills/categories error:', e?.response?.status, e?.response?.data || e?.message); } catch {}
       setError('Failed to load skills. Please try again.');
     } finally {
       setLoading(false);
@@ -54,6 +67,32 @@ export function useSkillsData(params: {
   useEffect(() => {
     loadSkills();
   }, [loadSkills]);
+
+  // Load eligible skills for the user's career level
+  useEffect(() => {
+    (async () => {
+      try {
+        const user = await authService.getUserData();
+        const careerLevelId = (user as any)?.careerLevelId || (user as any)?.careerLevel?.id;
+        try { console.log('🎯 Eligible fetch: user careerLevelId:', careerLevelId); } catch {}
+        if (!careerLevelId) return;
+        const resp = await apiService.get(`/skills/career-level/${careerLevelId}/categories`);
+        if (resp.success) {
+          const ids = new Set<string>();
+          (resp.data || []).forEach((group: any) => {
+            if (group?.skills && Array.isArray(group.skills)) {
+              group.skills.forEach((s: any) => {
+                if (s?.id) ids.add(s.id);
+                if (s?.mongoId) ids.add(s.mongoId);
+              });
+            }
+          });
+          setEligibleSet(ids);
+          try { console.log('🎯 Eligible set ready:', { count: ids.size }); } catch {}
+        }
+      } catch {}
+    })();
+  }, []);
 
   // Load user's current skills for add-to-assessment
   useEffect(() => {
@@ -120,6 +159,7 @@ export function useSkillsData(params: {
     setSkillsData,
     setError,
     toggleSkill,
+    eligibleSet,
   };
 }
 

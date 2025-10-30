@@ -10,6 +10,13 @@ interface Country {
   flag: string
 }
 
+// Convert SVG flag URLs to PNG format (React Native compatible)
+export const getConvertedFlagUrl = (flagUrl: string | null) => {
+  if (!flagUrl) return null;
+  // Convert SVG to PNG: https://flagcdn.com/xx.svg -> https://flagcdn.com/w20/xx.png
+  return flagUrl.replace('.svg', '.png').replace('flagcdn.com/', 'flagcdn.com/w20/');
+};
+
 export function useCountries() {
   const [countries, setCountries] = useState<Country[]>([])
   const [loading, setLoading] = useState(true)
@@ -40,5 +47,5 @@ export function useCountries() {
     return () => { isMounted = false }
   }, [])
 
-  return { countries, loading, error }
+  return { countries, loading, error, getConvertedFlagUrl }
 }

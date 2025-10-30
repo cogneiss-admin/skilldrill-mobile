@@ -8,14 +8,17 @@ type Props = {
   value: string[];
   onChange: (next: string[]) => void;
   color?: string;
+  error?: boolean;
+  focusIndex?: number | undefined;
 };
 
 const DEFAULT_BRAND = "#0A66C2";
 
-export default function CodeBoxes({ length = 6, value, onChange, color = DEFAULT_BRAND }: Props) {
+export default function CodeBoxes({ length = 6, value, onChange, color = DEFAULT_BRAND, error = false, focusIndex }: Props) {
   const refs = useRef(Array.from({ length }, () => React.createRef<any>())).current;
   const { width } = useWindowDimensions();
   const responsive = useResponsive();
+  const [focused, setFocused] = React.useState<number | null>(null);
 
   // Responsive sizing: try to fit within screen padding
   const horizontalPadding = responsive.padding.lg * 2; // container paddings
@@ -31,6 +34,13 @@ export default function CodeBoxes({ length = 6, value, onChange, color = DEFAULT
     refs[idx]?.current?.focus?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Imperatively focus a specific index when requested
+  useEffect(() => {
+    if (typeof focusIndex === 'number' && focusIndex >= 0 && focusIndex < length) {
+      refs[focusIndex]?.current?.focus?.();
+    }
+  }, [focusIndex, length, refs]);
 
   const handleChange = (index: number, text: string) => {
     const t = text.replace(/\D/g, "");
@@ -104,13 +114,15 @@ export default function CodeBoxes({ length = 6, value, onChange, color = DEFAULT
               // Select existing digit to overwrite quickly
               refs[i]?.current?.setNativeProps?.({ selection: { start: 0, end: (value[i] || "").length } });
             } catch {}
+            setFocused(i);
           }}
+          onBlur={() => setFocused((prev) => (prev === i ? null : prev))}
           style={{
             width: boxSize,
             height: Math.max(responsive.size(52), Math.floor(boxSize * 1.2)),
-            borderRadius: responsive.size(12),
-            borderWidth: 1.5,
-            borderColor: value[i] ? color : "#E5E7EB",
+            borderRadius: focused === i ? responsive.size(14) : responsive.size(12),
+            borderWidth: 2,
+            borderColor: error ? "#DC2626" : (focused === i || value[i] ? color : "#E5E7EB"),
             backgroundColor: "#ffffff",
             textAlign: "center",
             fontSize,

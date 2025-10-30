@@ -96,7 +96,7 @@ const AuthMiddleware = React.memo(({ children }: { children: React.ReactNode }) 
     }
 
     // Don't redirect if we're on the career-role screen - let users complete onboarding
-    const isCareerRoleScreen = segments[0] === 'auth' && segments[1] === 'career-role';
+    const isCareerRoleScreen = segments[0] === 'auth' && segments[1] === 'careerRole';
     if (isCareerRoleScreen) {
       console.log('📝 AuthMiddleware: On career-role screen, not redirecting');
       return;
@@ -197,8 +197,8 @@ const AuthMiddleware = React.memo(({ children }: { children: React.ReactNode }) 
         console.log(`📋 AuthMiddleware: User authenticated but onboarding incomplete, redirecting to: ${nextStep}`);
         router.replace(nextStep);
       } else {
-        console.log('❓ AuthMiddleware: Unable to determine next onboarding step, redirecting to career-role as fallback');
-        router.replace('/auth/career-role');
+        console.log('❓ AuthMiddleware: Unable to determine next onboarding step, redirecting to careerRole as fallback');
+        router.replace('/auth/careerRole');
       }
     } else {
       // If not authenticated and not on auth screens, redirect to login

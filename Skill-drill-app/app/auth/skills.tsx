@@ -1,26 +1,23 @@
 // @ts-nocheck
 import React, { useMemo, useState, useEffect, useCallback } from "react";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { View, Text, ScrollView, Image } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Button } from "react-native-paper";
-import { LinearGradient } from "expo-linear-gradient";
+// Button removed to match careerRole styling
 import { StatusBar } from "expo-status-bar";
-import { MotiView } from "moti";
 import * as Haptics from "expo-haptics";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useAuth } from "../../hooks/useAuth";
 import { apiService } from "../../services/api";
 import { useToast } from "../../hooks/useToast";
-import TierSection from "../components/TierSection";
-import AdaptiveTierSection from "../components/AdaptiveTierSection";
+import { AntDesign } from "@expo/vector-icons";
 import { useSkillsData } from "../../hooks/useSkillsData";
 import SkillsSkeleton from "../components/SkillsSkeleton";
 // Redux skills hook removed as part of code cleanup
 
-import { BRAND, GRADIENTS, BORDER_RADIUS, SHADOWS, PADDING } from "../components/Brand";
-const APP_NAME = "Skill Drill";
-const logoSrc = require("../../assets/images/logo.png");
+import { BRAND, PADDING } from "../components/Brand";
+import { Dimensions } from 'react-native';
+const { width } = Dimensions.get('window');
 
 
 
@@ -38,6 +35,8 @@ export default function SkillsScreen() {
   const { showToast } = useToast();
   const [busy, setBusy] = useState(false);
   const [skillsWithAssessments, setSkillsWithAssessments] = useState(new Set());
+  const [tiers, setTiers] = useState<Array<{ key: string; name: string; order?: number }>>([]);
+  const [timelineEndY, setTimelineEndY] = useState<number | null>(null);
 
   const {
     skillsData,
@@ -48,6 +47,7 @@ export default function SkillsScreen() {
     canContinue,
     toggleSkill,
     setSelected,
+    eligibleSet,
   } = useSkillsData({
     isAssessmentMode,
     isAddToAssessmentMode,
@@ -134,6 +134,26 @@ export default function SkillsScreen() {
     checkSkillsWithAssessments();
   }, [checkSkillsWithAssessments]);
 
+  // Load tier list from backend public endpoint
+  useEffect(() => {
+    (async () => {
+      try {
+        // Prefer alias to avoid collision with /skills/:skillId in some setups
+        const resp = await apiService.get('/skill-tiers');
+        if (resp?.success && Array.isArray(resp.data)) {
+          const parsed = resp.data
+            .map((t: any) => ({ key: t.key || t.name || t.value, name: t.name || t.key || '', order: t.order }))
+            .filter((t: any) => t.key);
+          parsed.sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
+          setTiers(parsed);
+          try { console.log('📚 Tiers fetched:', parsed); } catch {}
+        }
+      } catch (e: any) {
+        try { console.error('❌ /skills/tiers error:', e?.response?.status, e?.response?.data || e?.message); } catch {}
+      }
+    })();
+  }, []);
+
   const handleToggleSkill = useCallback(async (skillId) => {
     // Check if skill already has an assessment
     const skill = skillsData.find(s => s.id === skillId);
@@ -146,15 +166,7 @@ export default function SkillsScreen() {
     toggleSkill(skillId);
   }, [toggleSkill, skillsData, skillsWithAssessments, showToast]);
 
-  const handleTraditionalAssessment = useCallback((skill) => {
-    router.push({
-      pathname: '/adaptive-assessment',
-      params: {
-        skillId: skill.mongoId,
-        skillName: skill.name
-      }
-    });
-  }, [router]);
+  // No traditional assessment CTA in this inlined layout
 
   const handleContinue = async () => {
     if (!canContinue || busy) return;
@@ -173,7 +185,7 @@ export default function SkillsScreen() {
             const skill = skillsData.find(s => s.id === skillId);
             return skill?.mongoId;
           })
-          .filter(id => id && !id.startsWith('fallback_') && id.length > 10);
+          .filter(id => id && id.length > 10);
 
         console.log('➕ Valid skill IDs to add:', validSkillIds);
 
@@ -213,7 +225,7 @@ export default function SkillsScreen() {
             const skill = skillsData.find(s => s.id === skillId);
             return skill?.mongoId;
           })
-          .filter(id => id && !id.startsWith('fallback_') && id.length > 10);
+          .filter(id => id && id.length > 10);
 
         console.log('🎯 Valid skill IDs for assessment:', validSkillIds);
 
@@ -248,7 +260,7 @@ export default function SkillsScreen() {
             const skill = skillsData.find(s => s.id === skillId);
             return skill?.mongoId;
           })
-          .filter(id => id && !id.startsWith('fallback_') && id.length > 10);
+          .filter(id => id && id.length > 10);
         
         if (validSkillIds.length === 0) {
           showToast('error', 'No Valid Skills', 'Please select valid skills before continuing.');
@@ -290,89 +302,112 @@ export default function SkillsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: BRAND }}>
-        <StatusBar style="light" />
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+        <StatusBar style="dark" />
         <SkillsSkeleton />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: BRAND }}>
-      <StatusBar style="light" />
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+      <StatusBar style="dark" />
 
-      {/* Hero header */}
-      <View style={{ minHeight: 200, position: "relative" }}>
-        <LinearGradient colors={GRADIENTS.footer} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: "absolute", inset: 0 }} />
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "flex-start", paddingHorizontal: PADDING.md, paddingTop: 10 }}>
-          <Image source={logoSrc} style={{ width: 56, height: 56, shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 10 }} resizeMode="contain" />
-          <Text style={{ marginLeft: 12, color: "#ffffff", fontSize: 22, fontWeight: "900", letterSpacing: 0.8, textShadowColor: 'rgba(0,0,0,0.35)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6 }}>{APP_NAME}</Text>
-        </View>
-        <View style={{ flex: 1, justifyContent: "center", paddingHorizontal: PADDING.md, paddingBottom: 20 }}>
-          <MotiView from={{ opacity: 0, translateY: 6 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: "timing", duration: 480 }}>
-            <Text style={{ fontSize: 24, fontWeight: "900", color: "#ffffff" }}>
+      {/* Header with divider */}
+      <View style={{ paddingVertical: 16, paddingHorizontal: width * 0.06, borderBottomWidth: 1.5, borderBottomColor: '#D1D5DB', marginHorizontal: -(width * 0.06) }}>
+        <Text style={{ textAlign: 'center', fontSize: width * 0.048, fontWeight: '700', color: '#0F172A' }}>
               {isAddToAssessmentMode ? 'Add More Skills' : isAddMoreSkillsMode ? 'Add More Skills' : 'Select Your Skills'}
             </Text>
-            <Text style={{ marginTop: 8, color: "#E6F2FF", fontSize: 15 }}>
-              {isAddToAssessmentMode ? 'Choose additional skills to add to your current assessment' : isAddMoreSkillsMode ? 'Choose additional skills to add to your profile' : 'Choose the skills you want to assess and improve'}
-            </Text>
-            <Text style={{ marginTop: 4, color: "#E6F2FF", fontSize: 13, opacity: 0.9 }}>
-              {isAddToAssessmentMode
+      </View>
+
+      {/* Body */}
+      <View style={{ flex: 1, backgroundColor: '#F3F4F6', marginHorizontal: -(width * 0.06), paddingHorizontal: width * 0.06 }}>
+          <ScrollView contentContainerStyle={{ paddingBottom: 100, paddingHorizontal: width * 0.06, maxWidth: 560, width: '100%', alignSelf: 'center', paddingTop: 16 }} showsVerticalScrollIndicator={false}>
+            <Text style={{ fontSize: 14, color: '#4B5563', marginBottom: 4 }}>Choose the skills you want to assess and improve</Text>
+            <Text style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>{isAddToAssessmentMode
                 ? (selected.length > 0 ? `${selected.length} skill${selected.length !== 1 ? 's' : ''} will be added to assessment` : 'Select additional skills to add')
                 : isAddMoreSkillsMode
                 ? (selected.length > 0 ? `${selected.length} skill${selected.length !== 1 ? 's' : ''} will be added to your profile` : 'Select additional skills to add')
-                : (selected.length > 0 ? `${selected.length} skill${selected.length !== 1 ? 's' : ''} selected` : 'Select at least one skill to continue')
-              }
+                : (selected.length > 0 ? `${selected.length} skill${selected.length !== 1 ? 's' : ''} selected` : 'Select at least one skill to continue')}
             </Text>
-          </MotiView>
-        </View>
-      </View>
 
-      {/* Content card */}
-      <View style={{ flex: 1, marginTop: -24 }}>
-        <View style={{ flex: 1, backgroundColor: "#ffffff", borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 24, shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 16 }}>
-          <ScrollView contentContainerStyle={{ paddingHorizontal: PADDING.md, paddingBottom: 100, maxWidth: 560, width: '100%', alignSelf: 'center' }} showsVerticalScrollIndicator={false}>
-            
-                        {/* Skills organized by tier */}
-            {Object.entries(skillsByTier).map(([tierKey, tierSkills]) => {
-              if (!tierSkills || tierSkills.length === 0) return null;
-              
-              // Get tier info from first skill in group
-              const firstSkill = tierSkills[0];
-              const tierName = firstSkill?.skillTier?.name;
-              // Default icon based on tier order for now
-              const tierOrder = firstSkill?.skillTier?.order || 1;
-              const tierIcon = tierOrder === 1 ? '🛡️' : tierOrder === 2 ? '🚀' : '👑';
-              
-              return isAssessmentMode ? (
-                <AdaptiveTierSection
-                  key={tierKey}
-                  tierKey={tierKey}
-                  title={tierName}
-                  icon={tierIcon}
-                  skills={tierSkills}
-                  selectedIds={selected}
-                  onToggle={handleToggleSkill}
-                  brand={BRAND}
-                  skillsWithAssessments={skillsWithAssessments}
-                  isAssessmentMode={true}
-                  onTraditionalAssessment={handleTraditionalAssessment}
-                />
-              ) : (
-                <TierSection
-                  key={tierKey}
-                  tierKey={tierKey}
-                  title={tierName}
-                  icon={tierIcon}
-                  skills={tierSkills}
-                  selectedIds={selected}
-                  onToggle={handleToggleSkill}
-                  brand={BRAND}
-                  skillsWithAssessments={skillsWithAssessments}
-                />
+            {/* Skills organized by tier with a single continuous vertical line */}
+            {(() => { try { console.log('🔎 Render keys:', { tiers: tiers.map(t=>t.key), skillsTierKeys: Object.keys(skillsByTier) }); } catch {} return null; })()}
+            <View style={{ position: 'relative' }}>
+              <View style={{ position: 'absolute', left: 16, top: 14, bottom: 0, width: 2, backgroundColor: '#111827' }} />
+            {tiers.map((t, tierIdx) => [t.key, skillsByTier[t.key] || [], t.name, tierIdx] as const).map(([tierKey, tierSkills, tierName, tierIdx]) => {
+              const isLastTier = tierIdx === tiers.length - 1;
+              return (
+                <View key={tierKey} style={{ marginBottom: 28 }} onLayout={isLastTier && (!tierSkills || tierSkills.length === 0) ? (e) => {
+                  const y = e.nativeEvent.layout.y;
+                  setTimelineEndY(y + 14); // end at header connector
+                } : undefined}>
+
+                  {/* Tier header with connector */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                    <View style={{ width: 16 }} />
+                    <View style={{ width: 18, height: 2, backgroundColor: '#111827', marginRight: 8 }} />
+                    <Text style={{ fontSize: 18, fontWeight: '700', color: '#0F172A' }}>{tierName}</Text>
+                  </View>
+
+                  {/* Skills list (empty allowed) */}
+                  <View>
+                    {(tierSkills || []).map((skill: any, idx: number) => {
+                      const hasEligible = eligibleSet && (eligibleSet as any).size > 0;
+                      const locked = hasEligible ? !(eligibleSet?.has(skill.id) || eligibleSet?.has(skill.mongoId)) : false;
+                      const isSelected = selected.includes(skill.id);
+                      const isLastSkill = idx === (tierSkills.length - 1);
+                      return (
+                        <View key={skill.id} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                          {/* Timeline indicator column */}
+                          <View style={{ width: 32, alignItems: 'center' }}>
+                            {locked ? (
+                              <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#111827', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' }}>
+                                <AntDesign name="lock" size={10} color="#111827" />
+                              </View>
+                            ) : (
+                              <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#111827', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' }}>
+                                {isSelected ? <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: BRAND }} /> : null}
+                              </View>
+                            )}
+                          </View>
+
+                          {/* Skill row */}
+                          <View
+                            style={{
+                              flex: 1,
+                              backgroundColor: locked ? '#F9FAFB' : (isSelected ? '#E6F2FF' : '#FFFFFF'),
+                              borderRadius: 14,
+                              paddingVertical: 12,
+                              paddingHorizontal: 14,
+                              borderWidth: 1,
+                              borderColor: locked ? '#E5E7EB' : (isSelected ? BRAND : '#E5E7EB')
+                            }}
+                            onStartShouldSetResponder={() => !locked}
+                            onResponderRelease={() => { if (!locked) handleToggleSkill(skill.id); }}
+                            onLayout={isLastTier && isLastSkill ? (e) => {
+                              const y = e.nativeEvent.layout.y;
+                              setTimelineEndY(Math.max(14, y + 6)); // stop near the node center
+                            } : undefined}
+                          >
+                            <Text style={{ fontSize: 16, fontWeight: '700', color: locked ? '#9CA3AF' : '#111827' }} numberOfLines={1}>
+                              {skill.name}
+                            </Text>
+                            <Text style={{ marginTop: 4, fontSize: 12, color: locked ? '#9CA3AF' : '#6B7280' }} numberOfLines={1}>
+                              {skill?.category || ''}
+                            </Text>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
               );
-            })
-        }
+            })}
+            {timelineEndY != null && (
+              <View style={{ position: 'absolute', left: 15, top: timelineEndY, bottom: 0, width: 4, backgroundColor: '#F3F4F6' }} />
+            )}
+            </View>
 
             {/* Error Display */}
         {error && (
@@ -397,20 +432,15 @@ export default function SkillsScreen() {
           </ScrollView>
           
           {/* Sticky footer CTA */}
-          <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: PADDING.md, paddingTop: 12, paddingBottom: 34, zIndex: 1000, backgroundColor: "#ffffff" }}>
-            <LinearGradient colors={GRADIENTS.footer} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: "absolute", inset: 0, opacity: 0.1 }} />
-            <Button
-              mode="contained"
+          <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: width * 0.06, paddingTop: 12, paddingBottom: 12, zIndex: 1000, backgroundColor: "#ffffff", borderTopWidth: 1, borderTopColor: '#D1D5DB' }}>
+            <TouchableOpacity
               onPress={handleContinue}
-              loading={busy}
+              activeOpacity={0.85}
               disabled={!canContinue || busy}
-              contentStyle={{ height: 56 }}
-              style={{ borderRadius: 28, backgroundColor: BRAND, opacity: canContinue ? 1 : 0.7, shadowColor: BRAND, shadowOpacity: 0.35, shadowRadius: 14 }}
-              labelStyle={{ fontWeight: "800", letterSpacing: 0.3 }}
+              style={{ backgroundColor: BRAND, borderRadius: 22, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, marginHorizontal: 6, opacity: (!canContinue || busy) ? 0.6 : 1 }}
             >
-              Continue
-            </Button>
-          </View>
+              <Text style={{ color: '#fff', fontSize: width * 0.038, fontWeight: '600' }}>Continue</Text>
+            </TouchableOpacity>
         </View>
       </View>
     </SafeAreaView>

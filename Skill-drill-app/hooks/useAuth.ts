@@ -169,8 +169,8 @@ export const useAuth = () => {
     switch (user.onboardingStep) {
       case 'EMAIL_VERIFIED':
         // User just signed up, needs to complete career role
-        console.log('🔄 getOnboardingNextStep: User at EMAIL_VERIFIED, directing to career-role');
-        return '/auth/career-role';
+        console.log('🔄 getOnboardingNextStep: User at EMAIL_VERIFIED, directing to careerRole');
+        return '/auth/careerRole';
       case 'Completed':
         // User completed full onboarding
         console.log('🔄 getOnboardingNextStep: User at COMPLETED, directing to dashboard');
@@ -181,8 +181,8 @@ export const useAuth = () => {
         
         // First check: Do they have career/role info?
         if (!user.careerLevelId || !user.roleTypeId) {
-          console.log('🔄 getOnboardingNextStep: User missing career/role info, directing to career-role');
-          return '/auth/career-role';
+          console.log('🔄 getOnboardingNextStep: User missing career/role info, directing to careerRole');
+          return '/auth/careerRole';
         }
         
         // They have career/role info, check if they have skills

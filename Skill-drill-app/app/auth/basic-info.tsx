@@ -67,7 +67,7 @@ export default function BasicInfoScreen() {
       } else {
         // User needs to complete career info
         try { await Haptics.selectionAsync(); } catch {}
-        router.push("/auth/career-role");
+        router.push("/auth/careerRole");
       }
     } catch (error: any) {
       console.error('Profile update error:', error);

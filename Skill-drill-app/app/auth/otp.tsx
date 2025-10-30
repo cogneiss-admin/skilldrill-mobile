@@ -37,6 +37,7 @@ export default function OtpScreen() {
   const [errorMessage, setErrorMessage] = useState("");
   const [verified, setVerified] = useState(false);
   const { remaining, reset, setTo } = useCountdown(30);
+  const [focusIndex, setFocusIndex] = useState<number | undefined>(undefined);
 
   const refs = [useRef(null), useRef(null), useRef(null), useRef(null), useRef(null), useRef(null)];
 
@@ -113,12 +114,12 @@ export default function OtpScreen() {
           }, 700);
         } else {
           setTimeout(() => {
-            router.replace({ pathname: "/auth/career-role", params: { phone, email } });
+            router.replace({ pathname: "/auth/careerRole", params: { phone, email } });
           }, 700);
         }
         return true;
       } else {
-        setErrorMessage(response.message || "Invalid OTP");
+        setErrorMessage(response.message || "Incorrect OTP. Please try again.");
         return false;
       }
     } catch (error: any) {
@@ -128,7 +129,7 @@ export default function OtpScreen() {
         setTo(retryAfter);
         setErrorMessage(`Too many OTP requests. Try again in ${Math.ceil(retryAfter / 60)} minute(s).`);
       } else {
-        setErrorMessage(error.message || "Enter valid OTP");
+        setErrorMessage(error.message || "Incorrect OTP. Please try again.");
       }
       return false;
     } finally {
@@ -138,18 +139,17 @@ export default function OtpScreen() {
 
   // Auto-verify as soon as 6 digits are entered
   useEffect(() => {
-    if (code.length === 6 && !verified) {
+    // Only attempt verification when all 6 digits are entered and not already verifying
+    if (!verified && !busy && code.length === 6) {
       verifyOtp().then((ok) => {
         if (!ok) {
           // Reset code on failure so user can re-enter quickly
           setDigits(["", "", "", "", "", ""]);
+          setFocusIndex(0);
         }
       });
-    } else if (errorMessage) {
-      // Clear error while user is typing
-      setErrorMessage("");
     }
-  }, [code, verified, errorMessage, verifyOtp]);
+  }, [code, verified, busy, verifyOtp]);
 
   const resend = useCallback(async () => {
     if (remaining > 0) return;
@@ -196,7 +196,7 @@ export default function OtpScreen() {
       <StatusBar style="dark" />
 
       {/* Header */}
-      <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingVertical: 12 }}>
         <Pressable 
           onPress={() => {
             console.log('🔙 Back button pressed, attempting to go back...');
@@ -214,7 +214,7 @@ export default function OtpScreen() {
           hitSlop={12} 
           style={({ pressed }) => ({
             padding: 8, 
-            marginRight: 4,
+            marginRight: 12,
             backgroundColor: pressed ? '#e5e7eb' : '#f3f4f6',
             borderRadius: 8,
             opacity: pressed ? 0.7 : 1
@@ -222,7 +222,7 @@ export default function OtpScreen() {
         >
           <AntDesign name="arrowleft" size={22} color="#111827" />
         </Pressable>
-        <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827" }}>OTP Verification</Text>
+        <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827", marginLeft: 8 }}>OTP Verification</Text>
       </View>
 
       <KeyboardAvoidingView behavior={Platform.select({ ios: "padding", android: undefined })} style={{ flex: 1 }}>
@@ -241,12 +241,18 @@ export default function OtpScreen() {
               length={6}
               value={digits}
               onChange={(v) => {
-                if (!verified) setDigits(v);
+                if (!verified) {
+                  setDigits(v);
+                  if (focusIndex !== undefined) setFocusIndex(undefined);
+                  if (errorMessage) setErrorMessage("");
+                }
               }}
-              color={errorMessage ? "#DC2626" : verified ? "#16A34A" : "#0A66C2"}
+              color={verified ? "#16A34A" : "#0A66C2"}
+              error={!!errorMessage}
+              focusIndex={focusIndex}
             />
             {errorMessage ? (
-              <Text style={{ color: "#DC2626", marginTop: 10, textAlign: "center", fontWeight: "600" }}>{errorMessage}</Text>
+              <Text style={{ color: "#DC2626", marginTop: 10, textAlign: "center", fontWeight: "700" }}>{errorMessage}</Text>
             ) : verified ? (
               <Text style={{ color: "#16A34A", marginTop: 10, textAlign: "center", fontWeight: "700" }}>OTP verified! Redirecting…</Text>
             ) : null}
@@ -254,7 +260,7 @@ export default function OtpScreen() {
 
           {/* Resend */}
           <View style={{ alignItems: "center", marginTop: 24 }}>
-            <Text style={{ fontSize: 15, color: "#6B7280" }}>
+            <Text style={{ fontSize: 15, color: "#6B7280", fontWeight: '700' }}>
               Didn&apos;t get the OTP?{" "}
               <Text
                 onPress={resend}

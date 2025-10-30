@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useEffect, useMemo, useState } from "react";
-import { Pressable, View, Image, ScrollView, Text } from "react-native";
+import { Pressable, View, Image, ScrollView, Text, BackHandler } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button, TextInput } from "react-native-paper";
 import ErrorBanner from "../../components/ErrorBanner";
@@ -14,11 +14,14 @@ import GoogleGIcon from "../../components/GoogleGIcon";
 import LinkedInIcon from "../../components/LinkedInIcon";
 import CodeBoxes from "../../components/CodeBoxes";
 import { BRAND } from "../components/Brand";
-import { useCountries } from "../../hooks/useCountries";
+import { useResponsive } from "../../utils/responsive";
+import CountryPickerModal from "../components/CountryPickerModal";
+import { useCountries, getConvertedFlagUrl } from "../../hooks/useCountries";
 const logoSrc = require("../../assets/images/logo.png");
 
 export default function SignupScreen() {
   const router = useRouter();
+  const responsive = useResponsive();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -27,7 +30,7 @@ export default function SignupScreen() {
   const [selectedResidenceCountry, setSelectedResidenceCountry] = useState("IN");
   const [countryPickerVisible, setCountryPickerVisible] = useState(false);
   const [residencePickerVisible, setResidencePickerVisible] = useState(false);
-  const [countrySearchQuery, setCountrySearchQuery] = useState("");
+  // search handled inside CountryPickerModal
   const [residenceSearchQuery, setResidenceSearchQuery] = useState("");
   const [busy, setBusy] = useState(false);
   const { countries, loading: countriesLoading } = useCountries();
@@ -73,24 +76,16 @@ export default function SignupScreen() {
       code: "IN", 
       name: "India", 
       phoneCode: "+91", 
-      flag: "https://flagcdn.com/w320/in.png" 
+      flag: null 
     };
   }, [countries, selectedCountryCode]);
+
 
   const selectedResidenceCountryData = useMemo(() => {
     return countries.find(c => c.code === selectedResidenceCountry);
   }, [countries, selectedResidenceCountry]);
 
-  // Filter countries based on search queries
-  const filteredPhoneCountries = useMemo(() => {
-    if (!countrySearchQuery.trim()) return countries;
-    const query = countrySearchQuery.toLowerCase().trim();
-    return countries.filter(country => 
-      country.name.toLowerCase().includes(query) || 
-      country.phoneCode.includes(query) ||
-      country.code.toLowerCase().includes(query)
-    );
-  }, [countries, countrySearchQuery]);
+  // Country-code search handled inside CountryPickerModal
 
   const filteredResidenceCountries = useMemo(() => {
     if (!residenceSearchQuery.trim()) return countries;
@@ -135,7 +130,7 @@ export default function SignupScreen() {
       } else {
         // User needs to complete career info
         try { await Haptics.selectionAsync(); } catch {}
-        router.push("/auth/career-role");
+        router.push("/auth/careerRole");
       }
     } catch (error: any) {
       setErrorMessage(error?.message || 'Something went wrong. Please try again.');
@@ -255,6 +250,17 @@ export default function SignupScreen() {
       setErrorMessage(friendly || 'Failed to send OTP');
     }
   };
+
+  // Android hardware back: close open pickers/sheets first
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (countryPickerVisible) { setCountryPickerVisible(false); return true; }
+      if (residencePickerVisible) { setResidencePickerVisible(false); return true; }
+      if (otpSheetVisible && !otpBusy) { setOtpSheetVisible(false); return true; }
+      return false;
+    });
+    return () => sub.remove();
+  }, [countryPickerVisible, residencePickerVisible, otpSheetVisible, otpBusy]);
 
   // Bulk verify: send OTP to both email and phone if available; open sheet prioritizing phone
   const handleVerifyAll = async () => {
@@ -422,7 +428,7 @@ export default function SignupScreen() {
           // User needs to complete career info
           setTimeout(() => {
             setOtpSheetVisible(false);
-            router.replace("/auth/career-role");
+            router.replace("/auth/careerRole");
           }, 800);
         }
       } else {
@@ -465,35 +471,7 @@ export default function SignupScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: BRAND }}>
       <StatusBar style="light" />
 
-      {/* Header with back button */}
-      <View style={{ 
-        flexDirection: "row", 
-        alignItems: "center", 
-        paddingHorizontal: 16, 
-        paddingVertical: 12,
-        position: "absolute",
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 10
-      }}>
-        <Pressable 
-          onPress={() => {
-            console.log('🔙 Back button pressed from signup, going to login...');
-            router.replace("/auth/login");
-          }} 
-          hitSlop={12} 
-          style={({ pressed }) => ({
-            padding: 8, 
-            marginRight: 4,
-            backgroundColor: pressed ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)',
-            borderRadius: 8,
-            opacity: pressed ? 0.7 : 1
-          })}
-        >
-          <AntDesign name="arrowleft" size={22} color="#ffffff" />
-        </Pressable>
-      </View>
+      {/* Removed header back button for signup screen */}
 
       {/* Top half - Brand section like login (reduced height) */}
       <View style={{ 
@@ -526,8 +504,8 @@ export default function SignupScreen() {
         />
       </View>
 
-      {/* Bottom half - White form section matching login (more space) */}
-      <View style={{ flex: 1, backgroundColor: "#ffffff", borderTopLeftRadius: 24, borderTopRightRadius: 24, marginTop: -20 }}>
+      {/* Bottom half - White form section with square top edges */}
+      <View style={{ flex: 1, backgroundColor: "#ffffff", borderTopLeftRadius: 0, borderTopRightRadius: 0, marginTop: -20 }}>
         <ScrollView
           contentContainerStyle={{ paddingTop: 16, paddingHorizontal: 24, paddingBottom: 20, alignItems: "center", maxWidth: 560, width: '100%', alignSelf: 'center' }}
           showsVerticalScrollIndicator={false}
@@ -547,11 +525,13 @@ export default function SignupScreen() {
               value={name}
               onChangeText={setName}
               autoCapitalize="words"
-              style={{ backgroundColor: "#f8f9fa" }}
+              style={{ backgroundColor: "#f8f9fa", height: responsive.input.height }}
               textColor="#333333"
+              placeholderTextColor="#999999"
               outlineColor="#e9ecef"
               activeOutlineColor={BRAND}
-              contentStyle={{ fontSize: 16 }}
+              contentStyle={{ fontSize: responsive.input.fontSize, fontWeight: '700', paddingVertical: 0 }}
+              theme={{ colors: { onSurfaceVariant: '#666666' }, roundness: 12 }}
             />
           </View>
 
@@ -567,11 +547,13 @@ export default function SignupScreen() {
               textContentType="emailAddress"
               value={email}
               onChangeText={setEmail}
-              style={{ backgroundColor: "#f8f9fa" }}
+              style={{ backgroundColor: "#f8f9fa", height: responsive.input.height }}
               textColor="#333333"
+              placeholderTextColor="#999999"
               outlineColor="#e9ecef"
               activeOutlineColor={BRAND}
-              contentStyle={{ fontSize: 16 }}
+              contentStyle={{ fontSize: responsive.input.fontSize, fontWeight: '700', paddingVertical: 0 }}
+              theme={{ colors: { onSurfaceVariant: '#666666' }, roundness: 12 }}
               right={undefined}
             />
           </View>
@@ -586,55 +568,66 @@ export default function SignupScreen() {
             }}>
               Phone Number
             </Text>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
               <Pressable 
-                style={{ width: 100 }}
                 onPress={() => setCountryPickerVisible(true)}
+                style={{ width: 60 }}
               >
                 <View style={{
-                  backgroundColor: "#f8f9fa",
+                  backgroundColor: '#f8f9fa',
                   borderWidth: 1,
-                  borderColor: "#e9ecef",
+                  borderColor: '#e9ecef',
                   borderRadius: 12,
-                  minHeight: 56,
-                  justifyContent: 'center',
+                  height: responsive.input.height,
                   alignItems: 'center',
+                  justifyContent: 'center',
                   paddingHorizontal: 8
                 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     {selectedPhoneCountry.flag ? (
                       <Image 
-                        source={{ uri: selectedPhoneCountry.flag }}
-                        style={{ width: 16, height: 12, marginRight: 4 }}
+                        source={{ uri: getConvertedFlagUrl(selectedPhoneCountry.flag) }}
+                        style={{ width: 18, height: 12, marginRight: 6 }}
                       />
                     ) : (
-                      <View style={{ width: 16, height: 12, marginRight: 4, backgroundColor: '#f0f0f0' }} />
+                      <View style={{ width: 20, height: 14, marginRight: 6, backgroundColor: '#e9ecef', borderRadius: 2 }} />
                     )}
-                    <Text style={{
-                      fontSize: 14,
-                      color: "#333333"
-                    }}>
-                      {selectedPhoneCountry.phoneCode}
-                    </Text>
+                    <AntDesign name="down" size={12} color="#6B7280" />
                   </View>
                 </View>
               </Pressable>
+
               <TextInput
-                style={{
-                  backgroundColor: "#f8f9fa",
-                  borderWidth: 1,
-                  borderColor: "#e9ecef", 
-                  borderRadius: 12,
-                  minHeight: 56,
-                  fontSize: 16,
-                  color: "#333333",
-                  paddingHorizontal: 16,
-                  flex: 1
-                }}
-                placeholder="Enter phone number"
+                mode="outlined"
+                placeholder="Enter Phone Number"
                 value={formattedPhoneNumber}
                 onChangeText={setFormattedPhoneNumber}
                 keyboardType="phone-pad"
+                maxLength={15}
+                style={{
+                  backgroundColor: '#f8f9fa',
+                  height: responsive.input.height,
+                  flex: 1
+                }}
+                textColor="#333333"
+                placeholderTextColor="#999999"
+                outlineColor="#e9ecef"
+                activeOutlineColor={BRAND}
+                contentStyle={{
+                  paddingVertical: 0,
+                  fontSize: responsive.input.fontSize,
+                  fontWeight: '700',
+                  textAlignVertical: 'center'
+                }}
+                theme={{
+                  colors: { onSurfaceVariant: '#666666' },
+                  roundness: 12,
+                }}
+                left={<TextInput.Icon icon={() => (
+                  <Text style={{ color: '#111827', fontWeight: '700', fontSize: responsive.input.fontSize }}>
+                    {`${selectedPhoneCountry.phoneCode} `}
+                  </Text>
+                )} />}
               />
             </View>
           </View>
@@ -676,9 +669,9 @@ export default function SignupScreen() {
 
           {/* Contact method validation message */}
           {!emailOk && !phoneOk && (email.trim() || formattedPhoneNumber.trim()) && (
-            <View style={{ width: "100%", marginBottom: 8 }}>
-              <Text style={{ color: "#DC2626", fontSize: 12, marginTop: 4 }}>
-                Please provide a valid email address or phone number
+            <View style={{ width: "100%", marginTop: 2, marginBottom: 8 }}>
+              <Text style={{ color: "#DC2626", fontSize: 13, fontWeight: '700' }}>
+                * Please provide a valid email address or phone number
               </Text>
             </View>
           )}
@@ -688,7 +681,9 @@ export default function SignupScreen() {
           {/* Continue */}
           <View style={{ width: "100%", marginTop: 8 }}>
             {errorMessage ? (
-              <ErrorBanner message={errorMessage} tone="error" />
+              <Text style={{ color: '#DC2626', fontSize: 13, fontWeight: '700', marginBottom: 8 }}>
+                * {errorMessage}
+              </Text>
             ) : null}
 
             <Button
@@ -848,163 +843,25 @@ export default function SignupScreen() {
       )}
 
       {/* Country Code Picker Modal */}
-      {countryPickerVisible && (
-        <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'flex-end' }}>
-          <Pressable
-            onPress={() => {
-              setCountryPickerVisible(false);
-              setCountrySearchQuery("");
-            }}
-            style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)' }}
-          />
-          <View style={{ backgroundColor: '#ffffff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24, maxHeight: '70%' }}>
-            <View style={{ alignItems: 'center' }}>
-              <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: '#E5E7EB', marginBottom: 12 }} />
-            </View>
-            <Text style={{ fontSize: 18, fontWeight: '900', color: '#0f172a', marginBottom: 16 }}>Select Country Code</Text>
-            
-            {/* Search Input */}
-            <TextInput
-              mode="outlined"
-              placeholder="Search country..."
-              value={countrySearchQuery}
-              onChangeText={setCountrySearchQuery}
-              style={{ 
-                backgroundColor: "#f8f9fa",
-                marginBottom: 12,
-              }}
-              textColor="#333333"
-              placeholderTextColor="#999999"
-              outlineColor="#e9ecef"
-              activeOutlineColor={BRAND}
-              contentStyle={{
-                fontSize: 14,
-              }}
-              theme={{
-                colors: {
-                  onSurfaceVariant: "#666666",
-                },
-                roundness: 8,
-              }}
-              left={<TextInput.Icon icon="magnify" size={20} />}
-            />
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {countriesLoading ? (
-                <View style={{ padding: 20, alignItems: 'center' }}>
-                  <Text style={{ color: '#666666' }}>Loading countries...</Text>
-                </View>
-              ) : filteredPhoneCountries.length > 0 ? (
-                filteredPhoneCountries.map((country) => (
-                <Pressable
-                  key={country.code}
-                  style={({ pressed }) => ({
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    paddingVertical: 12,
-                    paddingHorizontal: 16,
-                    backgroundColor: pressed ? '#f3f4f6' : 'transparent',
-                    borderRadius: 8
-                  })}
-                  onPress={() => {
+      <CountryPickerModal
+        visible={countryPickerVisible}
+        onClose={() => setCountryPickerVisible(false)}
+        onSelect={(country) => {
                     setSelectedCountryCode(country.code);
-                    setCountryPickerVisible(false);
-                    setCountrySearchQuery("");
-                  }}
-                >
-                  <Image 
-                    source={{ uri: country.flag }}
-                    style={{ width: 24, height: 18, marginRight: 12 }}
-                  />
-                  <Text style={{ fontSize: 16, color: '#333333', flex: 1 }}>{country.name}</Text>
-                  <Text style={{ fontSize: 16, color: '#666666' }}>{country.phoneCode}</Text>
-                </Pressable>
-              ))) : (
-                <View style={{ padding: 20, alignItems: 'center' }}>
-                  <Text style={{ color: '#666666' }}>No countries found</Text>
-                </View>
-              )}
-            </ScrollView>
-          </View>
-        </View>
-      )}
+        }}
+      />
 
-      {/* Country of Residence Picker Modal */}
-      {residencePickerVisible && (
-        <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'flex-end' }}>
-          <Pressable
-            onPress={() => {
-              setResidencePickerVisible(false);
-              setResidenceSearchQuery("");
-            }}
-            style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)' }}
-          />
-          <View style={{ backgroundColor: '#ffffff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24, maxHeight: '70%' }}>
-            <View style={{ alignItems: 'center' }}>
-              <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: '#E5E7EB', marginBottom: 12 }} />
-            </View>
-            <Text style={{ fontSize: 18, fontWeight: '900', color: '#0f172a', marginBottom: 16 }}>Select Country of Residence</Text>
-            
-            {/* Search Input */}
-            <TextInput
-              mode="outlined"
-              placeholder="Search country..."
-              value={residenceSearchQuery}
-              onChangeText={setResidenceSearchQuery}
-              style={{ 
-                backgroundColor: "#f8f9fa",
-                marginBottom: 12,
-              }}
-              textColor="#333333"
-              placeholderTextColor="#999999"
-              outlineColor="#e9ecef"
-              activeOutlineColor={BRAND}
-              contentStyle={{
-                fontSize: 14,
-              }}
-              theme={{
-                colors: {
-                  onSurfaceVariant: "#666666",
-                },
-                roundness: 8,
-              }}
-              left={<TextInput.Icon icon="magnify" size={20} />}
-            />
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {countriesLoading ? (
-                <View style={{ padding: 20, alignItems: 'center' }}>
-                  <Text style={{ color: '#666666' }}>Loading countries...</Text>
-                </View>
-              ) : filteredResidenceCountries.length > 0 ? (
-                filteredResidenceCountries.map((country) => (
-                <Pressable
-                  key={country.code}
-                  style={({ pressed }) => ({
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    paddingVertical: 12,
-                    paddingHorizontal: 16,
-                    backgroundColor: pressed ? '#f3f4f6' : 'transparent',
-                    borderRadius: 8
-                  })}
-                  onPress={() => {
+      {/* Country of Residence Picker Modal via reusable component */}
+      <CountryPickerModal
+        visible={residencePickerVisible}
+        title="Select Country of Residence"
+        showPhoneCode={false}
+        onClose={() => setResidencePickerVisible(false)}
+        onSelect={(country) => {
                     setSelectedResidenceCountry(country.code);
                     setResidencePickerVisible(false);
-                    setResidenceSearchQuery("");
-                  }}
-                >
-                  <Text style={{ fontSize: 16, color: '#333333' }}>{country.name}</Text>
-                </Pressable>
-              ))) : (
-                <View style={{ padding: 20, alignItems: 'center' }}>
-                  <Text style={{ color: '#666666' }}>No countries found</Text>
-                </View>
-              )}
-            </ScrollView>
-          </View>
-        </View>
-      )}
+        }}
+      />
     </SafeAreaView>
   );
 }

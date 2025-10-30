@@ -69,7 +69,7 @@ const App = React.memo(() => {
         // Use getOnboardingNextStep to determine the exact next step
         const nextStep = getOnboardingNextStep();
         console.log('📋 Index: Navigating to next step:', nextStep);
-        router.replace(nextStep || '/auth/career-role');
+        router.replace(nextStep || '/auth/careerRole');
       }
     } else {
       console.log('🔐 Index: Navigating to login');

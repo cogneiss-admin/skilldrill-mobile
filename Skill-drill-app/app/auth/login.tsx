@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Pressable, View, Image, ScrollView, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TextInput } from "react-native-paper";
@@ -16,13 +16,15 @@ import { detectInputType, isValidEmail, isValidPhone, validationMessageFor } fro
 import { useSocialAuth } from "../../hooks/useSocialAuth";
 import { useResponsive } from "../../utils/responsive";
 import { BRAND } from "../components/Brand";
-import { useCountries } from "../../hooks/useCountries";
+import { useCountries, getConvertedFlagUrl } from "../../hooks/useCountries";
+import CountryPickerModal from "../components/CountryPickerModal";
 
 const logoSrc = require("../../assets/images/logo.png");
 
 export default function LoginScreen() {
   const router = useRouter();
   const responsive = useResponsive();
+  const phoneInputRef = useRef<any>(null);
   const [emailOrPhone, setEmailOrPhone] = useState("");
   const [showPhoneInput, setShowPhoneInput] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -30,10 +32,9 @@ export default function LoginScreen() {
   const [showSignupSuggestion, setShowSignupSuggestion] = useState(false);
   const [selectedCountryCode, setSelectedCountryCode] = useState("IN");
   const [countryPickerVisible, setCountryPickerVisible] = useState(false);
-  const [countrySearchQuery, setCountrySearchQuery] = useState("");
   const { signInWithGoogle, signInWithLinkedIn, isLoading: socialLoading, isProviderAvailable } = useSocialAuth();
   const { showError, showSuccess } = useToast();
-  const { countries, loading: countriesLoading } = useCountries();
+  const { countries } = useCountries();
 
   // Detect if input is email or phone number (simple, user-friendly heuristic)
   const inputType = useMemo(() => detectInputType(emailOrPhone), [emailOrPhone]);
@@ -43,26 +44,18 @@ export default function LoginScreen() {
     return emailOrPhone.trim();
   }, [emailOrPhone]);
 
-  // Get selected country data
+  // Derive selected phone country from countries + selectedCountryCode
   const selectedPhoneCountry = useMemo(() => {
-    return countries.find(c => c.code === selectedCountryCode) || { 
-      code: "IN", 
-      name: "India", 
-      phoneCode: "+91", 
-      flag: "https://flagcdn.com/w320/in.png" 
+    return countries.find((c: any) => c.code === selectedCountryCode) || {
+      code: "IN",
+      name: "India",
+      phoneCode: "+91",
+      flag: null,
     };
   }, [countries, selectedCountryCode]);
 
-  // Filter countries based on search query
-  const filteredCountries = useMemo(() => {
-    if (!countrySearchQuery.trim()) return countries;
-    const query = countrySearchQuery.toLowerCase().trim();
-    return countries.filter(country => 
-      country.name.toLowerCase().includes(query) || 
-      country.phoneCode.includes(query) ||
-      country.code.toLowerCase().includes(query)
-    );
-  }, [countries, countrySearchQuery]);
+
+  // Country filtering handled inside CountryPickerModal
 
   const isValidInput = useMemo(() => {
     if (!emailOrPhone.trim()) {
@@ -235,12 +228,12 @@ export default function LoginScreen() {
         />
       </View>
 
-      {/* Bottom half - White section with form */}
+      {/* Bottom half - White section with form (square top edges) */}
       <View style={{ 
         flex: 1,
         backgroundColor: "#ffffff",
-        borderTopLeftRadius: responsive.size(24),
-        borderTopRightRadius: responsive.size(24),
+        borderTopLeftRadius: 0,
+        borderTopRightRadius: 0,
         marginTop: responsive.spacing(-20),
       }}>
         <ScrollView
@@ -299,7 +292,16 @@ export default function LoginScreen() {
                   autoComplete="email"
                   value={emailOrPhone}
                   maxLength={50}
-                  onChangeText={setEmailOrPhone}
+                  onChangeText={(val) => {
+                    setEmailOrPhone(val);
+                    // Auto-switch to phone UI when first character indicates phone (digit or '+')
+                    if (!showPhoneInput && val && /^[+0-9]/.test(val[0] || '')) {
+                      setShowPhoneInput(true);
+                      setTimeout(() => {
+                        try { phoneInputRef.current?.focus?.(); } catch {}
+                      }, 0);
+                    }
+                  }}
                   style={{ 
                     backgroundColor: "#f8f9fa",
                     height: responsive.input.height,
@@ -311,6 +313,7 @@ export default function LoginScreen() {
                   contentStyle={{
                     paddingVertical: 0,
                     fontSize: responsive.input.fontSize,
+                    fontWeight: '700',
                     textAlign: "left",
                   }}
                   theme={{
@@ -321,100 +324,96 @@ export default function LoginScreen() {
                   }}
                   left={<TextInput.Icon icon="email-outline" size={responsive.size(20)} />}
                 />
-                <Pressable 
-                  onPress={() => setShowPhoneInput(true)}
-                  style={{ alignSelf: 'center', marginTop: 8 }}
-                >
-                  <Text style={{ color: BRAND, fontSize: 14, fontWeight: "600" }}>
-                    Use phone number instead
-                  </Text>
-                </Pressable>
               </View>
             ) : (
               <View>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={{ flexDirection: 'row', gap: 12 }}>
                   <Pressable 
-                    style={{ width: 100 }}
                     onPress={() => setCountryPickerVisible(true)}
+                    style={{ width: 60 }}
                   >
                     <View style={{
-                      backgroundColor: "#f8f9fa",
+                      backgroundColor: '#f8f9fa',
                       borderWidth: 1,
-                      borderColor: "#e9ecef",
+                      borderColor: '#e9ecef',
                       borderRadius: 12,
-                      minHeight: responsive.input.height,
-                      justifyContent: 'center',
+                      height: responsive.input.height,
                       alignItems: 'center',
+                      justifyContent: 'center',
                       paddingHorizontal: 8
                     }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         {selectedPhoneCountry.flag ? (
                           <Image 
-                            source={{ uri: selectedPhoneCountry.flag }}
-                            style={{ width: 16, height: 12, marginRight: 4 }}
+                            source={{ uri: getConvertedFlagUrl(selectedPhoneCountry.flag) }}
+                            style={{ width: 18, height: 12, marginRight: 6 }}
                           />
                         ) : (
-                          <View style={{ width: 16, height: 12, marginRight: 4, backgroundColor: '#f0f0f0' }} />
+                          <View style={{ width: 20, height: 14, marginRight: 6, backgroundColor: '#e9ecef', borderRadius: 2 }} />
                         )}
-                        <Text style={{
-                          fontSize: responsive.input.fontSize - 2,
-                          color: "#333333"
-                        }}>
-                          {selectedPhoneCountry.phoneCode}
-                        </Text>
+                        <AntDesign name="down" size={12} color="#6B7280" />
                       </View>
                     </View>
                   </Pressable>
+
                   <TextInput
-                    style={{
-                      backgroundColor: "#f8f9fa",
-                      borderWidth: 1,
-                      borderColor: "#e9ecef",
-                      borderRadius: 12,
-                      minHeight: responsive.input.height,
-                      fontSize: responsive.input.fontSize,
-                      color: "#333333",
-                      paddingHorizontal: 16,
+                    ref={phoneInputRef}
+                    mode="outlined"
+                    placeholder="Enter Phone Number"
+                    value={emailOrPhone}
+                    onChangeText={(val) => {
+                      setEmailOrPhone(val);
+                      // If cleared, return to email input UI
+                      if (!val) {
+                        setShowPhoneInput(false);
+                      }
+                    }}
+                    keyboardType="phone-pad"
+                    maxLength={15}
+                    style={{ 
+                      backgroundColor: '#f8f9fa',
+                      height: responsive.input.height,
                       flex: 1
                     }}
-                    placeholder="Enter phone number"
-                    value={emailOrPhone}
-                    onChangeText={setEmailOrPhone}
-                    keyboardType="phone-pad"
+                    textColor="#333333"
+                    placeholderTextColor="#999999"
+                    outlineColor="#e9ecef"
+                    activeOutlineColor={BRAND}
+                    contentStyle={{
+                      paddingVertical: 0,
+                      fontSize: responsive.input.fontSize,
+                      fontWeight: '700',
+                      textAlignVertical: 'center'
+                    }}
+                    theme={{
+                      colors: { onSurfaceVariant: '#666666' },
+                      roundness: 12,
+                    }}
+                    left={<TextInput.Icon icon={() => (
+                      <Text style={{ color: '#111827', fontWeight: '700', fontSize: responsive.input.fontSize }}>
+                        {`${selectedPhoneCountry.phoneCode} `}
+                      </Text>
+                    )} />}
                   />
                 </View>
-                <Pressable 
-                  onPress={() => setShowPhoneInput(false)}
-                  style={{ alignSelf: 'center', marginTop: 8 }}
-                >
-                  <Text style={{ color: BRAND, fontSize: 14, fontWeight: "600" }}>
-                    Use email instead
-                  </Text>
-                </Pressable>
               </View>
             )}
           </View>
         </View>
 
 
-        {/* Validation / auth message with CTA */}
+        {/* Inline validation/auth message (simple red text, like signup) */}
         {validationMessage ? (
-          <View style={{ 
+          <View style={{
             maxWidth: responsive.maxWidth.form,
-            alignSelf: "center", 
-            marginTop: responsive.spacing(-4), 
-            marginBottom: responsive.spacing(10),
+            alignSelf: 'center',
+            marginTop: 2,
+            marginBottom: responsive.spacing(6),
             width: '100%'
           }}>
-                    <ErrorBanner
-          message={validationMessage}
-          tone="error"
-          compact={true}
-          dismissible={true}
-          onDismiss={() => setValidationMessage("")}
-          animated={true}
-          showIcon={true}
-        />
+            <Text style={{ color: '#DC2626', fontSize: 13, fontWeight: '700' }}>
+              * {validationMessage}
+            </Text>
           </View>
         ) : null}
 
@@ -614,86 +613,13 @@ export default function LoginScreen() {
       </View>
 
       {/* Country Code Picker Modal */}
-      {countryPickerVisible && (
-        <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'flex-end' }}>
-          <Pressable
-            onPress={() => {
-              setCountryPickerVisible(false);
-              setCountrySearchQuery("");
-            }}
-            style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)' }}
-          />
-          <View style={{ backgroundColor: '#ffffff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24, maxHeight: '70%' }}>
-            <View style={{ alignItems: 'center' }}>
-              <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: '#E5E7EB', marginBottom: 12 }} />
-            </View>
-            <Text style={{ fontSize: 18, fontWeight: '900', color: '#0f172a', marginBottom: 16 }}>Select Country Code</Text>
-            
-            {/* Search Input */}
-            <TextInput
-              mode="outlined"
-              placeholder="Search country..."
-              value={countrySearchQuery}
-              onChangeText={setCountrySearchQuery}
-              style={{ 
-                backgroundColor: "#f8f9fa",
-                marginBottom: 12,
-              }}
-              textColor="#333333"
-              placeholderTextColor="#999999"
-              outlineColor="#e9ecef"
-              activeOutlineColor={BRAND}
-              contentStyle={{
-                fontSize: 14,
-              }}
-              theme={{
-                colors: {
-                  onSurfaceVariant: "#666666",
-                },
-                roundness: 8,
-              }}
-              left={<TextInput.Icon icon="magnify" size={20} />}
-            />
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {countriesLoading ? (
-                <View style={{ padding: 20, alignItems: 'center' }}>
-                  <Text style={{ color: '#666666' }}>Loading countries...</Text>
-                </View>
-              ) : filteredCountries.length > 0 ? (
-                filteredCountries.map((country) => (
-                <Pressable
-                  key={country.code}
-                  style={({ pressed }) => ({
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    paddingVertical: 12,
-                    paddingHorizontal: 16,
-                    backgroundColor: pressed ? '#f3f4f6' : 'transparent',
-                    borderRadius: 8
-                  })}
-                  onPress={() => {
-                    setSelectedCountryCode(country.code);
-                    setCountryPickerVisible(false);
-                    setCountrySearchQuery("");
-                  }}
-                >
-                  <Image 
-                    source={{ uri: country.flag }}
-                    style={{ width: 24, height: 18, marginRight: 12 }}
-                  />
-                  <Text style={{ fontSize: 16, color: '#333333', flex: 1 }}>{country.name}</Text>
-                  <Text style={{ fontSize: 16, color: '#666666' }}>{country.phoneCode}</Text>
-                </Pressable>
-              ))) : (
-                <View style={{ padding: 20, alignItems: 'center' }}>
-                  <Text style={{ color: '#666666' }}>No countries found</Text>
-                </View>
-              )}
-            </ScrollView>
-          </View>
-        </View>
-      )}
+      <CountryPickerModal
+        visible={countryPickerVisible}
+        onClose={() => setCountryPickerVisible(false)}
+        onSelect={(country) => {
+          setSelectedCountryCode(country.code);
+        }}
+      />
     </SafeAreaView>
   );
 }
