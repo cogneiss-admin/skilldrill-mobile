@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, Text, ScrollView, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 // Button removed to match careerRole styling
-import { StatusBar } from "expo-status-bar";
+import { StatusBar } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useAuth } from "../../hooks/useAuth";
@@ -303,7 +303,7 @@ export default function SkillsScreen() {
   if (loading) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-        <StatusBar style="dark" />
+        <StatusBar barStyle="dark-content" />
         <SkillsSkeleton />
       </SafeAreaView>
     );
@@ -311,7 +311,7 @@ export default function SkillsScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-      <StatusBar style="dark" />
+      <StatusBar barStyle="dark-content" />
 
       {/* Header with divider */}
       <View style={{ paddingVertical: 16, paddingHorizontal: width * 0.06, borderBottomWidth: 1.5, borderBottomColor: '#D1D5DB', marginHorizontal: -(width * 0.06) }}>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, ScrollView, TextInput, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
+import { StatusBar } from "react-native";
 import { Button, Surface, ProgressBar } from "react-native-paper";
 import { LinearGradient } from "expo-linear-gradient";
 import { MotiView } from "moti";
@@ -281,7 +281,7 @@ const AdaptiveAssessment: React.FC<AssessmentComponentProps> = ({
   if (error && !isAssessmentActive) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: BRAND }}>
-        <StatusBar style="light" />
+        <StatusBar barStyle="light-content" />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
           <AntDesign name="exclamationcircle" size={64} color="white" />
           <Text style={{ color: 'white', fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginTop: 16 }}>
@@ -305,7 +305,7 @@ const AdaptiveAssessment: React.FC<AssessmentComponentProps> = ({
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: BRAND }}>
-      <StatusBar style="light" />
+      <StatusBar barStyle="light-content" />
       {/* Full-screen loader overlay */}
       <AIGenerationLoader 
         visible={showLoader}

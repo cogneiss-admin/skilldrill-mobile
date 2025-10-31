@@ -6,7 +6,7 @@ import { Button } from "react-native-paper";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { MotiView } from "moti";
-import { StatusBar } from "expo-status-bar";
+import { StatusBar } from "react-native";
 import { AntDesign } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "../../hooks/useAuth";
@@ -118,7 +118,7 @@ export default function CareerRoleScreen() {
   if (loading) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
-        <StatusBar style="dark" />
+        <StatusBar barStyle="dark-content" />
         <CareerSkeleton />
       </SafeAreaView>
     );
@@ -142,7 +142,7 @@ export default function CareerRoleScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar style="dark" />
+      <StatusBar barStyle="dark-content" />
       <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Onboarding</Text>

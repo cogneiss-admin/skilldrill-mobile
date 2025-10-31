@@ -7,13 +7,13 @@ import {
   TouchableOpacity,
   Image,
   StatusBar,
-  SafeAreaView,
   AppState,
   RefreshControl,
   Alert,
   StyleSheet,
   Platform
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
@@ -323,7 +323,7 @@ export default function DashboardImproved() {
   if (authLoading || loadingSkills) {
     return (
       <SafeAreaView style={styles.container}>
-        <StatusBar style="dark" />
+        <StatusBar barStyle="dark-content" />
         <DashboardSkeleton />
       </SafeAreaView>
     );
@@ -852,7 +852,7 @@ export default function DashboardImproved() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+      <StatusBar barStyle="dark-content" />
 
       {/* Main Content */}
       {renderHomeContent()}

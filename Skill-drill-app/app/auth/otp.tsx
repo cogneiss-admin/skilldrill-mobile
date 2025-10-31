@@ -4,7 +4,7 @@ import { Alert, View, Pressable, Text, KeyboardAvoidingView, Platform } from "re
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
-import { StatusBar } from "expo-status-bar";
+import { StatusBar } from "react-native";
 import { AntDesign } from "@expo/vector-icons";
 import CodeBoxes from "../../components/CodeBoxes";
 
@@ -193,7 +193,7 @@ export default function OtpScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#ffffff" }}>
-      <StatusBar style="dark" />
+      <StatusBar barStyle="dark-content" />
 
       {/* Header */}
       <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingVertical: 12 }}>
@@ -220,7 +220,7 @@ export default function OtpScreen() {
             opacity: pressed ? 0.7 : 1
           })}
         >
-          <AntDesign name="arrowleft" size={22} color="#111827" />
+          <AntDesign name="left" size={22} color="#111827" />
         </Pressable>
         <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827", marginLeft: 8 }}>OTP Verification</Text>
       </View>

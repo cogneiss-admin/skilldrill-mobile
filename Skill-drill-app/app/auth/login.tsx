@@ -9,7 +9,7 @@ import * as Haptics from "expo-haptics";
 import { AntDesign, MaterialIcons } from "@expo/vector-icons";
 import GoogleGIcon from "../../components/GoogleGIcon";
 import LinkedInIcon from "../../components/LinkedInIcon";
-import { StatusBar } from "expo-status-bar";
+import { StatusBar } from "react-native";
 import { useToast } from "../../hooks/useToast";
 import { parseApiError, formatErrorMessage } from "../../utils/errorHandler";
 import { detectInputType, isValidEmail, isValidPhone, validationMessageFor } from "../components/validators";
@@ -165,7 +165,7 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: BRAND }}>
-      <StatusBar style="light" />
+      <StatusBar barStyle="light-content" />
       
       {/* Top half - Colorful section like Zomato */}
       <View style={{ 

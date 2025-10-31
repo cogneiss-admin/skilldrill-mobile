@@ -8,7 +8,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Defs, RadialGradient as SvgRadialGradient, Rect, Stop } from "react-native-svg";
 import { Button } from "react-native-paper";
 import { MotiView } from "moti";
-import { StatusBar } from "expo-status-bar";
+import { StatusBar } from "react-native";
 import * as Haptics from "expo-haptics";
 
 const logoSrc = require("../../assets/images/logo.png");
@@ -52,7 +52,7 @@ function WelcomeScreen({ onGetStarted }: { onGetStarted: () => void }) {
 
   return (
     <SafeAreaView className="flex-1">
-      <StatusBar style="light" />
+      <StatusBar barStyle="light-content" />
       <View className="flex-1">
         <StaticBackground />
         <View style={{ position: 'absolute', opacity: 0, pointerEvents: 'none' }}>

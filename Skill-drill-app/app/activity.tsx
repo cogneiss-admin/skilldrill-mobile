@@ -338,7 +338,7 @@ export default function MyActivity() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
-      <StatusBar style="dark" />
+      <StatusBar barStyle="dark-content" />
       
       {/* Enhanced Header - Clean Design */}
       <View style={{

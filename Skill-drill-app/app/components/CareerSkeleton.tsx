@@ -1,7 +1,6 @@
 // @ts-nocheck
 import React from 'react';
 import { View, ScrollView, Dimensions } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti';
 import SkeletonLine from './SkeletonLine';
 import { BRAND } from './Brand';
@@ -31,32 +30,22 @@ const ChoiceSkeleton = () => (
 
 const CareerSkeleton: React.FC = () => {
   return (
-    <View style={{ flex: 1, backgroundColor: BRAND }}>
-      {/* Header shimmer */}
-      <View style={{ minHeight: 200, position: 'relative' }}>
-        <LinearGradient colors={[BRAND, '#0E75D1', '#1285E0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: 'absolute', inset: 0 }} />
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingTop: 10 }}>
-          <View style={{ width: 56, height: 56, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.25)' }} />
-          <SkeletonLine width={140} height={20} radius={6} style={{ marginLeft: 12 }} />
-        </View>
-        <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 18 }}>
-          <SkeletonLine width={260} height={20} radius={6} />
-          <SkeletonLine width={180} height={14} radius={6} style={{ marginTop: 8 }} />
-        </View>
+    <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+      {/* Header */}
+      <View style={{ paddingVertical: 16, paddingHorizontal: 18, borderBottomWidth: 1.5, borderBottomColor: '#D1D5DB', marginHorizontal: -18 }}>
+        <SkeletonLine width={140} height={20} radius={6} style={{ alignSelf: 'center' }} />
       </View>
 
       {/* Content */}
-      <View style={{ flex: 1, marginTop: -24 }}>
-        <View style={{ flex: 1, backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 18 }}>
-          <ScrollView contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
-            <SkeletonLine width={'40%'} height={16} radius={6} style={{ marginBottom: 10 }} />
-            {Array.from({ length: 3 }).map((_, i) => <ChoiceSkeleton key={`career-${i}`} />)}
+      <View style={{ flex: 1, backgroundColor: '#F3F4F6', marginHorizontal: -18, paddingHorizontal: 18 }}>
+        <ScrollView contentContainerStyle={{ paddingBottom: 120, paddingTop: 16 }} showsVerticalScrollIndicator={false}>
+          <SkeletonLine width={'40%'} height={16} radius={6} style={{ marginBottom: 10 }} />
+          {Array.from({ length: 3 }).map((_, i) => <ChoiceSkeleton key={`career-${i}`} />)}
 
-            <View style={{ height: 18 }} />
-            <SkeletonLine width={'50%'} height={16} radius={6} style={{ marginBottom: 10 }} />
-            {Array.from({ length: 3 }).map((_, i) => <ChoiceSkeleton key={`role-${i}`} />)}
-          </ScrollView>
-        </View>
+          <View style={{ height: 18 }} />
+          <SkeletonLine width={'50%'} height={16} radius={6} style={{ marginBottom: 10 }} />
+          {Array.from({ length: 3 }).map((_, i) => <ChoiceSkeleton key={`role-${i}`} />)}
+        </ScrollView>
       </View>
     </View>
   );

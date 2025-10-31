@@ -9,7 +9,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Defs, RadialGradient as SvgRadialGradient, Rect, Stop } from "react-native-svg";
 import { Button } from "react-native-paper";
 import { MotiView } from "moti";
-import { StatusBar } from "expo-status-bar";
+import { StatusBar } from "react-native";
 import { useAuth } from "../hooks/useAuth";
 import { BRAND } from "./components/Brand";
 // Removed pre-load of home route; screen no longer exists
@@ -163,7 +163,7 @@ const WelcomeScreen = React.memo(({ onGetStarted }: { onGetStarted: () => void }
 
   return (
     <SafeAreaView className="flex-1">
-      <StatusBar style="light" />
+      <StatusBar barStyle="light-content" />
       <View className="flex-1">
         <StaticBackground />
         

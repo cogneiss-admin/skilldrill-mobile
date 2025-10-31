@@ -8,7 +8,7 @@ import * as Haptics from "expo-haptics";
 import { isValidEmail, isValidPhone } from "../components/validators";
 import { LinearGradient } from "expo-linear-gradient";
 import { MotiView } from "moti";
-import { StatusBar } from "expo-status-bar";
+import { StatusBar } from "react-native";
 import { useAuth } from "../../hooks/useAuth";
 import { BRAND } from "../components/Brand";
 const APP_NAME = "Skill Drill";
@@ -78,7 +78,7 @@ export default function BasicInfoScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: BRAND }}>
-      <StatusBar style="light" />
+      <StatusBar barStyle="light-content" />
       {/* Top brand header with animated title */}
       <View style={{ height: "35%", position: "relative" }}>
         <LinearGradient

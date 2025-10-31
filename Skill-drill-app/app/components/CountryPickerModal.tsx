@@ -35,14 +35,14 @@ const CountryPickerModal: React.FC<CountryPickerModalProps> = ({ visible, title 
       {/* Top bar with back */}
       <View style={{ paddingLeft: 6, paddingRight: 6, paddingTop: 16, paddingBottom: 4 }}>
         <TouchableOpacity onPress={() => { setSearch(''); onClose(); }} style={{ padding: 8, alignSelf: 'flex-start' }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <AntDesign name="arrowleft" size={22} color="#111" />
+          <AntDesign name="left" size={22} color="#111" />
         </TouchableOpacity>
       </View>
 
       {/* Search Bar full width below back with small side gutters and radius */}
       <View style={{ paddingHorizontal: Math.max(8, Math.round(width * 0.03)), paddingBottom: 6 }}>
         <View style={{ width: '100%', backgroundColor: '#f5f5f5', borderRadius: 10, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, height: 46 }}>
-          <AntDesign name="search1" size={18} color="#999" style={{ marginRight: 8 }} />
+          <AntDesign name="search" size={18} color="#999" style={{ marginRight: 8 }} />
           <TextInput
             placeholder="Search by country name..."
             placeholderTextColor="#999"

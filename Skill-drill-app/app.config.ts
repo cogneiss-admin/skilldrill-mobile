@@ -29,15 +29,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   plugins: [
     'expo-router',
-    [
-      'expo-splash-screen',
-      {
-        image: './assets/images/splash-icon.png',
-        imageWidth: 200,
-        resizeMode: 'contain',
-        backgroundColor: '#0A66C2',
-      },
-    ],
+    'expo-font',
   ],
   experiments: {
     typedRoutes: true,

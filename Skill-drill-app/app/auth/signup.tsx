@@ -8,7 +8,7 @@ import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { isValidEmail } from "../components/validators";
 import { useSocialAuth } from "../../hooks/useSocialAuth";
-import { StatusBar } from "expo-status-bar";
+import { StatusBar } from "react-native";
 import { AntDesign } from "@expo/vector-icons";
 import GoogleGIcon from "../../components/GoogleGIcon";
 import LinkedInIcon from "../../components/LinkedInIcon";
@@ -469,7 +469,7 @@ export default function SignupScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: BRAND }}>
-      <StatusBar style="light" />
+      <StatusBar barStyle="light-content" />
 
       {/* Removed header back button for signup screen */}
 
