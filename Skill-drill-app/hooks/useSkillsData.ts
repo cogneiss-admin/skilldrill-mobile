@@ -82,13 +82,30 @@ export function useSkillsData(params: {
           (resp.data || []).forEach((group: any) => {
             if (group?.skills && Array.isArray(group.skills)) {
               group.skills.forEach((s: any) => {
-                if (s?.id) ids.add(s.id);
-                if (s?.mongoId) ids.add(s.mongoId);
+                // Add both id and mongoId as strings to handle different formats
+                if (s?.id) {
+                  ids.add(String(s.id));
+                  ids.add(s.id); // Also add as-is in case it's already a string
+                }
+                if (s?.mongoId) {
+                  ids.add(String(s.mongoId));
+                  ids.add(s.mongoId);
+                }
+                // Also check for skillId field (some API responses might use this)
+                if (s?.skillId) {
+                  ids.add(String(s.skillId));
+                  ids.add(s.skillId);
+                }
               });
             }
           });
           setEligibleSet(ids);
-          try { console.log('🎯 Eligible set ready:', { count: ids.size }); } catch {}
+          try { 
+            console.log('🎯 Eligible set ready:', { 
+              count: ids.size,
+              sampleIds: Array.from(ids).slice(0, 3)
+            }); 
+          } catch {}
         }
       } catch {}
     })();

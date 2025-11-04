@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useMemo, useState, useEffect, useCallback } from "react";
+import React, { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, Text, ScrollView, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -37,6 +37,7 @@ export default function SkillsScreen() {
   const [skillsWithAssessments, setSkillsWithAssessments] = useState(new Set());
   const [tiers, setTiers] = useState<Array<{ key: string; name: string; order?: number }>>([]);
   const [timelineEndY, setTimelineEndY] = useState<number | null>(null);
+  const timelineContainerRef = useRef<View>(null);
 
   const {
     skillsData,
@@ -155,16 +156,27 @@ export default function SkillsScreen() {
   }, []);
 
   const handleToggleSkill = useCallback(async (skillId) => {
-    // Check if skill already has an assessment
+    // Check if skill is locked (not eligible for user's career level)
     const skill = skillsData.find(s => s.id === skillId);
-    if (skill && skillsWithAssessments.has(skill.mongoId)) {
-      showToast('info', 'Assessment Exists', 'You already have an assessment for this skill. Please select a different skill.');
-      return;
+    if (skill) {
+      const hasEligible = eligibleSet && eligibleSet.size > 0;
+      const isLocked = hasEligible ? !(eligibleSet.has(skill.id) || eligibleSet.has(skill.mongoId)) : false;
+      
+      if (isLocked) {
+        showToast('info', 'Skill Locked', 'This skill is not available for your career level.');
+        return;
+      }
+      
+      // Check if skill already has an assessment
+      if (skillsWithAssessments.has(skill.mongoId)) {
+        showToast('info', 'Assessment Exists', 'You already have an assessment for this skill. Please select a different skill.');
+        return;
+      }
     }
     
     try { await Haptics.selectionAsync(); } catch {}
     toggleSkill(skillId);
-  }, [toggleSkill, skillsData, skillsWithAssessments, showToast]);
+  }, [toggleSkill, skillsData, skillsWithAssessments, eligibleSet, showToast]);
 
   // No traditional assessment CTA in this inlined layout
 
@@ -333,44 +345,98 @@ export default function SkillsScreen() {
 
             {/* Skills organized by tier with a single continuous vertical line */}
             {(() => { try { console.log('🔎 Render keys:', { tiers: tiers.map(t=>t.key), skillsTierKeys: Object.keys(skillsByTier) }); } catch {} return null; })()}
-            <View style={{ position: 'relative' }}>
-              <View style={{ position: 'absolute', left: 16, top: 14, bottom: 0, width: 2, backgroundColor: '#111827' }} />
+            <View ref={timelineContainerRef} style={{ position: 'relative' }}>
+              {timelineEndY != null ? (
+                <View style={{ position: 'absolute', left: 16, top: 14, height: Math.max(0, timelineEndY - 14), width: 2.5, backgroundColor: '#000000', zIndex: 10 }} />
+              ) : (
+                <View style={{ position: 'absolute', left: 16, top: 14, bottom: 0, width: 2.5, backgroundColor: '#000000', zIndex: 10 }} />
+              )}
             {tiers.map((t, tierIdx) => [t.key, skillsByTier[t.key] || [], t.name, tierIdx] as const).map(([tierKey, tierSkills, tierName, tierIdx]) => {
               const isLastTier = tierIdx === tiers.length - 1;
               return (
-                <View key={tierKey} style={{ marginBottom: 28 }} onLayout={isLastTier && (!tierSkills || tierSkills.length === 0) ? (e) => {
-                  const y = e.nativeEvent.layout.y;
-                  setTimelineEndY(y + 14); // end at header connector
-                } : undefined}>
-
+                <View 
+                  key={tierKey} 
+                  style={{ marginBottom: 28 }}
+                  onLayout={isLastTier ? (e) => {
+                    const { y, height } = e.nativeEvent.layout;
+                    if (!tierSkills || tierSkills.length === 0) {
+                      // Empty tier: end at the tier header connector center
+                      // Header has marginBottom: 12, so connector is roughly at y + 10-12px (center of ~20px header)
+                      setTimelineEndY(y + 11);
+                    } else {
+                      // Tier with skills: end at the last skill indicator center
+                      // Last skill row has marginBottom: 12, and indicator is vertically centered in the row
+                      // Row height: ~12px padding top + ~20px text + ~4px subtitle + ~12px padding bottom = ~48px
+                      // Indicator center is at row center = row bottom - 24px
+                      // But we need to account for the marginBottom: 12 on the last row
+                      // So: container height - marginBottom (12) - half row height (24)
+                      const lastRowHeight = 48; // estimated row height
+                      setTimelineEndY(y + height - 12 - (lastRowHeight / 2));
+                    }
+                  } : undefined}
+                >
                   {/* Tier header with connector */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                    <View style={{ width: 16 }} />
-                    <View style={{ width: 18, height: 2, backgroundColor: '#111827', marginRight: 8 }} />
+                  <View 
+                    style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}
+                  >
+                    {/* Spacer to align connector start with vertical line center (17.25px) */}
+                    <View style={{ width: 17.25 }} />
+                    {/* Horizontal connector starting from vertical line center */}
+                    <View style={{ width: 18, height: 2.5, backgroundColor: '#000000', marginRight: 8, zIndex: 10 }} />
                     <Text style={{ fontSize: 18, fontWeight: '700', color: '#0F172A' }}>{tierName}</Text>
                   </View>
 
                   {/* Skills list (empty allowed) */}
                   <View>
                     {(tierSkills || []).map((skill: any, idx: number) => {
-                      const hasEligible = eligibleSet && (eligibleSet as any).size > 0;
-                      const locked = hasEligible ? !(eligibleSet?.has(skill.id) || eligibleSet?.has(skill.mongoId)) : false;
+                      // Determine if skill is locked based on eligibleSet
+                      // Only lock if eligibleSet is populated (user has career level) and skill is not in the set
+                      const hasEligible = eligibleSet && eligibleSet.size > 0;
+                      const skillIdStr = String(skill.id || '');
+                      const mongoIdStr = String(skill.mongoId || '');
+                      const isInEligibleSet = eligibleSet?.has(skill.id) || 
+                                              eligibleSet?.has(skill.mongoId) || 
+                                              eligibleSet?.has(skillIdStr) || 
+                                              eligibleSet?.has(mongoIdStr);
+                      const locked = hasEligible ? !isInEligibleSet : false;
                       const isSelected = selected.includes(skill.id);
                       const isLastSkill = idx === (tierSkills.length - 1);
+                      
+                      // Debug logging for first skill only (to avoid spam)
+                      if (idx === 0 && tierIdx === 0) {
+                        try {
+                          console.log('🔒 Skill locking check:', {
+                            skillName: skill.name,
+                            skillId: skill.id,
+                            mongoId: skill.mongoId,
+                            hasEligible,
+                            eligibleSetSize: eligibleSet?.size || 0,
+                            isInEligibleSet,
+                            locked
+                          });
+                        } catch {}
+                      }
                       return (
-                        <View key={skill.id} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                          {/* Timeline indicator column */}
-                          <View style={{ width: 32, alignItems: 'center' }}>
+                        <View 
+                          key={skill.id} 
+                          style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, position: 'relative' }}
+                        >
+                          {/* Timeline indicator - absolutely positioned to center on vertical line */}
+                          {/* Vertical line: left: 16, width: 2.5, center at 17.25px from timeline container edge */}
+                          {/* Circle: 20px wide, needs center at 17.25px, so left edge at 17.25 - 10 = 7.25px */}
+                          <View style={{ position: 'absolute', left: 7.25, width: 20, height: 20, alignItems: 'center', justifyContent: 'center', zIndex: 20 }}>
                             {locked ? (
-                              <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#111827', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' }}>
-                                <AntDesign name="lock" size={10} color="#111827" />
+                              <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#000000', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' }}>
+                                <AntDesign name="lock" size={12} color="#000000" />
                               </View>
                             ) : (
-                              <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#111827', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' }}>
+                              <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#000000', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' }}>
                                 {isSelected ? <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: BRAND }} /> : null}
                               </View>
                             )}
                           </View>
+                          {/* Spacer to maintain proper spacing for skill card */}
+                          <View style={{ width: 32 }} />
 
                           {/* Skill row */}
                           <View
@@ -385,10 +451,6 @@ export default function SkillsScreen() {
                             }}
                             onStartShouldSetResponder={() => !locked}
                             onResponderRelease={() => { if (!locked) handleToggleSkill(skill.id); }}
-                            onLayout={isLastTier && isLastSkill ? (e) => {
-                              const y = e.nativeEvent.layout.y;
-                              setTimelineEndY(Math.max(14, y + 6)); // stop near the node center
-                            } : undefined}
                           >
                             <Text style={{ fontSize: 16, fontWeight: '700', color: locked ? '#9CA3AF' : '#111827' }} numberOfLines={1}>
                               {skill.name}
@@ -404,9 +466,6 @@ export default function SkillsScreen() {
                 </View>
               );
             })}
-            {timelineEndY != null && (
-              <View style={{ position: 'absolute', left: 15, top: timelineEndY, bottom: 0, width: 4, backgroundColor: '#F3F4F6' }} />
-            )}
             </View>
 
             {/* Error Display */}

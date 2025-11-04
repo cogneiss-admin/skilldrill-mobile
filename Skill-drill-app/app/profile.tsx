@@ -13,6 +13,7 @@ import { useCountries, getConvertedFlagUrl } from '../hooks/useCountries';
 import CountryPickerModal from './components/CountryPickerModal';
 import CodeBoxes from '../components/CodeBoxes';
 import { isValidEmail, isValidPhone, validationMessageFor } from './components/validators';
+import ProfileSkeleton from './components/ProfileSkeleton';
 
 const { width } = Dimensions.get('window');
 
@@ -58,6 +59,7 @@ export default function ProfileScreen() {
   const [phoneCheckingDB, setPhoneCheckingDB] = useState(false);
   const [emailCheckingDB, setEmailCheckingDB] = useState(false);
   const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const { countries } = useCountries();
   const initial = useMemo(() => (name?.trim()?.[0]?.toUpperCase() || 'U'), [name]);
 
@@ -526,6 +528,7 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     (async () => {
+      setLoadingProfile(true);
       try {
         const { authService } = await import('../services/authService');
         const { apiService } = await import('../services/api');
@@ -729,6 +732,7 @@ export default function ProfileScreen() {
       } finally {
         setLoadingCL(false);
         setLoadingRT(false);
+        setLoadingProfile(false);
       }
     })();
   }, []);
@@ -954,6 +958,16 @@ export default function ProfileScreen() {
       ]
     );
   };
+
+  // Show shimmer while loading
+  if (loadingProfile) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+        <StatusBar barStyle="light-content" />
+        <ProfileSkeleton />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
