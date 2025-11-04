@@ -1,9 +1,21 @@
 // Learn more https://docs.expo.io/guides/customizing-metro
 const { getDefaultConfig } = require('expo/metro-config');
 const { withNativeWind } = require('nativewind/metro');
+const { resolver: defaultResolver } = getDefaultConfig(__dirname);
 
 /** @type {import('expo/metro-config').MetroConfig} */
 const config = getDefaultConfig(__dirname);
+
+// Enable SVG imports as React components
+config.transformer = {
+  ...config.transformer,
+  babelTransformerPath: require.resolve('react-native-svg-transformer'),
+};
+config.resolver = {
+  ...config.resolver,
+  assetExts: defaultResolver.assetExts.filter((ext) => ext !== 'svg'),
+  sourceExts: [...defaultResolver.sourceExts, 'svg'],
+};
 
 // Fix tslib module resolution for all platforms
 config.resolver.resolverMainFields = ['react-native', 'browser', 'main'];

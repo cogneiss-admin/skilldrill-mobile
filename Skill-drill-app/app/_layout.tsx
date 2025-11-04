@@ -5,6 +5,7 @@ import React, { Suspense, useEffect, useMemo, useState } from "react";
 import "./global.css";
 import { Slot, useRootNavigationState, useSegments, useRouter } from "expo-router";
 import { View, Animated as RNAnimated } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Provider as PaperProvider, MD3LightTheme } from "react-native-paper";
 import { Provider as ReduxProvider } from "react-redux";
 import { store } from "../store";
@@ -171,6 +172,13 @@ const AuthMiddleware = React.memo(({ children }: { children: React.ReactNode }) 
       return;
     }
 
+    // Don't redirect if we're on the profile screen (protected)
+    const isProfileScreen = segments[0] === 'profile';
+    if (isProfileScreen) {
+      console.log('👤 AuthMiddleware: On profile screen, not redirecting');
+      return;
+    }
+
     if (isAuthenticated) {
       const onboardingComplete = isOnboardingComplete();
       const nextStep = getOnboardingNextStep();
@@ -239,27 +247,29 @@ const RootLayout = React.memo(() => {
   }, [segmentKey]);
 
   return (
-    <ReduxProvider store={store}>
-      <PaperProvider theme={theme}>
-        {navState?.key ? (
-          <>
-            <Suspense fallback={<View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: BRAND }}><SmallLogo /></View>}>
-              <AuthMiddleware>
-                <Slot />
-              </AuthMiddleware>
-            </Suspense>
-            {/* Global OTP Bottom Sheet Portal */}
-            <GlobalOtpSheet />
-            {/* Toast Container */}
-            <ToastContainer toasts={toasts} onDismiss={dismissToast} />
-          </>
-        ) : (
-          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: BRAND }}>
-            <SmallLogo />
-          </View>
-        )}
-      </PaperProvider>
-    </ReduxProvider>
+    <SafeAreaProvider>
+      <ReduxProvider store={store}>
+        <PaperProvider theme={theme}>
+          {navState?.key ? (
+            <>
+              <Suspense fallback={<View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: BRAND }}><SmallLogo /></View>}>
+                <AuthMiddleware>
+                  <Slot />
+                </AuthMiddleware>
+              </Suspense>
+              {/* Global OTP Bottom Sheet Portal */}
+              <GlobalOtpSheet />
+              {/* Toast Container */}
+              <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+            </>
+          ) : (
+            <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: BRAND }}>
+              <SmallLogo />
+            </View>
+          )}
+        </PaperProvider>
+      </ReduxProvider>
+    </SafeAreaProvider>
   );
 });
 

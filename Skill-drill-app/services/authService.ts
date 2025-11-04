@@ -59,6 +59,7 @@ export interface PasswordLoginRequest {
 export interface OtpVerificationRequest {
   identifier: string; // email or phone
   otp: string;
+  signupToken?: string;
 }
 
 export interface ResendOtpRequest {
@@ -312,6 +313,21 @@ class AuthService {
     }
   }
 
+  // Validate profile update field (phone or email) - checks DB without sending OTP
+  public async validateProfileUpdateField(data: { phoneNo?: string; email?: string; countryCode?: string }): Promise<ApiResponse<{ valid: boolean }>> {
+    return apiService.post<{ valid: boolean }>('/multi-auth/profile/validate-field', data);
+  }
+
+  // Send OTP for profile update (phone or email)
+  public async sendProfileUpdateOTP(data: { phoneNo?: string; email?: string; countryCode?: string }): Promise<ApiResponse<{ identifier: string; expiresAt: string }>> {
+    return apiService.post<{ identifier: string; expiresAt: string }>('/multi-auth/profile/send-otp', data);
+  }
+
+  // Verify OTP for profile update (only verifies, doesn't update profile)
+  public async verifyProfileUpdateOTP(data: { phoneNo?: string; email?: string; otp: string; countryCode?: string }): Promise<ApiResponse<{ verified: boolean; phoneNo?: string | null; email?: string | null }>> {
+    return apiService.post<{ verified: boolean; phoneNo?: string | null; email?: string | null }>('/multi-auth/profile/verify-otp', data);
+  }
+
   // Update user profile via API
   public async updateProfileViaAPI(profileData: { 
     careerLevelId?: string; 
@@ -319,6 +335,7 @@ class AuthService {
     onboardingStep?: string; 
     name?: string; 
     email?: string; 
+    phoneNo?: string;
   }): Promise<ApiResponse<User>> {
     // Prevent multiple simultaneous profile updates
     if (this.isUpdatingProfile) {
@@ -335,7 +352,8 @@ class AuthService {
       if (profileData.roleType) payload.roleType = profileData.roleType; // backend expects roleType → roleTypeId
       if (profileData.onboardingStep) payload.onboardingStep = profileData.onboardingStep;
       if (profileData.name) payload.name = profileData.name;
-      if (profileData.email) payload.email = profileData.email;
+      if (profileData.email !== undefined) payload.email = profileData.email;
+      if (profileData.phoneNo !== undefined) payload.phoneNo = profileData.phoneNo;
 
       const response = await apiService.put<User>('/multi-auth/profile', payload);
       

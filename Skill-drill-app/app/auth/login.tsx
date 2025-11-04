@@ -94,7 +94,13 @@ export default function LoginScreen() {
         response = await authService.loginWithEmail({ email: emailOrPhone.trim() });
         console.log('📧 Email login response:', response);
       } else {
-        const phoneNo = internationalPhone;
+        // Format phone with country calling code to E.164 when user hasn't typed +<code>
+        const rawDigits = (emailOrPhone || '').replace(/\D/g, '');
+        const phoneCountryCode = (selectedPhoneCountry?.phoneCode || '').replace(/\D/g, '');
+        const phoneNo = emailOrPhone.trim().startsWith('+')
+          ? emailOrPhone.trim()
+          : (phoneCountryCode ? `+${phoneCountryCode}${rawDigits}` : rawDigits);
+
         console.log('📱 Sending phone login request with:', phoneNo);
         response = await authService.loginWithPhone({ phoneNo });
         console.log('📱 Phone login response:', response);
@@ -105,7 +111,7 @@ export default function LoginScreen() {
         // Pass the identifier to the OTP screen
         const params = inputType === "email" 
           ? { email: emailOrPhone.trim() }
-          : { phone: internationalPhone };
+          : { phone: (emailOrPhone.trim().startsWith('+') ? emailOrPhone.trim() : `+${(selectedPhoneCountry?.phoneCode || '').replace(/\D/g, '')}${(emailOrPhone || '').replace(/\D/g, '')}`) };
           
         console.log('🚀 Navigating to OTP with params:', params);
         try {

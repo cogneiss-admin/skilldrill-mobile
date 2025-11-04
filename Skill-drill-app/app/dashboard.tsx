@@ -22,6 +22,7 @@ import SessionManager from '../utils/sessionManager';
 import DashboardSkeleton from './components/DashboardSkeleton';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { Dimensions } from 'react-native';
 import { BRAND, GRADIENTS, BORDER_RADIUS, SHADOWS, PADDING } from './components/Brand';
 import { useResponsive } from '../utils/responsive';
 import BottomNavigation from '../components/BottomNavigation';
@@ -35,6 +36,7 @@ const SUCCESS = "#22C55E";
 const WARNING = "#F59E0B";
 const ERROR = "#EF4444";
 const APP_NAME = "Skill Drill";
+const { width } = Dimensions.get('window');
 
 // Typography System
 const TYPOGRAPHY = {
@@ -111,7 +113,7 @@ type CompletedAssessment = {
 
 export default function DashboardImproved() {
   const router = useRouter();
-  const { user, isLoading: authLoading, logout } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const { showToast } = useToast();
   const responsive = useResponsive();
   
@@ -265,39 +267,6 @@ export default function DashboardImproved() {
     return 'U';
   };
 
-  // Handle logout
-  const handleLogout = () => {
-    const performLogout = async () => {
-      try {
-        await logout();
-        showToast('success', 'Logged Out', 'You have been successfully logged out');
-        router.replace('/auth/login');
-      } catch (error) {
-        console.error('❌ Logout error:', error);
-        showToast('error', 'Logout Failed', 'Failed to logout. Please try again.');
-      }
-    };
-
-    // Use window.confirm for web, Alert.alert for mobile
-    if (Platform.OS === 'web') {
-      if (window.confirm('Are you sure you want to logout?')) {
-        performLogout();
-      }
-    } else {
-      Alert.alert(
-        'Logout',
-        'Are you sure you want to logout?',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Logout',
-            style: 'destructive',
-            onPress: performLogout
-          }
-        ]
-      );
-    }
-  };
 
   // Load data on mount
   useEffect(() => {
@@ -342,14 +311,21 @@ export default function DashboardImproved() {
       {/* Clean Header - Minimal Design */}
       <View style={styles.cleanHeader}>
         <View style={styles.headerContent}>
-          <Text style={styles.appNameOnly}>Dashboard</Text>
-          <TouchableOpacity onPress={handleLogout} style={styles.profileButton}>
-            <View style={styles.profileCircle}>
-              <Text style={styles.profileText}>
-                {getUserInitials()}
-              </Text>
-            </View>
-          </TouchableOpacity>
+          <View style={styles.headerLeft}>
+            <Text style={styles.appNameOnly}>Dashboard</Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <TouchableOpacity onPress={() => {}} style={styles.notificationCircle} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+              <Ionicons name="notifications-outline" size={18} color="#374151" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/profile')} style={styles.profileButton}>
+              <View style={styles.profileCircle}>
+                <Text style={styles.profileText}>
+                  {getUserInitials()}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -868,28 +844,23 @@ export default function DashboardImproved() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC'
+    backgroundColor: '#FFFFFF'
   },
   scrollContainer: {
     flex: 1,
-    backgroundColor: '#F8FAFC'
+    backgroundColor: '#F3F4F6'
   },
   scrollContent: {
-    paddingBottom: 100,
+    paddingBottom: 60,
     paddingTop: 5
   },
   cleanHeader: {
     backgroundColor: '#FFFFFF',
-    paddingTop: 15,
-    paddingBottom: 15,
-    paddingHorizontal: PADDING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    paddingVertical: 16,
+    paddingHorizontal: width * 0.06,
+    borderBottomWidth: 1.5,
+    borderBottomColor: '#D1D5DB',
+    marginHorizontal: -(width * 0.06),
   },
   headerContent: {
     flexDirection: 'row',
@@ -899,6 +870,7 @@ const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginLeft: 0,
   },
   logo: {
     width: 32,
@@ -910,27 +882,26 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#0F172A',
     letterSpacing: 0.8,
-    textShadowColor: 'rgba(0, 0, 0, 0.1)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    paddingLeft: 8,
   },
   profileButton: {
     padding: 4,
   },
   profileCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#F8FAFC',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 3,
+  },
+  notificationCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'transparent',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   profileText: {
     color: '#374151',

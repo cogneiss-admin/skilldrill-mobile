@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AntDesign, Ionicons } from '@expo/vector-icons';
 import { BRAND } from '../app/components/Brand';
 
@@ -19,6 +20,7 @@ interface BottomNavigationProps {
 const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab }) => {
   const router = useRouter();
   const pathname = usePathname();
+  const insets = useSafeAreaInsets();
 
   // Determine active tab based on current route if not provided
   const currentActiveTab = activeTab || (() => {
@@ -37,81 +39,37 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab }) => {
         router.replace('/activity');
         break;
       case 'profile':
-        // TODO: Add profile screen route when created
-        console.log('Profile tab pressed');
+        router.replace('/profile');
         break;
     }
   };
 
   return (
-    <View style={styles.bottomNavigation}>
+    <View style={[styles.bottomNavigation, { paddingBottom: insets.bottom > 0 ? insets.bottom : 4 }]}>
       <View style={styles.bottomNavRow}>
         {/* Home Tab */}
-        <TouchableOpacity
-          onPress={() => handleTabPress('home')}
-          style={styles.navButton}
-        >
-          <AntDesign
-            name="home"
-            size={24}
-            color={currentActiveTab === 'home' ? BRAND : GRAY}
-          />
-          <Text style={[
-            TYPOGRAPHY.labelSmall,
-            {
-              color: currentActiveTab === 'home' ? BRAND : GRAY,
-              marginTop: 4
-            }
-          ]}>
-            Home
-          </Text>
+        <TouchableOpacity onPress={() => handleTabPress('home')} style={styles.navButton} activeOpacity={0.85}>
+          <AntDesign name="home" size={22} color={currentActiveTab === 'home' ? BRAND : GRAY} />
+          <Text style={[TYPOGRAPHY.labelSmall, currentActiveTab === 'home' ? styles.tabLabelActive : styles.tabLabelInactive]}>Home</Text>
         </TouchableOpacity>
 
         {/* Activity Tab */}
-        <TouchableOpacity
-          onPress={() => handleTabPress('activity')}
-          style={styles.navButton}
-        >
-          <Ionicons
-            name="time-outline"
-            size={24}
-            color={currentActiveTab === 'activity' ? BRAND : GRAY}
-          />
-          <Text style={[
-            TYPOGRAPHY.labelSmall,
-            {
-              color: currentActiveTab === 'activity' ? BRAND : GRAY,
-              marginTop: 4
-            }
-          ]}>
-            Activity
-          </Text>
+        <TouchableOpacity onPress={() => handleTabPress('activity')} style={styles.navButton} activeOpacity={0.85}>
+          <Ionicons name="time-outline" size={22} color={currentActiveTab === 'activity' ? BRAND : GRAY} />
+          <Text style={[TYPOGRAPHY.labelSmall, currentActiveTab === 'activity' ? styles.tabLabelActive : styles.tabLabelInactive]}>Activity</Text>
         </TouchableOpacity>
 
         {/* Profile Tab */}
-        <TouchableOpacity
-          onPress={() => handleTabPress('profile')}
-          style={styles.navButton}
-        >
-          <Ionicons
-            name="person-outline"
-            size={24}
-            color={currentActiveTab === 'profile' ? BRAND : GRAY}
-          />
-          <Text style={[
-            TYPOGRAPHY.labelSmall,
-            {
-              color: currentActiveTab === 'profile' ? BRAND : GRAY,
-              marginTop: 4
-            }
-          ]}>
-            Profile
-          </Text>
+        <TouchableOpacity onPress={() => handleTabPress('profile')} style={styles.navButton} activeOpacity={0.85}>
+          <Ionicons name="person-outline" size={22} color={currentActiveTab === 'profile' ? BRAND : GRAY} />
+          <Text style={[TYPOGRAPHY.labelSmall, currentActiveTab === 'profile' ? styles.tabLabelActive : styles.tabLabelInactive]}>Profile</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 };
+
+const { width } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
   bottomNavigation: {
@@ -120,11 +78,11 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    paddingBottom: 25,
+    borderTopWidth: 1.5,
+    borderTopColor: '#D1D5DB',
+    paddingBottom: 4,
     paddingTop: 12,
-    paddingHorizontal: 20,
+    paddingHorizontal: width * 0.06,
   },
   bottomNavRow: {
     flexDirection: 'row',
@@ -136,8 +94,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 4,
-    minHeight: 50,
+    minHeight: 48,
   },
+  tabLabelInactive: { color: GRAY, marginTop: 4, fontWeight: '500' },
+  tabLabelActive: { color: BRAND, marginTop: 4, fontWeight: '700' },
 });
 
 export default BottomNavigation;

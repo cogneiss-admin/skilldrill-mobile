@@ -1,6 +1,7 @@
 // @ts-nocheck
 import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, View, Image, ScrollView, Text, BackHandler } from "react-native";
+import { KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button, TextInput } from "react-native-paper";
 import ErrorBanner from "../../components/ErrorBanner";
@@ -41,6 +42,8 @@ export default function SignupScreen() {
   const [otpMode, setOtpMode] = useState<"email" | "phone">("email");
   const [otpTarget, setOtpTarget] = useState<string>("");
   const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
+  const [emailSignupToken, setEmailSignupToken] = useState<string | null>(null);
+  const [phoneSignupToken, setPhoneSignupToken] = useState<string | null>(null);
   const [otpBusy, setOtpBusy] = useState(false);
   const [otpError, setOtpError] = useState("");
   const [otpVerified, setOtpVerified] = useState(false);
@@ -181,11 +184,15 @@ export default function SignupScreen() {
             email: target, 
             name: name.trim(), 
             phoneNo: phoneOk ? internationalPhone : undefined,
+            phoneCountryCode: phoneOk ? (selectedPhoneCountry?.phoneCode || '').replace(/\s/g, '') : undefined,
+            countryCode: phoneOk ? selectedPhoneCountry?.code : undefined,
+            countryName: phoneOk ? selectedPhoneCountry?.name : undefined,
             residenceCountryCode: selectedResidenceCountry,
             residenceCountryName: selectedResidenceCountryData?.name,
             region: selectedResidenceCountryData?.region,
               });
           if (resSignup?.success) { 
+            setEmailSignupToken((resSignup.data as any)?.signupToken || null);
             // Success - open OTP sheet
             setOtpMode(mode);
             setOtpDigits(["", "", "", "", "", ""]);
@@ -216,11 +223,15 @@ export default function SignupScreen() {
             phoneNo: target, 
             name: name.trim(), 
             email: emailOk ? email.trim() : undefined,
+            phoneCountryCode: (selectedPhoneCountry?.phoneCode || '').replace(/\s/g, ''),
+            countryCode: selectedPhoneCountry?.code,
+            countryName: selectedPhoneCountry?.name,
             residenceCountryCode: selectedResidenceCountry,
             residenceCountryName: selectedResidenceCountryData?.name,
             region: selectedResidenceCountryData?.region,
               });
           if (resSignup?.success) { 
+            setPhoneSignupToken((resSignup.data as any)?.signupToken || null);
             // Success - open OTP sheet
             setOtpMode(mode);
             setOtpDigits(["", "", "", "", "", ""]);
@@ -270,24 +281,81 @@ export default function SignupScreen() {
       setErrorMessage("");
       const { authService } = await import("../../services/authService");
       
-      // Try signup first for both email and phone
-      let signupSuccess = false;
-      let signupError = null;
+      // Send OTPs to both email and phone if both provided
+      if (emailOk && phoneOk) {
+        const tasks = [
+          authService.signupWithEmail({ 
+            email: email.trim(), 
+            name: name.trim(), 
+            phoneNo: internationalPhone,
+            phoneCountryCode: (selectedPhoneCountry?.phoneCode || '').replace(/\s/g, ''),
+            countryCode: selectedPhoneCountry?.code,
+            countryName: selectedPhoneCountry?.name,
+            residenceCountryCode: selectedResidenceCountry,
+            residenceCountryName: selectedResidenceCountryData?.name,
+            region: selectedResidenceCountryData?.region,
+          }),
+          authService.signupWithPhone({ 
+            phoneNo: internationalPhone, 
+            name: name.trim(), 
+            email: email.trim(),
+            phoneCountryCode: (selectedPhoneCountry?.phoneCode || '').replace(/\s/g, ''),
+            countryCode: selectedPhoneCountry?.code,
+            countryName: selectedPhoneCountry?.name,
+            residenceCountryCode: selectedResidenceCountry,
+            residenceCountryName: selectedResidenceCountryData?.name,
+            region: selectedResidenceCountryData?.region,
+          })
+        ];
 
-      // Try email signup first
-      if (emailOk) {
+        const [emailRes, phoneRes] = await Promise.allSettled(tasks);
+
+        let anySuccess = false;
+
+        if (emailRes.status === 'fulfilled' && emailRes.value?.success) {
+          anySuccess = true;
+          setEmailSignupToken((emailRes.value.data as any)?.signupToken || null);
+          setOtpSentEmail(true);
+        }
+        if (phoneRes.status === 'fulfilled' && phoneRes.value?.success) {
+          anySuccess = true;
+          setPhoneSignupToken((phoneRes.value.data as any)?.signupToken || null);
+          setOtpSentPhone(true);
+        }
+
+        if (!anySuccess) {
+          const firstErr = emailRes.status === 'rejected' ? emailRes.reason : phoneRes.status === 'rejected' ? phoneRes.reason : null;
+          setOtpError(authService.handleAuthError?.(firstErr) || firstErr?.message || 'Failed to send OTP');
+          return;
+        }
+
+        // Prefer phone OTP sheet if available
+        if (phoneRes.status === 'fulfilled' && phoneRes.value?.success) {
+          setOtpMode('phone');
+          setOtpTarget(internationalPhone);
+        } else {
+          setOtpMode('email');
+          setOtpTarget(email.trim());
+        }
+        setOtpDigits(["", "", "", "", "", ""]);
+        setOtpError("");
+        setOtpVerified(false);
+        setOtpSheetVisible(true);
+        setResendRemaining(30);
+
+      } else if (emailOk) {
+        // Only email provided
         try {
           const resSignupE = await authService.signupWithEmail({ 
             email: email.trim(), 
             name: name.trim(), 
-            phoneNo: phoneOk ? internationalPhone : undefined,
+            phoneNo: undefined,
             residenceCountryCode: selectedResidenceCountry,
             residenceCountryName: selectedResidenceCountryData?.name,
             region: selectedResidenceCountryData?.region,
               });
           if (resSignupE?.success) { 
-            signupSuccess = true;
-            // Open sheet for email OTP
+            setEmailSignupToken((resSignupE.data as any)?.signupToken || null);
             setOtpMode('email');
             setOtpTarget(email.trim());
             setOtpDigits(["", "", "", "", "", ""]);
@@ -297,37 +365,26 @@ export default function SignupScreen() {
             setOtpSentEmail(true);
             setResendRemaining(30);
           }
-        } catch (signupErrorCaught: any) {
-          if (signupErrorCaught?.code === 'USER_EXISTS' || signupErrorCaught?.code === 'USER_PENDING_VERIFICATION') {
-            // User already exists - show error and redirect to login
-            setErrorMessage(authService.handleAuthError(signupErrorCaught));
-            setOtpSheetVisible(false);
-            // Redirect to login after a short delay
-            setTimeout(() => {
-              router.push("/auth/login");
-            }, 2000);
+        } catch (e: any) {
+          setOtpError(authService.handleAuthError?.(e) || e?.message || 'Failed to send OTP');
             return;
-          } else {
-            // Other signup error - try phone signup if available
-            signupError = signupErrorCaught;
-          }
         }
-      }
-
-      // If email signup failed, try phone signup
-      if (!signupSuccess && phoneOk) {
+      } else if (phoneOk) {
+        // Only phone provided
         try {
           const resSignupP = await authService.signupWithPhone({ 
             phoneNo: internationalPhone, 
             name: name.trim(), 
-            email: emailOk ? email.trim() : undefined,
+            email: undefined,
+            phoneCountryCode: (selectedPhoneCountry?.phoneCode || '').replace(/\s/g, ''),
+            countryCode: selectedPhoneCountry?.code,
+            countryName: selectedPhoneCountry?.name,
             residenceCountryCode: selectedResidenceCountry,
             residenceCountryName: selectedResidenceCountryData?.name,
             region: selectedResidenceCountryData?.region,
               });
           if (resSignupP?.success) { 
-            signupSuccess = true;
-            // Open sheet for phone OTP
+            setPhoneSignupToken((resSignupP.data as any)?.signupToken || null);
             setOtpMode('phone');
             setOtpTarget(internationalPhone);
             setOtpDigits(["", "", "", "", "", ""]);
@@ -337,26 +394,10 @@ export default function SignupScreen() {
             setOtpSentPhone(true);
             setResendRemaining(30);
           }
-        } catch (phoneSignupError: any) {
-          if (phoneSignupError?.code === 'USER_EXISTS' || phoneSignupError?.code === 'USER_PENDING_VERIFICATION') {
-            // User already exists - show error and redirect to login
-            setErrorMessage(authService.handleAuthError(phoneSignupError));
-            setOtpSheetVisible(false);
-            // Redirect to login after a short delay
-            setTimeout(() => {
-              router.push("/auth/login");
-            }, 2000);
+        } catch (e: any) {
+          setOtpError(authService.handleAuthError?.(e) || e?.message || 'Failed to send OTP');
             return;
-          } else {
-            // Other error - show the error
-            setOtpError(authService.handleAuthError(phoneSignupError) || phoneSignupError?.message || 'Failed to send OTP');
-          }
         }
-      }
-
-      // If both signup attempts failed and it's not due to existing user, show error
-      if (!signupSuccess && signupError) {
-        setOtpError(authService.handleAuthError(signupError) || signupError?.message || 'Failed to send OTP');
       }
 
     } catch (err: any) {
@@ -409,7 +450,7 @@ export default function SignupScreen() {
       setOtpBusy(true);
       setOtpError("");
       const { authService } = await import("../../services/authService");
-      const res = await authService.verifyOtp({ identifier: otpTarget, otp: code });
+      const res = await authService.verifyOtp({ identifier: otpTarget, otp: code, signupToken: otpMode === 'phone' ? (phoneSignupToken || undefined) : (emailSignupToken || undefined) });
       if (res.success) {
         try { await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
         setOtpVerified(true);
@@ -805,6 +846,7 @@ export default function SignupScreen() {
             onPress={() => { if (!otpBusy) setOtpSheetVisible(false); }}
             style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)' }}
           />
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 40}>
           <View style={{ backgroundColor: '#ffffff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 12 }}>
             <View style={{ alignItems: 'center' }}>
               <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: '#E5E7EB', marginBottom: 12 }} />
@@ -839,6 +881,7 @@ export default function SignupScreen() {
 
             {/* No submit button; auto-verifies on 6th digit */}
           </View>
+          </KeyboardAvoidingView>
         </View>
       )}
 
