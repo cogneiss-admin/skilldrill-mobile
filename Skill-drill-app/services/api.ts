@@ -473,6 +473,14 @@ class ApiService {
     return this.get(`/assessment/results/${sessionId}`);
   }
 
+  /**
+   * Get drill recommendations for a completed assessment
+   */
+  public async getDrillRecommendations(assessmentId: string): Promise<ApiResponse> {
+    console.log('🧭 Fetching drill recommendations for assessment:', assessmentId);
+    return this.get(`/assessment/${assessmentId}/recommendations`);
+  }
+ 
 }
 
 // Create and export singleton instance

@@ -232,11 +232,17 @@ const AdaptiveAssessment: React.FC<AssessmentComponentProps> = ({
           clearAssessmentData();
           setCompletedSessionId(null);
           
+          const payload = {
+            ...response.data,
+            assessmentId: targetSessionId,
+            skillName: apiSkillName || 'Assessment',
+          };
           router.push({
             pathname: "/adaptive-results",
             params: {
-              results: JSON.stringify(response.data),
+              results: JSON.stringify(payload),
               skillName: apiSkillName || 'Assessment',
+              assessmentId: targetSessionId,
             }
           });
         }

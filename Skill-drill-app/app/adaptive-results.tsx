@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StatusBar } from "react-nativ
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from '@expo/vector-icons';
+import { useToast } from "../hooks/useToast";
 
 const BRAND = "#0A66C2";
 
@@ -47,11 +48,12 @@ const GoldenStarRating = ({ score }: { score: number }) => {
 
 
 const AdaptiveResultsScreen = () => {
-  const { results, skillName } = useLocalSearchParams<{
+  const { results, skillName, assessmentId: assessmentIdParam } = useLocalSearchParams<{
     results: string;
-    skillName: string;
+    skillName?: string;
+    assessmentId?: string;
   }>();
-  
+  const { showInfo } = useToast();
   const router = useRouter();
 
   // Parse results
@@ -63,9 +65,32 @@ const AdaptiveResultsScreen = () => {
     parsedResults = {};
   }
 
+  const derivedAssessmentId = typeof assessmentIdParam === 'string' && assessmentIdParam.length > 0
+    ? assessmentIdParam
+    : parsedResults?.assessmentId;
+
+  const resolvedSkillName = skillName || parsedResults?.skillName || 'Assessment';
+  const finalScoreNumber = typeof parsedResults.finalScore === 'number' ? parsedResults.finalScore : undefined;
+
   const handleBack = () => {
     // Navigate to dashboard instead of going back to assessment
     router.push('/dashboard');
+  };
+
+  const handleRecommendedSteps = () => {
+    if (!derivedAssessmentId) {
+      showInfo('We need your assessment details before recommending drills.');
+      return;
+    }
+
+    router.push({
+      pathname: '/recommended-drills',
+      params: {
+        assessmentId: derivedAssessmentId,
+        skillName: resolvedSkillName,
+        finalScore: finalScoreNumber !== undefined ? String(finalScoreNumber) : undefined,
+      },
+    });
   };
 
   return (
@@ -112,7 +137,7 @@ const AdaptiveResultsScreen = () => {
       {/* Main Content */}
       <ScrollView 
         style={{ flex: 1 }} 
-        contentContainerStyle={{ padding: 24 }}
+        contentContainerStyle={{ padding: 24, paddingBottom: 140 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Card 1: Trophy, Congratulations, and Score */}
@@ -163,10 +188,10 @@ const AdaptiveResultsScreen = () => {
           </Text>
 
           {/* Golden Star Rating */}
-          {parsedResults.finalScore && <GoldenStarRating score={parsedResults.finalScore} />}
+          {finalScoreNumber !== undefined && <GoldenStarRating score={finalScoreNumber} />}
           
           {/* Numeric Score Display */}
-          {parsedResults.finalScore && (
+          {finalScoreNumber !== undefined && (
             <View style={{ alignItems: 'center', marginTop: 16 }}>
               <Text style={{
                 fontSize: 18,
@@ -181,7 +206,7 @@ const AdaptiveResultsScreen = () => {
                 color: '#0A66C2',
                 fontWeight: 'bold',
               }}>
-                {parsedResults.finalScore.toFixed(1)}/10
+                {finalScoreNumber.toFixed(1)}/10
               </Text>
             </View>
           )}
@@ -276,6 +301,41 @@ const AdaptiveResultsScreen = () => {
         )}
 
       </ScrollView>
+
+      {/* Footer */}
+      <View style={{
+        paddingHorizontal: 24,
+        paddingVertical: 16,
+        backgroundColor: '#FFFFFF',
+        borderTopWidth: 1,
+        borderTopColor: '#E5E7EB'
+      }}>
+        <TouchableOpacity
+          onPress={handleRecommendedSteps}
+          activeOpacity={0.85}
+          style={{
+            backgroundColor: BRAND,
+            paddingVertical: 16,
+            borderRadius: 14,
+            alignItems: 'center',
+            justifyContent: 'center',
+            shadowColor: '#0A66C2',
+            shadowOffset: { width: 0, height: 10 },
+            shadowOpacity: 0.12,
+            shadowRadius: 12,
+            elevation: 3
+          }}
+        >
+          <Text style={{
+            color: '#FFFFFF',
+            fontSize: 16,
+            fontWeight: '600',
+            letterSpacing: 0.3
+          }}>
+            Recommended Next Steps
+          </Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 };

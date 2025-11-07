@@ -165,6 +165,12 @@ const AuthMiddleware = React.memo(({ children }: { children: React.ReactNode }) 
       return;
     }
 
+    const isRecommendedDrillsScreen = segments[0] === 'recommended-drills';
+    if (isRecommendedDrillsScreen) {
+      console.log('🏅 AuthMiddleware: On recommended-drills screen, not redirecting');
+      return;
+    }
+
     // Don't redirect if we're on the activity screen
     const isActivityScreen = segments[0] === 'activity';
     if (isActivityScreen) {

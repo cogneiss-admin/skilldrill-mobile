@@ -77,80 +77,84 @@ export const GRADIENTS = {
 
 // ===== TYPOGRAPHY =====
 export const TYPOGRAPHY = {
-  // Font Sizes
+  h1: { fontSize: 22, fontWeight: '800', color: '#111827', letterSpacing: 0.2 },
+  h2: { fontSize: 18, fontWeight: '700', color: '#1F2937', letterSpacing: 0.15 },
+  subtitle: { fontSize: 15, fontWeight: '500', color: '#374151' },
+  body: { fontSize: 14, color: '#4B5563', lineHeight: 20 },
+  label: { fontSize: 12, fontWeight: '600', color: '#6B7280', letterSpacing: 0.05 },
+  button: { fontSize: 16, fontWeight: '600', color: '#FFFFFF', letterSpacing: 0.3 },
+  caption: { fontSize: 12, color: '#6B7280', lineHeight: 16 },
+  overline: { fontSize: 11, fontWeight: '700', color: BRAND, letterSpacing: 1.2 },
+  pill: { fontSize: 12, fontWeight: '600', letterSpacing: 0.4 },
   fontSize: {
-    xs: 10,
-    sm: 12,
-    base: 14,
+    xs: 12,
+    sm: 14,
     md: 16,
     lg: 18,
-    xl: 20,
-    '2xl': 24,
-    '3xl': 28,
-    '4xl': 32,
-    '5xl': 40
+    xl: 22,
   },
-  
-  // Font Weights
   fontWeight: {
-    normal: '400',
+    regular: '400',
     medium: '500',
     semibold: '600',
     bold: '700',
-    extrabold: '800',
-    black: '900'
   },
-  
-  // Line Heights
-  lineHeight: {
-    tight: 1.2,
-    normal: 1.4,
-    relaxed: 1.6,
-    loose: 1.8
+};
+
+export const CARD = {
+  base: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 12,
+    elevation: 3,
   },
-  
-  // Letter Spacing
-  letterSpacing: {
-    tight: -0.5,
-    normal: 0,
-    wide: 0.5,
-    wider: 1,
-    widest: 2
-  }
-} as const;
+  highlight: {
+    backgroundColor: BRAND,
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: BRAND,
+    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 16,
+    elevation: 4,
+  },
+};
 
 // ===== SPACING =====
 export const SPACING = {
-  // Padding
+  xs: 6,
+  sm: 10,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  '2xl': 24,
+  '3xl': 40,
   padding: {
     xs: 8,
     sm: 12,
     md: 16,
     lg: 20,
     xl: 24,
-    '2xl': 32,
-    '3xl': 40
+    '2xl': 28,
   },
-  
-  // Margins
   margin: {
-    xs: 8,
-    sm: 12,
+    xs: 6,
+    sm: 10,
     md: 16,
     lg: 20,
     xl: 24,
     '2xl': 32,
-    '3xl': 40
   },
-  
-  // Gaps
   gap: {
-    xs: 4,
-    sm: 8,
-    md: 12,
-    lg: 16,
-    xl: 20,
-    '2xl': 24
+    xs: 6,
+    sm: 10,
+    md: 14,
+    lg: 18,
+    xl: 24,
   }
 } as const;
 

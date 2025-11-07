@@ -227,7 +227,7 @@ export default function MyActivity() {
   };
 
   // Handle viewing feedback - navigate to new results screen
-  const handleViewFeedback = async (assessmentId: string) => {
+  const handleViewFeedback = async (assessmentId: string, skillName?: string) => {
     try {
       console.log('🔍 Fetching assessment results for:', assessmentId);
       setFeedbackLoading(true);
@@ -236,13 +236,19 @@ export default function MyActivity() {
 
       if (response.success) {
         console.log('✅ Assessment results fetched, navigating to results screen');
+        const payload = {
+          ...response.data,
+          assessmentId,
+          skillName: skillName || response.data?.skillName,
+        };
         
         // Navigate to new adaptive-results screen
         router.push({
           pathname: "/adaptive-results",
           params: {
-            results: JSON.stringify(response.data),
-            skillName: response.data.skillName,
+            results: JSON.stringify(payload),
+            skillName: skillName || response.data.skillName,
+            assessmentId,
           }
         });
       } else {
@@ -327,7 +333,7 @@ export default function MyActivity() {
           templateExists={templateExists}
           isGenerating={generatingAssessment === skill.skill.id}
           onGenerateAssessment={() => generateAssessmentTemplate(skill.skill.id, skill.skill.name)}
-          onViewFeedback={completedAssessment ? () => handleViewFeedback(completedAssessment.id) : undefined}
+          onViewFeedback={completedAssessment ? () => handleViewFeedback(completedAssessment.id, completedAssessment.skillName || skill.skill.name) : undefined}
           onDeleteAssessment={() => handleDeleteAssessment(skill.skill.id, skill.skill.name)}
         />
       );

@@ -279,6 +279,7 @@ export default function WelcomeScreen() {
 }
 
 function AnimatedWelcome() {
+  const responsive = useResponsive();
   return (
     <MotiView
       from={{ opacity: 0 }}
