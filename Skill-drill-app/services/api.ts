@@ -155,13 +155,24 @@ class ApiService {
         return response;
       },
       async (error) => {
-        console.error('❌ Response error:', {
-          status: error.response?.status,
-          url: error.config?.url,
-          message: error.message,
-          data: error.response?.data
-        });
         const originalRequest = error.config;
+
+        // Suppress expected 404 errors for not-yet-implemented commerce endpoints
+        const isCommerceEndpoint = error.config?.url?.includes('/commerce/');
+        const is404 = error.response?.status === 404;
+
+        if (!(isCommerceEndpoint && is404)) {
+          // Only log non-commerce 404 errors
+          console.error('❌ Response error:', {
+            status: error.response?.status,
+            url: error.config?.url,
+            message: error.message,
+            data: error.response?.data
+          });
+        } else {
+          // Silently handle expected commerce 404s
+          console.log('ℹ️ Commerce endpoint not yet implemented:', error.config?.url);
+        }
 
         if (error.response?.status === 401 && !originalRequest._retry) {
           if (this.isRefreshing) {
@@ -480,7 +491,108 @@ class ApiService {
     console.log('🧭 Fetching drill recommendations for assessment:', assessmentId);
     return this.get(`/assessment/${assessmentId}/recommendations`);
   }
- 
+
+  // ===========================================
+  // PAYMENT & COMMERCE METHODS
+  // ===========================================
+
+  /**
+   * Create checkout session for payment
+   */
+  public async createCheckout(params: {
+    priceId: string;
+    provider: string;
+    metadata: {
+      skillId: string;
+      assessmentId?: string;
+      recommendationId?: string;
+    };
+  }): Promise<ApiResponse> {
+    console.log('💳 Creating checkout session:', params);
+    return this.post('/commerce/checkout', params);
+  }
+
+  /**
+   * Get user's active subscription
+   */
+  public async getSubscription(): Promise<ApiResponse> {
+    console.log('📅 Fetching user subscription');
+    return this.get('/commerce/subscription');
+  }
+
+  /**
+   * Get subscription pricing plans
+   */
+  public async getPricingPlans(): Promise<ApiResponse> {
+    console.log('💰 Fetching pricing plans');
+    return this.get('/commerce/pricing');
+  }
+
+  // ===========================================
+  // DRILL ASSIGNMENT METHODS
+  // ===========================================
+
+  /**
+   * Get all drill assignments for user
+   */
+  public async getDrillAssignments(params?: {
+    cursor?: string;
+    limit?: number;
+  }): Promise<ApiResponse> {
+    console.log('📚 Fetching drill assignments');
+    const queryParams = new URLSearchParams();
+    if (params?.cursor) queryParams.append('cursor', params.cursor);
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+
+    const queryString = queryParams.toString();
+    return this.get(`/drills/assignments${queryString ? `?${queryString}` : ''}`);
+  }
+
+  /**
+   * Get single drill assignment with items
+   */
+  public async getDrillAssignment(assignmentId: string): Promise<ApiResponse> {
+    console.log('📖 Fetching drill assignment:', assignmentId);
+    return this.get(`/drills/assignments/${assignmentId}`);
+  }
+
+  /**
+   * Create new drill assignment
+   */
+  public async createDrillAssignment(params: {
+    skillId: string;
+    source: string;
+    recommendationId?: string;
+  }): Promise<ApiResponse> {
+    console.log('✨ Creating drill assignment:', params);
+    return this.post('/drills/assign', params);
+  }
+
+  /**
+   * Submit drill attempt
+   */
+  public async submitDrillAttempt(params: {
+    drillItemId: string;
+    textContent?: string;
+    audioUrl?: string;
+    durationSec?: number;
+  }): Promise<ApiResponse> {
+    console.log('📝 Submitting drill attempt:', {
+      drillItemId: params.drillItemId,
+      hasText: !!params.textContent,
+      hasAudio: !!params.audioUrl
+    });
+    return this.post('/drills/attempt', params);
+  }
+
+  /**
+   * Get drill aggregate/progress data
+   */
+  public async getDrillAggregate(assignmentId: string): Promise<ApiResponse> {
+    console.log('📊 Fetching drill aggregate for assignment:', assignmentId);
+    return this.get(`/drills/aggregate?assignmentId=${assignmentId}`);
+  }
+
 }
 
 // Create and export singleton instance

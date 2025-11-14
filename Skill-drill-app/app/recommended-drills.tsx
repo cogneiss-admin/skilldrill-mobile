@@ -1,14 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, ScrollView, TouchableOpacity, StatusBar, ActivityIndicator } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, StatusBar, ActivityIndicator, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { MotiView } from "moti";
 import { apiService } from "../services/api";
 import { useToast } from "../hooks/useToast";
-import { BRAND, BRAND_LIGHT, BRAND_ACCENT, TYPOGRAPHY, CARD, SPACING } from "./components/Brand";
+import { useAnimation } from "../hooks/useAnimation";
+import Button from "../components/Button";
+import { BRAND, BRAND_LIGHT, BRAND_ACCENT, TYPOGRAPHY, CARD, SPACING, COLORS, BORDER_RADIUS, SHADOWS, GRADIENTS } from "./components/Brand";
 
 type RecommendationResponse = {
+  id?: string; // Recommendation ID
   assessmentId: string;
   skillId?: string;
   skillName?: string;
@@ -206,13 +210,32 @@ const RecommendedDrillsScreen = () => {
     loadRecommendations();
   }, [loadRecommendations]);
 
+  const { fadeIn, fadeAnim } = useAnimation();
+
+  useEffect(() => {
+    fadeIn();
+  }, []);
+
   const handleBack = () => {
     router.back();
   };
 
-  const handleUpgrade = () => {
-    showInfo('Redirecting to subscription options…');
-    router.push('/subscription');
+  const handleUnlockDrills = () => {
+    if (!recommendation) {
+      showError('Recommendation data not available');
+      return;
+    }
+
+    // Navigate to subscription screen with all necessary parameters
+    router.push({
+      pathname: '/subscriptionScreen',
+      params: {
+        skillId: recommendation.skillId || '',
+        assessmentId: recommendation.assessmentId,
+        recommendationId: recommendation.id || recommendation.assessmentId,
+        drillCount: drillCount.toString()
+      }
+    });
   };
 
   const renderContent = () => {
@@ -286,143 +309,150 @@ const RecommendedDrillsScreen = () => {
 
     return (
       <View style={{ gap: SPACING.gap.lg }}>
-        <LinearGradient
-          colors={[BRAND, BRAND_ACCENT]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={{
-            borderRadius: 24,
-            padding: 22,
-            shadowColor: BRAND,
-            shadowOpacity: 0.18,
-            shadowOffset: { width: 0, height: 10 },
-            shadowRadius: 16,
-            elevation: 4,
-          }}
+        <MotiView
+          from={{ opacity: 0, translateY: 20 }}
+          animate={{ opacity: 1, translateY: 0 }}
+          transition={{ type: 'spring', delay: 100 }}
         >
-          <Text style={{ ...TYPOGRAPHY.overline, color: '#FFFFFF', opacity: 0.9 }}>Here’s your path to improvement</Text>
-          <Text style={{ marginTop: 12, fontSize: 24, fontWeight: '800', color: '#FFFFFF' }}>
-            Great job! You scored {resolvedScore !== undefined ? `${resolvedScore.toFixed(1)}/10` : '—'}
-          </Text>
-          <Text style={{ marginTop: 12, color: '#E0F2FE', lineHeight: 20 }}>
-            Based on your results, we’ve crafted a drill plan to boost your {resolvedSkillName.toLowerCase()} mastery.
-          </Text>
-        </LinearGradient>
-
-        <View style={{ ...CARD.highlight, backgroundColor: '#6C2BD9' }}>
-          <Text style={{ ...TYPOGRAPHY.overline, color: '#C4B5FD' }}>Recommendation summary</Text>
-          <Text style={{ marginTop: 12, fontSize: 20, fontWeight: '800', color: '#FFFFFF' }}>
-            {drillCount} drill{drillCount === 1 ? '' : 's'} recommended for {resolvedSkillName}
-          </Text>
-          {recommendation?.recommendedNextSteps?.reason && (
-            <Text style={{ marginTop: 10, color: '#EDE9FE', lineHeight: 20 }}>
-              {recommendation.recommendedNextSteps.reason}
-            </Text>
-          )}
-          {recommendation?.recommendedNextSteps?.ruleUsed && (
-            <Text style={{ marginTop: 10, color: '#EDE9FE', lineHeight: 18 }}>
-              Policy match: {recommendation.recommendedNextSteps.ruleUsed.minScore}–{recommendation.recommendedNextSteps.ruleUsed.maxScore} ➜ {recommendation.recommendedNextSteps.ruleUsed.drillCount} drills
-            </Text>
-          )}
-          {priceLabel && (
-            <Text style={{ marginTop: 14, color: '#C4B5FD', fontWeight: '600' }}>
-              {priceLabel} • Includes {drillCount} drills
-            </Text>
-          )}
-          <TouchableOpacity
-            onPress={handleUpgrade}
-            activeOpacity={0.9}
+          <LinearGradient
+            colors={GRADIENTS.primary}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
             style={{
-              marginTop: 16,
-              backgroundColor: '#FFFFFF',
-              paddingVertical: 14,
-              borderRadius: 999,
-              alignItems: 'center',
+              borderRadius: 24,
+              padding: 22,
+              shadowColor: BRAND,
+              shadowOpacity: 0.18,
+              shadowOffset: { width: 0, height: 10 },
+              shadowRadius: 16,
+              elevation: 4,
             }}
           >
-            <Text style={{ color: '#6C2BD9', fontSize: 16, fontWeight: '700' }}>Upgrade to Pro</Text>
-          </TouchableOpacity>
-        </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.xs }}>
+              <Ionicons name="trophy" size={24} color="#FFD700" />
+              <Text style={{ ...TYPOGRAPHY.overline, color: '#FFFFFF', opacity: 0.9, marginLeft: SPACING.xs }}>Your Path to Excellence</Text>
+            </View>
+            <Text style={{ marginTop: 12, fontSize: 28, fontWeight: '800', color: '#FFFFFF' }}>
+              Amazing! You scored {resolvedScore !== undefined ? `${resolvedScore.toFixed(1)}/10` : '—'}
+            </Text>
+            <Text style={{ marginTop: 12, color: '#E0F2FE', lineHeight: 22, fontSize: 15 }}>
+              Based on your performance, we've crafted a personalized drill plan to help you master {resolvedSkillName}.
+            </Text>
+          </LinearGradient>
+        </MotiView>
+
+        <MotiView
+          from={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ type: 'spring', delay: 200 }}
+        >
+          <LinearGradient
+            colors={['#8B5CF6', '#6C2BD9']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{ borderRadius: 20, padding: 22, ...SHADOWS.lg }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm }}>
+              <Ionicons name="bulb" size={20} color="#FFD700" />
+              <Text style={{ ...TYPOGRAPHY.overline, color: '#C4B5FD', marginLeft: SPACING.xs }}>
+                Personalized Recommendation
+              </Text>
+            </View>
+            <Text style={{ marginTop: 12, fontSize: 26, fontWeight: '800', color: '#FFFFFF' }}>
+              {drillCount} Practice Drill{drillCount === 1 ? '' : 's'}
+            </Text>
+            <Text style={{ marginTop: 8, fontSize: 16, color: '#EDE9FE', opacity: 0.9 }}>
+              Designed specifically for {resolvedSkillName}
+            </Text>
+            {recommendation?.recommendedNextSteps?.reason && (
+              <Text style={{ marginTop: 12, color: '#EDE9FE', lineHeight: 22, fontSize: 15 }}>
+                💡 {recommendation.recommendedNextSteps.reason}
+              </Text>
+            )}
+            {priceLabel && (
+              <View style={{ marginTop: 16, flexDirection: 'row', alignItems: 'center', paddingTop: SPACING.md, borderTopWidth: 1, borderTopColor: 'rgba(255, 255, 255, 0.2)' }}>
+                <Ionicons name="pricetag" size={18} color="#C4B5FD" />
+                <Text style={{ marginLeft: SPACING.xs, color: '#C4B5FD', fontWeight: '700', fontSize: 16 }}>
+                  {priceLabel}
+                </Text>
+                <Text style={{ marginLeft: SPACING.xs, color: '#EDE9FE', opacity: 0.8 }}>
+                  • {drillCount} drills included
+                </Text>
+              </View>
+            )}
+          </LinearGradient>
+        </MotiView>
 
         <View style={{ gap: SPACING.gap.md }}>
+          <MotiView
+            from={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 300 }}
+          >
+            <Text style={{ ...TYPOGRAPHY.h2, color: COLORS.text.primary, marginBottom: SPACING.sm }}>
+              What You'll Practice
+            </Text>
+          </MotiView>
+
           {drillItems.map((drill, index) => (
-            <View
+            <MotiView
               key={drill.id}
-              style={{
-                ...CARD.base,
-                padding: 20,
-                borderRadius: 20,
-                flexDirection: 'row',
-                gap: SPACING.gap.md,
-                alignItems: 'flex-start',
-              }}
+              from={{ opacity: 0, translateX: -20 }}
+              animate={{ opacity: 1, translateX: 0 }}
+              transition={{ type: 'spring', delay: 400 + index * 100 }}
             >
               <View
                 style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 24,
-                  backgroundColor: BRAND_LIGHT,
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  ...CARD.base,
+                  padding: 20,
+                  borderRadius: 20,
+                  flexDirection: 'row',
+                  gap: SPACING.gap.md,
+                  alignItems: 'flex-start',
                 }}
               >
-                <MaterialCommunityIcons name="target-variant" size={24} color={BRAND} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>{drill.name}</Text>
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-                  <Text
-                    style={{
-                      backgroundColor: '#EEF2FF',
-                      color: '#4338CA',
-                      paddingVertical: 4,
-                      paddingHorizontal: 10,
-                      borderRadius: 999,
-                      fontSize: 12,
-                      fontWeight: '600',
-                    }}
-                  >
-                    {drill.scope || 'Global'}
-                  </Text>
-                  {drill.difficulty && (
-                    <Text
-                      style={{
-                        backgroundColor: '#FDF2F8',
-                        color: '#C026D3',
-                        paddingVertical: 4,
-                        paddingHorizontal: 10,
-                        borderRadius: 999,
-                        fontSize: 12,
-                        fontWeight: '600',
-                      }}
-                    >
-                      {drill.difficulty}
-                    </Text>
+                <View
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: 26,
+                    backgroundColor: BRAND_LIGHT,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <MaterialCommunityIcons name="target-variant" size={28} color={BRAND} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 17, fontWeight: '700', color: '#111827', marginBottom: SPACING.xs }}>{drill.name}</Text>
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                    <View style={{ backgroundColor: '#EEF2FF', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 999 }}>
+                      <Text style={{ color: '#4338CA', fontSize: 12, fontWeight: '600' }}>
+                        {drill.scope || 'Global'}
+                      </Text>
+                    </View>
+                    {drill.difficulty && (
+                      <View style={{ backgroundColor: '#FDF2F8', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 999 }}>
+                        <Text style={{ color: '#C026D3', fontSize: 12, fontWeight: '600' }}>
+                          {drill.difficulty}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  {drill.durationMinutes && (
+                    <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center' }}>
+                      <Ionicons name="time-outline" size={16} color="#4B5563" />
+                      <Text style={{ marginLeft: 4, color: '#4B5563', fontSize: 13 }}>
+                        {drill.durationMinutes} min session
+                      </Text>
+                    </View>
+                  )}
+                  {drill.description && (
+                    <Text style={{ marginTop: 8, color: '#4B5563', lineHeight: 20 }}>{drill.description}</Text>
                   )}
                 </View>
-                {drill.durationMinutes && (
-                  <Text style={{ marginTop: 8, color: '#4B5563', fontSize: 12 }}>
-                    <Ionicons name="time-outline" size={14} color="#4B5563" /> {drill.durationMinutes} min session
-                  </Text>
-                )}
-                {drill.description && (
-                  <Text style={{ marginTop: 8, color: '#4B5563', lineHeight: 20 }}>{drill.description}</Text>
-                )}
               </View>
-              <TouchableOpacity
-                onPress={handleUpgrade}
-                activeOpacity={0.9}
-                style={{
-                  backgroundColor: '#E0E7FF',
-                  paddingVertical: 10,
-                  paddingHorizontal: 16,
-                  borderRadius: 999,
-                }}
-              >
-                <Text style={{ color: BRAND, fontWeight: '600' }}>Unlock</Text>
-              </TouchableOpacity>
-            </View>
+            </MotiView>
           ))}
 
           {drillItems.length === 0 && (
@@ -485,36 +515,27 @@ const RecommendedDrillsScreen = () => {
         {renderContent()}
       </ScrollView>
 
-      <View
-        style={{
-          paddingHorizontal: 24,
-          paddingVertical: 16,
-          backgroundColor: '#FFFFFF',
-          borderTopWidth: 1,
-          borderTopColor: '#E5E7EB',
-        }}
-      >
-        <TouchableOpacity
-          onPress={handleUpgrade}
-          activeOpacity={0.9}
+      {!isLoading && !error && !policyMissing && recommendation && (
+        <View
           style={{
-            backgroundColor: BRAND,
+            paddingHorizontal: 24,
             paddingVertical: 16,
-            borderRadius: 999,
-            alignItems: 'center',
-            justifyContent: 'center',
-            shadowColor: BRAND,
-            shadowOffset: { width: 0, height: 10 },
-            shadowOpacity: 0.12,
-            shadowRadius: 12,
-            elevation: 3,
+            backgroundColor: '#FFFFFF',
+            borderTopWidth: 1,
+            borderTopColor: '#E5E7EB',
           }}
         >
-          <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '600', letterSpacing: 0.3 }}>
-            Unlock All Drills
-          </Text>
-        </TouchableOpacity>
-      </View>
+          <Button
+            variant="gradient"
+            size="large"
+            onPress={handleUnlockDrills}
+            icon="rocket"
+            fullWidth
+          >
+            Unlock All {drillCount} Drill{drillCount === 1 ? '' : 's'}
+          </Button>
+        </View>
+      )}
     </SafeAreaView>
   );
 };

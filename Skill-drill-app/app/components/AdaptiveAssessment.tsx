@@ -432,9 +432,9 @@ const AdaptiveAssessment: React.FC<AssessmentComponentProps> = ({
                   placeholderTextColor="#999"
                   value={userResponse}
                   onChangeText={setUserResponse}
-                  maxLength={2000}
+                  maxLength={2400}
                 />
-                
+
                 <Text style={{
                   fontSize: 12,
                   color: '#999',
@@ -442,7 +442,7 @@ const AdaptiveAssessment: React.FC<AssessmentComponentProps> = ({
                   paddingHorizontal: 20,
                   paddingBottom: 16,
                 }}>
-                  {userResponse.length}/2000 characters
+                  {userResponse.length}/2400 characters
                 </Text>
               </Surface>
             </MotiView>
