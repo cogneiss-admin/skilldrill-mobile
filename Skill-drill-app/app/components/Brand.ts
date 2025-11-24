@@ -291,6 +291,11 @@ export const COMPONENTS = {
   }
 } as const;
 
+// ===== SCREEN BACKGROUNDS =====
+// Centralized screen background colors for easy maintenance
+export const SCREEN_BACKGROUND = COLORS.background.tertiary; // #F3F4F6 - Main screen background color
+export const SCREEN_CONTAINER_BACKGROUND = COLORS.white; // #FFFFFF - Container background (usually white)
+
 // ===== LEGACY SUPPORT =====
 // Keep these for backward compatibility
 export const PADDING = SPACING.padding;
