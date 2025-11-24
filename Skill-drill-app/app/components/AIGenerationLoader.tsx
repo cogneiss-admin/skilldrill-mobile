@@ -323,8 +323,7 @@ export default function AIGenerationLoader({
             ))}
           </View>
         </MotiView>
-      </MotiView>
-    </View>
-    </BlurView >
+      </View>
+    </BlurView>
   );
 }

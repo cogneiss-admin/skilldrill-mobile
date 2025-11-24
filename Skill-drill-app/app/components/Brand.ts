@@ -3,7 +3,7 @@
 import React from "react";
 
 // ===== ASSETS =====
-export const LOGO_SRC = require('../assets/images/logo.png');
+export const LOGO_SRC = require('../../assets/images/logo.png');
 
 // ===== BRAND COLORS =====
 export const BRAND = "#0A66C2";

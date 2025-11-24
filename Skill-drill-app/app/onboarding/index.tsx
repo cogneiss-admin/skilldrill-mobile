@@ -10,11 +10,10 @@ import { MotiView } from "moti";
 import { StatusBar } from "react-native";
 import * as Haptics from "expo-haptics";
 
-import { LOGO_SRC } from '../components/Brand';
+import { BRAND, GRADIENTS, LOGO_SRC } from '../components/Brand';
 const logoSrc = LOGO_SRC;
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-import { BRAND, GRADIENTS, LOGO_SRC } from '../components/Brand';
 
 export default function Onboarding() {
   const [navigating, setNavigating] = useState(false);
