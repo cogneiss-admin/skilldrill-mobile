@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { MotiView } from 'moti';
@@ -40,8 +39,6 @@ interface ActivitySkillCardProps {
   onViewFeedback?: () => void;
   onDeleteAssessment?: () => void; // Testing: Delete assessment progress
 }
-
-// Removed: Using centralized functions from assessmentUtils
 
 const getScoreColor = (score: number): string => {
   if (score >= 9) return '#10B981';
@@ -101,7 +98,6 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
   const scoreColor = score ? getScoreColor(score) : '#6B7280';
   const levelLabel = score ? getLevelLabel(score) : 'Not Assessed';
 
-  // Calculate progress using centralized utility
   const progressCalc = calculateAssessmentProgress(
     progressData?.completedResponses || 0,
     progressData?.totalPrompts || 0
@@ -121,7 +117,7 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
         if (templateExists) {
           // Start existing assessment
           router.push({
-            pathname: '/adaptive-assessment',
+            pathname: '/assessmentScenarios',
             params: { skillId }
           });
         } else {
@@ -133,7 +129,7 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
       case AssessmentActionType.ResumeAssessment:
         // Resume with session ID for proper continuation
         router.push({
-          pathname: '/adaptive-assessment',
+          pathname: '/assessmentScenarios',
           params: { 
             skillId,
             sessionId: id,
@@ -354,7 +350,7 @@ export const ActivitySkillCard: React.FC<ActivitySkillCardProps> = ({
                 textAlign: 'center',
                 marginTop: 4
               }}>
-                {templateExists ? (totalPrompts > 0 ? `${totalPrompts} scenario-based questions` : 'Scenario-based assessment') : 'Click to generate AI-powered assessment'}
+                {templateExists ? (progressData?.totalPrompts && progressData.totalPrompts > 0 ? `${progressData.totalPrompts} scenario-based questions` : 'Scenario-based assessment') : 'Click to generate AI-powered assessment'}
               </Text>
             </View>
           )}

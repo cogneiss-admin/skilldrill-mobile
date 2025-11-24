@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, FlatList, Image, Dimensions, TouchableOpacity } from 'react-native';
 import { AntDesign } from '@expo/vector-icons';

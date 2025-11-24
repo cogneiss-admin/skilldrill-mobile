@@ -4,7 +4,7 @@ export interface ApiError {
   message: string;
   code?: string;
   status?: number;
-  details?: any;
+  details?: Record<string, unknown>;
 }
 
 export interface ValidationError {
@@ -15,9 +15,9 @@ export interface ValidationError {
 export class AppError extends Error {
   public code?: string;
   public status?: number;
-  public details?: any;
+  public details?: Record<string, unknown>;
 
-  constructor(message: string, code?: string, status?: number, details?: any) {
+  constructor(message: string, code?: string, status?: number, details?: Record<string, unknown>) {
     super(message);
     this.name = 'AppError';
     this.code = code;
@@ -27,7 +27,7 @@ export class AppError extends Error {
 }
 
 // Parse API error responses
-export function parseApiError(error: any): ApiError {
+export function parseApiError(error: unknown): ApiError {
   if (error instanceof AppError) {
     return {
       message: error.message,
@@ -37,25 +37,29 @@ export function parseApiError(error: any): ApiError {
     };
   }
 
-  if (error?.response?.data) {
-    const data = error.response.data;
-    return {
-      message: data.message || data.error || 'An error occurred',
-      code: data.code,
-      status: error.response.status,
-      // Preserve useful vendor-specific fields (like retry_after) inside details
-      details: {
-        ...(data.details || {}),
-        retryAfter: data.retry_after || data.retryAfter,
-      },
-    };
+  // Handle Axios errors
+  if (typeof error === 'object' && error !== null && 'response' in error) {
+    const axiosError = error as { response?: { data?: { message?: string; error?: string; code?: string; details?: Record<string, unknown>; retry_after?: number; retryAfter?: number }; status?: number } };
+    if (axiosError.response?.data) {
+      const data = axiosError.response.data;
+      return {
+        message: data.message || data.error || 'An error occurred',
+        code: data.code,
+        status: axiosError.response.status,
+        details: {
+          ...(data.details || {}),
+          retryAfter: data.retry_after || data.retryAfter,
+        },
+      };
+    }
   }
 
-  if (error?.message) {
+  // Handle Error objects
+  if (error instanceof Error) {
     return {
       message: error.message,
-      code: error.code,
-      status: error.status,
+      code: undefined,
+      status: undefined,
     };
   }
 
@@ -91,7 +95,8 @@ export function formatErrorMessage(error: ApiError | string): string {
         return 'OTP expired. Request new one.';
       case 'OTP_RATE_LIMIT_EXCEEDED': {
         // If backend provides retry-after seconds, format a friendlier message
-        const seconds = (error as any)?.details?.retryAfter || (error as any)?.details?.retry_after;
+        const errorDetails = error.details as { retryAfter?: number; retry_after?: number } | undefined;
+        const seconds = errorDetails?.retryAfter || errorDetails?.retry_after;
         if (typeof seconds === 'number' && seconds > 0) {
           const mins = Math.ceil(seconds / 60);
           return `Too many OTP requests. Try again in ${mins} minute${mins > 1 ? 's' : ''}.`;
@@ -285,21 +290,21 @@ export function createError(
   message: string,
   code?: string,
   status?: number,
-  details?: any
+  details?: Record<string, unknown>
 ): AppError {
   return new AppError(message, code, status, details);
 }
 
 // Handle network errors
-export function handleNetworkError(error: any): ApiError {
-  if (error.name === 'NetworkError' || error.message?.includes('network')) {
+export function handleNetworkError(error: unknown): ApiError {
+  if (error instanceof Error && (error.name === 'NetworkError' || error.message?.includes('network'))) {
     return {
       message: 'Network error. Please check your internet connection and try again.',
       code: 'NETWORK_ERROR',
     };
   }
 
-  if (error.name === 'TimeoutError' || error.message?.includes('timeout')) {
+  if (error instanceof Error && (error.name === 'TimeoutError' || error.message?.includes('timeout'))) {
     return {
       message: 'Request timed out. Please try again.',
       code: 'TIMEOUT',
@@ -310,10 +315,10 @@ export function handleNetworkError(error: any): ApiError {
 }
 
 // Log error for debugging
-export function logError(error: any, context?: string) {
+export function logError(error: unknown, context?: string) {
   const errorInfo = {
-    message: error?.message || error,
-    stack: error?.stack,
+    message: error instanceof Error ? error.message : String(error),
+    stack: error instanceof Error ? error.stack : undefined,
     context,
     timestamp: new Date().toISOString(),
     userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : undefined,
@@ -326,14 +331,14 @@ export function logError(error: any, context?: string) {
     console.group('Error Details');
     console.log('Context:', context);
     console.log('Error:', error);
-    console.log('Stack:', error?.stack);
+    console.log('Stack:', error instanceof Error ? error.stack : undefined);
     console.groupEnd();
   }
 }
 
 // Validation helpers
 export const validators = {
-  required: (fieldName: string) => (value: any) => 
+  required: (fieldName: string) => (value: unknown): string | null => 
     !value || (typeof value === "string" && value.trim() === "") 
       ? `${fieldName} is required` 
       : null,

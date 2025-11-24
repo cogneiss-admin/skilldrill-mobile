@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useMemo, useRef, useState, useEffect } from "react";
 import { Dimensions, Text, View, Animated as RNAnimated } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -6,15 +5,16 @@ import { useRouter } from "expo-router";
 import Carousel from "react-native-reanimated-carousel";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Defs, RadialGradient as SvgRadialGradient, Rect, Stop } from "react-native-svg";
-import { Button } from "react-native-paper";
+import Button from "../../components/Button";
 import { MotiView } from "moti";
 import { StatusBar } from "react-native";
 import * as Haptics from "expo-haptics";
 
-const logoSrc = require("../../assets/images/logo.png");
+import { LOGO_SRC } from '../components/Brand';
+const logoSrc = LOGO_SRC;
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-const BRAND = "#0A66C2";
+import { BRAND, GRADIENTS, LOGO_SRC } from '../components/Brand';
 
 export default function Onboarding() {
   const [navigating, setNavigating] = useState(false);
@@ -97,7 +97,7 @@ function WelcomeScreen({ onGetStarted }: { onGetStarted: () => void }) {
               ))}
             </View>
             <View className="mt-8" />
-            <Button mode="contained" onPress={onGetStarted} contentStyle={{ height: 56 }} style={{ borderRadius: 28, backgroundColor: "#ffffff", shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 8 }} labelStyle={{ fontSize: 18, fontWeight: "700", color: "#0A66C2", letterSpacing: 0.5 }}>
+            <Button variant="primary" onPress={onGetStarted} size="large" style={{ borderRadius: 28, backgroundColor: "#ffffff", shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 8 }}>
               Get Started
             </Button>
           </View>
@@ -139,7 +139,7 @@ function LogoPulse({ size = 200 }: { size?: number }) {
   return (
     <View style={{ alignItems: 'center', justifyContent: 'center' }}>
       <RNAnimated.View style={{ width: size, height: size, transform: [{ scale }], position: 'relative' }}>
-        <LinearGradient colors={["#0A66C2", "#0E75D1", "#1285E0"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: 'absolute', width: size, height: size, borderRadius: size / 2 }} />
+        <LinearGradient colors={GRADIENTS.onboarding} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: 'absolute', width: size, height: size, borderRadius: size / 2 }} />
         <RNAnimated.Image source={logoSrc} style={{ width: size, height: size, position: 'absolute' }} resizeMode="contain" />
       </RNAnimated.View>
     </View>
@@ -149,7 +149,7 @@ function LogoPulse({ size = 200 }: { size?: number }) {
 function StaticBackground() {
   return (
     <View className="flex-1">
-      <LinearGradient colors={["#0A66C2", "#0E75D1", "#1285E0"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ flex: 1 }} />
+      <LinearGradient colors={GRADIENTS.onboarding} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ flex: 1 }} />
       <LinearGradient colors={["rgba(10, 102, 194, 0.9)", "rgba(18, 133, 224, 0.6)", "rgba(10, 102, 194, 0.8)"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: "absolute", inset: 0 }} />
       <Svg width={SCREEN_WIDTH} height={SCREEN_HEIGHT} style={{ position: "absolute" }}>
         <Defs>
@@ -158,8 +158,8 @@ function StaticBackground() {
             <Stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
           </SvgRadialGradient>
           <SvgRadialGradient id="brand-accent2" cx="70%" cy="80%" r="60%">
-            <Stop offset="0%" stopColor="#0A66C2" stopOpacity="0.4" />
-            <Stop offset="100%" stopColor="#0A66C2" stopOpacity="0" />
+            <Stop offset="0%" stopColor={BRAND} stopOpacity="0.4" />
+            <Stop offset="100%" stopColor={BRAND} stopOpacity="0" />
           </SvgRadialGradient>
         </Defs>
         <Rect x="0" y="0" width="100%" height="100%" fill="url(#brand-accent1)" />

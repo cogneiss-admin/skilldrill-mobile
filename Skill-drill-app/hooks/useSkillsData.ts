@@ -1,8 +1,10 @@
-// @ts-nocheck
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiService } from '../services/api';
 import authService from '../services/authService';
+import { Skill } from '../features/skillsSlice';
+import { SkillGroup } from '../types/skills';
+import { User } from '../services/api';
 
 export function useSkillsData(params: {
   isAssessmentMode: boolean;
@@ -10,7 +12,7 @@ export function useSkillsData(params: {
 }) {
   const { isAssessmentMode, isAddToAssessmentMode } = params;
 
-  const [skillsData, setSkillsData] = useState<any[]>([]);
+  const [skillsData, setSkillsData] = useState<Skill[]>([]);
   const [selected, setSelected] = useState<Array<string | number>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -31,10 +33,10 @@ export function useSkillsData(params: {
             sampleGroup: Array.isArray(response.data) && response.data[0]?.title,
           });
         } catch {}
-        const allSkills: any[] = [];
-        response.data.forEach((group: any) => {
+        const allSkills: Skill[] = [];
+        response.data.forEach((group: SkillGroup) => {
           if (group.skills && Array.isArray(group.skills)) {
-            group.skills.forEach((skill: any) => {
+            group.skills.forEach((skill: Skill) => {
               allSkills.push({
                 id: skill.id,
                 name: skill.name,
@@ -73,15 +75,15 @@ export function useSkillsData(params: {
     (async () => {
       try {
         const user = await authService.getUserData();
-        const careerLevelId = (user as any)?.careerLevelId || (user as any)?.careerLevel?.id;
+        const careerLevelId = user?.careerLevelId || user?.careerLevel?.id;
         try { console.log('🎯 Eligible fetch: user careerLevelId:', careerLevelId); } catch {}
         if (!careerLevelId) return;
         const resp = await apiService.get(`/skills/career-level/${careerLevelId}/categories`);
         if (resp.success) {
           const ids = new Set<string>();
-          (resp.data || []).forEach((group: any) => {
+          (resp.data || []).forEach((group: SkillGroup) => {
             if (group?.skills && Array.isArray(group.skills)) {
-              group.skills.forEach((s: any) => {
+              group.skills.forEach((s: Skill) => {
                 // Add both id and mongoId as strings to handle different formats
                 if (s?.id) {
                   ids.add(String(s.id));
@@ -118,7 +120,7 @@ export function useSkillsData(params: {
         try {
           const response = await apiService.get('/user/skills');
           if (response.success && response.data?.length > 0) {
-            const currentSkillIds = response.data.map((userSkill: any) => userSkill.skill?.id || userSkill.id);
+            const currentSkillIds = response.data.map((userSkill: { skill?: { id: string }; id?: string }) => userSkill.skill?.id || userSkill.id);
             setSelected(currentSkillIds);
           }
         } catch {}
@@ -134,7 +136,7 @@ export function useSkillsData(params: {
           if (persisted) {
             try {
               const parsed = JSON.parse(persisted);
-              const validSelections = parsed.filter((id: any) => skillsData.some((s) => s.id === id));
+              const validSelections = parsed.filter((id: string | number) => skillsData.some((s) => s.id === id));
               setSelected(validSelections);
             } catch {}
           }
@@ -156,7 +158,7 @@ export function useSkillsData(params: {
 
   // Group by tier memo
   const skillsByTier = useMemo(() => {
-    const groups: Record<string, any[]> = {};
+    const groups: Record<string, Skill[]> = {};
     for (const skill of skillsData) {
       // Use skillTier data for grouping; fall back to 'default'
       const tierKey = (skill.skillTier && skill.skillTier.key) ? skill.skillTier.key : 'default';

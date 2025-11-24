@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Ensure Reanimated is initialized
 import "react-native-reanimated";
 import React, { Suspense, useEffect, useMemo, useState } from "react";
@@ -12,7 +11,7 @@ import { store } from "../store";
 import { useAuth } from "../hooks/useAuth";
 import ToastContainer from "../components/ToastContainer";
 import { useToast } from "../hooks/useToast";
-import { BRAND } from "./components/Brand";
+import { BRAND, LOGO_SRC } from "./components/Brand";
 import SessionManager from "../utils/sessionManager";
 
 const theme = {
@@ -23,7 +22,7 @@ const theme = {
   },
 };
 
-const logoSrc = require("../assets/images/logo.png");
+const logoSrc = LOGO_SRC;
 
 function GlobalOtpSheet() {
   return null; // reserved for future global portal
@@ -137,12 +136,6 @@ const AuthMiddleware = React.memo(({ children }: { children: React.ReactNode }) 
       console.log('🎯 AuthMiddleware: On assessment screen, not redirecting');
       return;
     }
-    // Also allow adaptive-assessment (was being redirected previously)
-    const isAssessmentIntro = segments[0] === 'adaptive-assessment';
-    if (isAssessmentIntro) {
-      console.log('🎯 AuthMiddleware: On adaptive-assessment screen, not redirecting');
-      return;
-    }
 
     // Don't redirect if we're on the session-loading screen
     const isSessionLoadingScreen = segments[0] === 'session-loading';
@@ -158,12 +151,32 @@ const AuthMiddleware = React.memo(({ children }: { children: React.ReactNode }) 
       return;
     }
 
-    // Don't redirect if we're on the adaptive-results screen
-    const isAdaptiveResultsScreen = segments[0] === 'adaptive-results';
-    if (isAdaptiveResultsScreen) {
-      console.log('📊 AuthMiddleware: On adaptive-results screen, not redirecting');
+    // Don't redirect if we're on the new assessment screens (camelCase)
+    const isAssessmentScenariosScreen = segments[0] === 'assessmentScenarios';
+    if (isAssessmentScenariosScreen) {
+      console.log('🎯 AuthMiddleware: On assessmentScenarios screen, not redirecting');
       return;
     }
+
+    const isAssessmentResultsScreen2 = segments[0] === 'assessmentResults';
+    if (isAssessmentResultsScreen2) {
+      console.log('📊 AuthMiddleware: On assessmentResults screen, not redirecting');
+      return;
+    }
+
+    // Don't redirect if we're on the drill screens
+    const isDrillsScenariosScreen = segments[0] === 'drillsScenarios';
+    if (isDrillsScenariosScreen) {
+      console.log('🎯 AuthMiddleware: On drillsScenarios screen, not redirecting');
+      return;
+    }
+
+    const isDrillsResultsScreen = segments[0] === 'drillsResults';
+    if (isDrillsResultsScreen) {
+      console.log('📊 AuthMiddleware: On drillsResults screen, not redirecting');
+      return;
+    }
+
 
     const isRecommendedDrillsScreen = segments[0] === 'recommended-drills';
     if (isRecommendedDrillsScreen) {

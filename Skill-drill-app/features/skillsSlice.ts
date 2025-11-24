@@ -44,9 +44,9 @@ export const fetchSkills = createAsyncThunk(
         const allSkills: Skill[] = [];
 
         // Transform the API response format
-        response.data.forEach((group: any) => {
+        response.data.forEach((group: { title?: string; skills?: Array<{ id: string; name: string; description?: string; icon?: string; skillTierId?: string; tier?: string; mongoId?: string }> }) => {
           if (group.skills && Array.isArray(group.skills)) {
-            group.skills.forEach((skill: any) => {
+            group.skills.forEach((skill: { id: string; name: string; description?: string; icon?: string; skillTierId?: string; tier?: string; mongoId?: string }) => {
               const skillName = skill.name;
               const icon = skill.icon;
 

@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Alert } from 'react-native';
-import { Button } from 'react-native-paper';
+import Button from '../../components/Button';
 import { MotiView } from 'moti';
 import { useRouter } from 'expo-router';
 import { AntDesign, MaterialIcons } from '@expo/vector-icons';
+import { Skill } from '../../features/skillsSlice';
 
 interface EnhancedSkillCardProps {
-  skill: any;
+  skill: Skill;
   index: number;
   brand?: string;
 }
@@ -34,7 +35,7 @@ const EnhancedSkillCard: React.FC<EnhancedSkillCardProps> = ({
     }
 
     router.push({
-      pathname: "/adaptive-assessment",
+      pathname: "/assessmentScenarios",
       params: {
         skillId: skillId,
         skillName: name
@@ -112,12 +113,9 @@ const EnhancedSkillCard: React.FC<EnhancedSkillCardProps> = ({
           {/* Quick Action Button */}
           <View style={{ marginTop: 12 }}>
             <Button
-              mode="contained"
+              variant="primary"
               onPress={handleAdaptiveAssessment}
-              buttonColor={brand}
               style={{ borderRadius: 8 }}
-              contentStyle={{ paddingVertical: 4 }}
-              labelStyle={{ fontSize: 14, fontWeight: '600' }}
             >
               Start AI Adaptive Assessment
             </Button>
@@ -189,12 +187,9 @@ const EnhancedSkillCard: React.FC<EnhancedSkillCardProps> = ({
               </View>
               
               <Button
-                mode="contained"
+                variant="primary"
                 onPress={handleAdaptiveAssessment}
-                buttonColor={brand}
                 style={{ borderRadius: 8 }}
-                contentStyle={{ paddingVertical: 4 }}
-                labelStyle={{ fontSize: 14, fontWeight: '600' }}
               >
                 Start Adaptive Assessment
               </Button>

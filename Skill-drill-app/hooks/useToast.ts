@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { ToastType } from '../components/ToastNotification';
 

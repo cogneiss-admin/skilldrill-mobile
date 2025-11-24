@@ -101,19 +101,27 @@ class SocialAuthService {
         authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
       });
 
-      console.log('📱 OAuth Result:', result.type, (result as any).params);
+      interface OAuthResult {
+        type: string;
+        params?: {
+          code?: string;
+          [key: string]: unknown;
+        };
+      }
+      const oauthResult = result as OAuthResult;
+      console.log('📱 OAuth Result:', oauthResult.type, oauthResult.params);
 
-      if (result.type === 'success' && result.params.code) {
+      if (oauthResult.type === 'success' && oauthResult.params?.code) {
         console.log('✅ Authorization code received, exchanging for tokens...');
-        return await this.handleGoogleCallback(result.params.code);
-      } else if (result.type === 'cancel') {
+        return await this.handleGoogleCallback(oauthResult.params.code);
+      } else if (oauthResult.type === 'cancel') {
         throw new Error('Google authentication was cancelled by user');
       } else if (result.type === 'error') {
         throw new Error(`Google OAuth error: ${result.error?.message || 'Unknown error'}`);
       } else {
         throw new Error('Google authentication failed - no authorization code received');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Google sign-in error:', error);
       console.error('Error details:', {
         message: error.message,
@@ -192,7 +200,7 @@ class SocialAuthService {
         authProvider: 'GOOGLE',
         avatarUrl: socialUserData.avatar_url,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Google callback error:', error);
       throw new Error(error.message || 'Google authentication failed');
     }
@@ -219,12 +227,21 @@ class SocialAuthService {
         authorizationEndpoint: 'https://www.linkedin.com/oauth/v2/authorization',
       });
 
-      if (result.type === 'success' && result.params.code) {
-        return await this.handleLinkedInCallback(result.params.code);
+      interface OAuthResult {
+        type: string;
+        params?: {
+          code?: string;
+          [key: string]: unknown;
+        };
+      }
+      const oauthResult = result as OAuthResult;
+
+      if (oauthResult.type === 'success' && oauthResult.params?.code) {
+        return await this.handleLinkedInCallback(oauthResult.params.code);
       } else {
         throw new Error('LinkedIn authentication was cancelled or failed');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('LinkedIn sign-in error:', error);
       throw new Error(error.message || 'LinkedIn authentication failed');
     }
@@ -312,7 +329,7 @@ class SocialAuthService {
         authProvider: 'LINKEDIN',
         avatarUrl: socialUserData.avatar_url,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('LinkedIn callback error:', error);
       throw new Error(error.message || 'LinkedIn authentication failed');
     }

@@ -1,9 +1,7 @@
-// @ts-nocheck
 import React, { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, Text, ScrollView, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-// Button removed to match careerRole styling
 import { StatusBar } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -13,7 +11,6 @@ import { useToast } from "../../hooks/useToast";
 import { AntDesign } from "@expo/vector-icons";
 import { useSkillsData } from "../../hooks/useSkillsData";
 import SkillsSkeleton from "../components/SkillsSkeleton";
-// Redux skills hook removed as part of code cleanup
 
 import { BRAND, PADDING } from "../components/Brand";
 import { Dimensions } from 'react-native';
@@ -142,14 +139,20 @@ export default function SkillsScreen() {
         // Prefer alias to avoid collision with /skills/:skillId in some setups
         const resp = await apiService.get('/skill-tiers');
         if (resp?.success && Array.isArray(resp.data)) {
-          const parsed = resp.data
-            .map((t: any) => ({ key: t.key || t.name || t.value, name: t.name || t.key || '', order: t.order }))
-            .filter((t: any) => t.key);
-          parsed.sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
+          interface TierData {
+            key?: string;
+            name?: string;
+            value?: string;
+            order?: number;
+          }
+          const parsed = (resp.data as TierData[])
+            .map((t) => ({ key: t.key || t.name || t.value || '', name: t.name || t.key || '', order: t.order ?? 0 }))
+            .filter((t) => t.key);
+          parsed.sort((a, b) => a.order - b.order);
           setTiers(parsed);
           try { console.log('📚 Tiers fetched:', parsed); } catch {}
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         try { console.error('❌ /skills/tiers error:', e?.response?.status, e?.response?.data || e?.message); } catch {}
       }
     })();
@@ -257,7 +260,7 @@ export default function SkillsScreen() {
           AsyncStorage.removeItem('selectedSkills').catch(console.error);
 
           router.replace({
-            pathname: '/adaptive-assessment',
+            pathname: '/assessmentScenarios',
             params: { selectedSkills: JSON.stringify(validSkillIds) }
           });
           return; // Exit early to prevent dashboard navigation
@@ -388,7 +391,7 @@ export default function SkillsScreen() {
 
                   {/* Skills list (empty allowed) */}
                   <View>
-                    {(tierSkills || []).map((skill: any, idx: number) => {
+                    {(tierSkills || []).map((skill, idx: number) => {
                       // Determine if skill is locked based on eligibleSet
                       // Only lock if eligibleSet is populated (user has career level) and skill is not in the set
                       const hasEligible = eligibleSet && eligibleSet.size > 0;

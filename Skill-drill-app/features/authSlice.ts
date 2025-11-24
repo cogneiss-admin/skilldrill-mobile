@@ -39,7 +39,7 @@ export const checkAuthStatus = createAsyncThunk(
       }
       
       return { isAuthenticated: false, user: null };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return rejectWithValue(error.message);
     }
   }
@@ -69,7 +69,7 @@ export const loginUser = createAsyncThunk(
       } else {
         throw new Error(response.message);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       return rejectWithValue(error.message);
     }
   }
@@ -86,7 +86,7 @@ export const verifyOtpUser = createAsyncThunk(
       } else {
         throw new Error(response.message);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       return rejectWithValue(error.message);
     }
   }
@@ -98,7 +98,7 @@ export const logoutUser = createAsyncThunk(
     try {
       await authService.logout();
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       return rejectWithValue(error.message);
     }
   }

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React from 'react';
 import { View, ScrollView, Dimensions, Text } from 'react-native';
 import { MotiView } from 'moti';

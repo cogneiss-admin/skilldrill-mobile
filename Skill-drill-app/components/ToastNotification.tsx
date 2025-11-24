@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useEffect, useRef } from 'react';
 import { View, Text, Pressable, Animated, Dimensions, StyleSheet } from 'react-native';
 import { AntDesign, Ionicons, MaterialIcons } from '@expo/vector-icons';

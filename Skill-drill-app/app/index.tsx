@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import { Dimensions, Text, View, StyleSheet, Animated as RNAnimated } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -7,14 +6,13 @@ import SplashOverlay from "./components/SplashOverlay";
 import Carousel from "react-native-reanimated-carousel";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Defs, RadialGradient as SvgRadialGradient, Rect, Stop } from "react-native-svg";
-import { Button } from "react-native-paper";
+import Button from "../components/Button";
 import { MotiView } from "moti";
 import { StatusBar } from "react-native";
 import { useAuth } from "../hooks/useAuth";
-import { BRAND } from "./components/Brand";
-// Removed pre-load of home route; screen no longer exists
+import { BRAND, GRADIENTS, LOGO_SRC } from "./components/Brand";
 
-const logoSrc = require("../assets/images/logo.png");
+const logoSrc = LOGO_SRC;
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -290,9 +288,9 @@ const WelcomeScreen = React.memo(({ onGetStarted }: { onGetStarted: () => void }
 
             <View className="mt-8" />
             <Button
-              mode="contained"
+              variant="primary"
               onPress={onGetStarted}
-              contentStyle={{ height: 56 }}
+              size="large"
               style={{ 
                 borderRadius: 28,
                 backgroundColor: "#ffffff",
@@ -301,12 +299,6 @@ const WelcomeScreen = React.memo(({ onGetStarted }: { onGetStarted: () => void }
                 shadowOpacity: 0.25,
                 shadowRadius: 12,
                 elevation: 8,
-              }}
-              labelStyle={{ 
-                fontSize: 16, 
-                fontWeight: "700",
-                color: "#0A66C2",
-                letterSpacing: 0.5,
               }}
             >
               Get Started
@@ -427,7 +419,7 @@ function LogoPulse({ size = 200 }: { size?: number }) {
       >
         {/* Background gradient that matches our main background */}
         <LinearGradient
-          colors={["#0A66C2", "#0E75D1", "#1285E0"]}
+          colors={GRADIENTS.onboarding}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={{ 
@@ -475,8 +467,8 @@ function StaticBackground() {
             <Stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
           </SvgRadialGradient>
           <SvgRadialGradient id="brand-accent2" cx="70%" cy="80%" r="60%">
-            <Stop offset="0%" stopColor="#0A66C2" stopOpacity="0.4" />
-            <Stop offset="100%" stopColor="#0A66C2" stopOpacity="0" />
+            <Stop offset="0%" stopColor={BRAND} stopOpacity="0.4" />
+            <Stop offset="100%" stopColor={BRAND} stopOpacity="0" />
           </SvgRadialGradient>
         </Defs>
         <Rect x="0" y="0" width="100%" height="100%" fill="url(#brand-accent1)" />

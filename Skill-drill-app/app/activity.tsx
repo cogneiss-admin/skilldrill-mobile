@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useState, useEffect } from "react";
 import { 
   Text, 
@@ -180,7 +179,7 @@ export default function MyActivity() {
       
       // Navigate directly to assessment since sequential mode generates questions on-demand
       router.push({
-        pathname: '/adaptive-assessment',
+        pathname: '/assessmentScenarios',
         params: { skillId }
       });
     } catch (error) {
@@ -213,8 +212,9 @@ export default function MyActivity() {
   // Get assessment progress for a specific skill
   const getSkillProgress = (skillId: string) => {
     // New: derive progress from activeSessions list in session status
-    if (activeSession && Array.isArray((activeSession as any).activeSessions)) {
-      const session = (activeSession as any).activeSessions.find((s: any) => s.skillId === skillId);
+    const sessionStatus = activeSession as AssessmentSession | null | undefined;
+    if (sessionStatus && Array.isArray(sessionStatus.activeSessions)) {
+      const session = sessionStatus.activeSessions.find((s) => s.skillId === skillId);
       if (session) {
         return {
           totalPrompts: session.totalQuestions || 0,
@@ -242,9 +242,9 @@ export default function MyActivity() {
           skillName: skillName || response.data?.skillName,
         };
         
-        // Navigate to new adaptive-results screen
+        // Navigate to new AssessmentResults screen
         router.push({
-          pathname: "/adaptive-results",
+          pathname: "/assessmentResults",
           params: {
             results: JSON.stringify(payload),
             skillName: skillName || response.data.skillName,
@@ -340,7 +340,6 @@ export default function MyActivity() {
     });
   };
 
-  // Remove full-screen spinner; show skeletons in place instead
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }}>

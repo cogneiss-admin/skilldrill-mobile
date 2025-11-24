@@ -1,9 +1,9 @@
-// @ts-nocheck
 import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, View, Image, ScrollView, Text, BackHandler } from "react-native";
 import { KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Button, TextInput } from "react-native-paper";
+import { TextInput } from "react-native-paper";
+import Button from "../../components/Button";
 import ErrorBanner from "../../components/ErrorBanner";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
@@ -14,11 +14,11 @@ import { AntDesign } from "@expo/vector-icons";
 import GoogleGIcon from "../../components/GoogleGIcon";
 import LinkedInIcon from "../../components/LinkedInIcon";
 import CodeBoxes from "../../components/CodeBoxes";
-import { BRAND } from "../components/Brand";
+import { BRAND, LOGO_SRC } from "../components/Brand";
 import { useResponsive } from "../../utils/responsive";
 import CountryPickerModal from "../components/CountryPickerModal";
 import { useCountries, getConvertedFlagUrl } from "../../hooks/useCountries";
-const logoSrc = require("../../assets/images/logo.png");
+const logoSrc = LOGO_SRC;
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -135,8 +135,9 @@ export default function SignupScreen() {
         try { await Haptics.selectionAsync(); } catch {}
         router.push("/auth/careerRole");
       }
-    } catch (error: any) {
-      setErrorMessage(error?.message || 'Something went wrong. Please try again.');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Something went wrong. Please try again.';
+      setErrorMessage(errorMessage);
     } finally {
       setBusy(false);
     }
@@ -192,7 +193,7 @@ export default function SignupScreen() {
             region: selectedResidenceCountryData?.region,
               });
           if (resSignup?.success) { 
-            setEmailSignupToken((resSignup.data as any)?.signupToken || null);
+            setEmailSignupToken((resSignup.data as { signupToken?: string })?.signupToken || null);
             // Success - open OTP sheet
             setOtpMode(mode);
             setOtpDigits(["", "", "", "", "", ""]);
@@ -203,16 +204,17 @@ export default function SignupScreen() {
             setOtpSentEmail(true); 
             setResendRemaining(30); 
           }
-        } catch (signupError: any) {
-          if (signupError?.code === 'USER_EXISTS' || signupError?.code === 'USER_PENDING_VERIFICATION') {
+        } catch (signupError: unknown) {
+          const errorObj = signupError as { code?: string; message?: string } | undefined;
+          if (errorObj?.code === 'USER_EXISTS' || errorObj?.code === 'USER_PENDING_VERIFICATION') {
             // User already exists - show error and redirect to login
-            setErrorMessage(authService.handleAuthError(signupError));
+            setErrorMessage(authService.handleAuthError(signupError as Error));
             // Redirect to login after a short delay
             setTimeout(() => {
               router.push("/auth/login");
             }, 2000);
           } else {
-            const friendly = authService.handleAuthError?.(signupError) || signupError?.message;
+            const friendly = authService.handleAuthError?.(signupError as Error) || errorObj?.message;
             setErrorMessage(friendly || 'Failed to send OTP');
           }
         }
@@ -231,7 +233,7 @@ export default function SignupScreen() {
             region: selectedResidenceCountryData?.region,
               });
           if (resSignup?.success) { 
-            setPhoneSignupToken((resSignup.data as any)?.signupToken || null);
+            setPhoneSignupToken((resSignup.data as { signupToken?: string })?.signupToken || null);
             // Success - open OTP sheet
             setOtpMode(mode);
             setOtpDigits(["", "", "", "", "", ""]);
@@ -242,21 +244,22 @@ export default function SignupScreen() {
             setOtpSentPhone(true); 
             setResendRemaining(30); 
           }
-        } catch (signupError: any) {
-          if (signupError?.code === 'USER_EXISTS' || signupError?.code === 'USER_PENDING_VERIFICATION') {
+        } catch (signupError: unknown) {
+          const errorObj = signupError as { code?: string; message?: string } | undefined;
+          if (errorObj?.code === 'USER_EXISTS' || errorObj?.code === 'USER_PENDING_VERIFICATION') {
             // User already exists - show error and redirect to login
-            setErrorMessage(authService.handleAuthError(signupError));
+            setErrorMessage(authService.handleAuthError(signupError as Error));
             // Redirect to login after a short delay
             setTimeout(() => {
               router.push("/auth/login");
             }, 2000);
           } else {
-            const friendly = authService.handleAuthError?.(signupError) || signupError?.message;
+            const friendly = authService.handleAuthError?.(signupError as Error) || errorObj?.message;
             setErrorMessage(friendly || 'Failed to send OTP');
           }
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       const friendly = authService.handleAuthError?.(error) || error?.message;
       setErrorMessage(friendly || 'Failed to send OTP');
     }
@@ -314,12 +317,12 @@ export default function SignupScreen() {
 
         if (emailRes.status === 'fulfilled' && emailRes.value?.success) {
           anySuccess = true;
-          setEmailSignupToken((emailRes.value.data as any)?.signupToken || null);
+          setEmailSignupToken((emailRes.value.data as { signupToken?: string })?.signupToken || null);
           setOtpSentEmail(true);
         }
         if (phoneRes.status === 'fulfilled' && phoneRes.value?.success) {
           anySuccess = true;
-          setPhoneSignupToken((phoneRes.value.data as any)?.signupToken || null);
+          setPhoneSignupToken((phoneRes.value.data as { signupToken?: string })?.signupToken || null);
           setOtpSentPhone(true);
         }
 
@@ -355,7 +358,7 @@ export default function SignupScreen() {
             region: selectedResidenceCountryData?.region,
               });
           if (resSignupE?.success) { 
-            setEmailSignupToken((resSignupE.data as any)?.signupToken || null);
+            setEmailSignupToken((resSignupE.data as { signupToken?: string })?.signupToken || null);
             setOtpMode('email');
             setOtpTarget(email.trim());
             setOtpDigits(["", "", "", "", "", ""]);
@@ -365,8 +368,9 @@ export default function SignupScreen() {
             setOtpSentEmail(true);
             setResendRemaining(30);
           }
-        } catch (e: any) {
-          setOtpError(authService.handleAuthError?.(e) || e?.message || 'Failed to send OTP');
+        } catch (e: unknown) {
+          const errorObj = e as { message?: string } | undefined;
+          setOtpError(authService.handleAuthError?.(e as Error) || errorObj?.message || 'Failed to send OTP');
             return;
         }
       } else if (phoneOk) {
@@ -384,7 +388,7 @@ export default function SignupScreen() {
             region: selectedResidenceCountryData?.region,
               });
           if (resSignupP?.success) { 
-            setPhoneSignupToken((resSignupP.data as any)?.signupToken || null);
+            setPhoneSignupToken((resSignupP.data as { signupToken?: string })?.signupToken || null);
             setOtpMode('phone');
             setOtpTarget(internationalPhone);
             setOtpDigits(["", "", "", "", "", ""]);
@@ -394,14 +398,16 @@ export default function SignupScreen() {
             setOtpSentPhone(true);
             setResendRemaining(30);
           }
-        } catch (e: any) {
-          setOtpError(authService.handleAuthError?.(e) || e?.message || 'Failed to send OTP');
+        } catch (e: unknown) {
+          const errorObj = e as { message?: string } | undefined;
+          setOtpError(authService.handleAuthError?.(e as Error) || errorObj?.message || 'Failed to send OTP');
             return;
         }
       }
 
-    } catch (err: any) {
-      setOtpError(err?.message || 'Failed to send OTP');
+    } catch (err: unknown) {
+      const errorObj = err as { message?: string } | undefined;
+      setOtpError(errorObj?.message || 'Failed to send OTP');
     }
   };
 
@@ -431,9 +437,10 @@ export default function SignupScreen() {
       }
       setResendRemaining(retryAfter);
       setOtpError(anySuccess ? '' : 'Please wait before requesting a new code.');
-    } catch (err: any) {
-      const retry = Number(err?.data?.retry_after || err?.data?.retryAfter || 30);
-      if (err?.code === 'OTP_RATE_LIMIT_EXCEEDED' || err?.status === 429) {
+    } catch (err: unknown) {
+      const errorObj = err as { code?: string; status?: number; data?: { retry_after?: number; retryAfter?: number } } | undefined;
+      const retry = Number(errorObj?.data?.retry_after || errorObj?.data?.retryAfter || 30);
+      if (errorObj?.code === 'OTP_RATE_LIMIT_EXCEEDED' || errorObj?.status === 429) {
         setResendRemaining(retry);
         setOtpError('Too many requests. Please wait a bit and try again.');
       } else {
@@ -475,13 +482,14 @@ export default function SignupScreen() {
       } else {
         setOtpError(res.message || "Incorrect OTP");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       try {
         const { authService } = await import("../../services/authService");
-        const friendly = authService.handleAuthError?.(err);
+        const errorObj = err as { code?: string; message?: string } | undefined;
+        const friendly = authService.handleAuthError?.(err as Error);
         if (friendly) {
           setOtpError(friendly);
-        } else if (err?.code === 'INVALID_OTP') {
+        } else if (errorObj?.code === 'INVALID_OTP') {
           setOtpError('Incorrect OTP');
         } else if (err?.code === 'OTP_EXPIRED') {
           setOtpError('OTP expired. Please request a new one.');
@@ -728,13 +736,12 @@ export default function SignupScreen() {
             ) : null}
 
             <Button
-              mode="contained"
+              variant="primary"
               onPress={handleContinue}
               loading={busy}
               disabled={!canContinue || busy}
-              contentStyle={{ height: 50 }}
+              size="large"
               style={{ borderRadius: 26, backgroundColor: BRAND, opacity: canContinue ? 1 : 0.7 }}
-              labelStyle={{ fontWeight: "700" }}
             >
               {verifiedOk ? 'Continue' : 'Verify & Continue'}
             </Button>

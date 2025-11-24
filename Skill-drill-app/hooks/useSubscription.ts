@@ -97,7 +97,7 @@ export const useSubscription = (): UseSubscriptionReturn => {
           credits: subscriptionData.credits,
           endDate: subscriptionData.endDate
         });
-      } catch (apiError: any) {
+      } catch (apiError: unknown) {
         // If endpoint doesn't exist yet, just log and continue
         if (apiError.status === 404 || apiError.message?.includes('Route') || apiError.message?.includes('not found')) {
           console.log('[Subscription] Subscription endpoint not implemented yet');
@@ -107,7 +107,7 @@ export const useSubscription = (): UseSubscriptionReturn => {
         }
       }
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[Subscription] Load error:', err);
       setError(null); // Don't set error for missing endpoints
       setSubscription(null);
@@ -176,7 +176,7 @@ export const useSubscription = (): UseSubscriptionReturn => {
 
       return assignmentId;
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[Subscription] Unlock error:', err);
       showError(err.message || 'Failed to unlock drills');
       throw err;

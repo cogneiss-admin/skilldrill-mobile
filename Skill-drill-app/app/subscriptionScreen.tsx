@@ -1,7 +1,7 @@
 /**
  * Subscription Screen
  *
- * Beautiful payment screen showing two options:
+ * Beaunttiful payme screen showing two options:
  * 1. One-time drill pack purchase
  * 2. Monthly subscription with recurring credits
  *
@@ -46,6 +46,7 @@ import {
   BORDER_RADIUS,
   GRADIENTS
 } from './components/Brand';
+import { PricingPlan } from '../types/pricing';
 
 type PaymentOption = 'drill-pack' | 'subscription';
 
@@ -63,7 +64,7 @@ export default function SubscriptionScreen() {
 
   const [selectedOption, setSelectedOption] = useState<PaymentOption>('drill-pack');
   const [loadingPricing, setLoadingPricing] = useState(true);
-  const [pricingData, setPricingData] = useState<any>(null);
+  const [pricingData, setPricingData] = useState<PricingPlan | null>(null);
 
   const drillCount = params.drillCount ? parseInt(params.drillCount) : 15;
 
@@ -82,9 +83,10 @@ export default function SubscriptionScreen() {
         if (res.success) {
           setPricingData(res.data);
         }
-      } catch (apiError: any) {
+      } catch (apiError: unknown) {
         // If endpoint doesn't exist yet, use default pricing
-        if (apiError.status === 404 || apiError.message?.includes('Route') || apiError.message?.includes('not found')) {
+        const errorObj = apiError as { status?: number; message?: string } | undefined;
+        if (errorObj?.status === 404 || errorObj?.message?.includes('Route') || errorObj?.message?.includes('not found')) {
           console.log('[Subscription] Using default pricing (endpoint not implemented yet)');
           setPricingData({
             drillPack: {
@@ -102,7 +104,7 @@ export default function SubscriptionScreen() {
           throw apiError;
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to load pricing:', error);
       // Use fallback pricing
       setPricingData({
@@ -140,37 +142,62 @@ export default function SubscriptionScreen() {
 
         // Navigate to drill practice
         router.push({
-          pathname: '/drillPractice',
+          pathname: '/drillsScenarios',
           params: { assignmentId }
         });
         return;
       }
 
       // Process payment
-      const priceId = selectedOption === 'drill-pack'
-        ? pricingData?.drillPack?.priceId
-        : pricingData?.subscription?.priceId;
+      // Use dynamic pricing (recommendationId) if available, otherwise fallback to fixed pricing (priceId)
+      if (params.recommendationId && selectedOption === 'drill-pack') {
+        // Dynamic pricing mode - use recommendationId
+        console.log('[Subscription] Using dynamic pricing with recommendationId:', params.recommendationId);
 
-      if (!priceId) {
-        throw new Error('Price information not available');
-      }
+        await processPayment({
+          recommendationId: params.recommendationId,
+          metadata: {
+            skillId: params.skillId,
+            assessmentId: params.assessmentId,
+            recommendationId: params.recommendationId
+          },
+          onSuccess: (assignmentId) => {
+            // Navigate to drill practice
+            router.push({
+              pathname: '/drillsScenarios',
+              params: { assignmentId }
+            });
+          }
+        });
+      } else {
+        // Fixed pricing mode - use priceId
+        const priceId = selectedOption === 'drill-pack'
+          ? pricingData?.drillPack?.priceId
+          : pricingData?.subscription?.priceId;
 
-      await processPayment({
-        priceId,
-        metadata: {
-          skillId: params.skillId,
-          assessmentId: params.assessmentId,
-          recommendationId: params.recommendationId
-        },
-        onSuccess: (assignmentId) => {
-          // Navigate to drill practice
-          router.push({
-            pathname: '/drillPractice',
-            params: { assignmentId }
-          });
+        if (!priceId) {
+          throw new Error('Price information not available');
         }
-      });
-    } catch (error: any) {
+
+        console.log('[Subscription] Using fixed pricing with priceId:', priceId);
+
+        await processPayment({
+          priceId,
+          metadata: {
+            skillId: params.skillId,
+            assessmentId: params.assessmentId,
+            recommendationId: params.recommendationId
+          },
+          onSuccess: (assignmentId) => {
+            // Navigate to drill practice
+            router.push({
+              pathname: '/drillsScenarios',
+              params: { assignmentId }
+            });
+          }
+        });
+      }
+    } catch (error: unknown) {
       console.error('Payment failed:', error);
     }
   };
@@ -320,7 +347,7 @@ export default function SubscriptionScreen() {
                   style={styles.benefitItem}
                 >
                   <View style={styles.benefitIcon}>
-                    <Ionicons name={benefit.icon as any} size={20} color={BRAND} />
+                    <Ionicons name={benefit.icon as keyof typeof Ionicons.glyphMap} size={20} color={BRAND} />
                   </View>
                   <Text style={styles.benefitText}>{benefit.text}</Text>
                 </MotiView>
@@ -444,7 +471,8 @@ const styles = StyleSheet.create({
   creditNoticeTitle: {
     ...TYPOGRAPHY.subtitle,
     color: COLORS.success,
-    marginBottom: SPACING.xs
+    marginBottom: SPACING.xs,
+    fontWeight: TYPOGRAPHY.subtitle.fontWeight as '500' | '600' | '700'
   },
   creditNoticeText: {
     ...TYPOGRAPHY.caption,
@@ -465,9 +493,11 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.xl
   },
   benefitsTitle: {
-    ...TYPOGRAPHY.h2,
+    fontSize: TYPOGRAPHY.h2.fontSize,
+    fontWeight: '600' as const,
     color: COLORS.text.primary,
-    marginBottom: SPACING.md
+    marginBottom: SPACING.md,
+    letterSpacing: TYPOGRAPHY.h2.letterSpacing
   },
   benefitsList: {
     gap: SPACING.gap.md

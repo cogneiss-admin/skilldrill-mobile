@@ -80,9 +80,9 @@ export interface User {
 export class ApiError extends Error {
   public status: number;
   public code?: string;
-  public data?: any;
+  public data?: Record<string, unknown>;
 
-  constructor(message: string, status: number, code?: string, data?: any) {
+  constructor(message: string, status: number, code?: string, data?: Record<string, unknown>) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
@@ -95,8 +95,8 @@ class ApiService {
   private api: AxiosInstance;
   private isRefreshing = false;
   private failedQueue: {
-    resolve: (value?: any) => void;
-    reject: (error?: any) => void;
+    resolve: (value?: string | null) => void;
+    reject: (error?: unknown) => void;
   }[] = [];
 
   constructor() {
@@ -198,7 +198,7 @@ class ApiService {
             // Import authService to handle token refresh
             const { default: authService } = await import('./authService');
             const response = await authService.refreshToken(refreshToken);
-            const { accessToken, refreshToken: newRefreshToken } = response.data as any;
+            const { accessToken, refreshToken: newRefreshToken } = response.data as { accessToken: string; refreshToken: string };
 
             await this.setAccessToken(accessToken);
             await this.setRefreshToken(newRefreshToken);
@@ -225,7 +225,7 @@ class ApiService {
     );
   }
 
-  private processQueue(error: any, token: string | null) {
+  private processQueue(error: unknown, token: string | null) {
     this.failedQueue.forEach(({ resolve, reject }) => {
       if (error) {
         reject(error);
@@ -285,12 +285,12 @@ class ApiService {
     try {
       const response: AxiosResponse<ApiResponse<T>> = await this.api.get(url, config);
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw this.handleError(error);
     }
   }
 
-  public async post<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+  public async post<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     try {
       console.log('📤 Making POST request to:', url);
       console.log('📤 Full URL:', `${this.api.defaults.baseURL}${url}`);
@@ -298,47 +298,57 @@ class ApiService {
       const response: AxiosResponse<ApiResponse<T>> = await this.api.post(url, data, config);
       console.log('✅ POST response:', response.data);
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStatus = (error as { status?: number }).status;
+      const errorCode = (error as { code?: string }).code;
       console.error('❌ POST request failed:', {
         url,
         data,
-        error: error.message,
-        status: error.status,
-        code: error.code
+        error: errorMessage,
+        status: errorStatus,
+        code: errorCode
       });
       throw this.handleError(error);
     }
   }
 
-  public async put<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+  public async put<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     try {
       const response: AxiosResponse<ApiResponse<T>> = await this.api.put(url, data, config);
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw this.handleError(error);
     }
   }
 
-  public async delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+  public async delete<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     try {
       const response: AxiosResponse<ApiResponse<T>> = await this.api.delete(url, config);
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw this.handleError(error);
     }
   }
 
-  private handleError(error: any): ApiError {
-    if (__DEV__) console.debug('🔍 API Error Details:', {
-      message: error.message,
-      code: error.code,
-      status: error.response?.status,
-      url: error.config?.url,
-      method: error.config?.method,
-      data: error.response?.data
-    });
+  private handleError(error: unknown): ApiError {
+    // Type guard for Axios errors
+    const isAxiosError = (err: unknown): err is { response?: { status?: number; data?: unknown }; config?: { url?: string; method?: string }; message?: string; code?: string } => {
+      return typeof err === 'object' && err !== null;
+    };
 
-    if (error.response) {
+    if (__DEV__ && isAxiosError(error)) {
+      console.debug('🔍 API Error Details:', {
+        message: error.message,
+        code: error.code,
+        status: error.response?.status,
+        url: error.config?.url,
+        method: error.config?.method,
+        data: error.response?.data
+      });
+    }
+
+    if (isAxiosError(error) && error.response) {
       const { status, data } = error.response;
       
       // Handle 401 Unauthorized errors
@@ -354,7 +364,9 @@ class ApiService {
         // Don't trigger session expiration if user is logging out
         if (SessionManager.isCurrentlyLoggingOut()) {
           console.log('🔐 Skipping 401 handling - user is logging out');
-          return new ApiError('Logout in progress', status, data?.code, data);
+          const errorData = typeof data === 'object' && data !== null ? data as Record<string, unknown> : undefined;
+          const errorCode = typeof data === 'object' && data !== null && 'code' in data ? String(data.code) : undefined;
+          return new ApiError('Logout in progress', status || 401, errorCode, errorData);
         }
 
         // Only trigger session-expired flow if user is on a protected route and not logging out
@@ -364,9 +376,10 @@ class ApiService {
       }
       
       // Handle specific error codes
-      let message = data?.message;
+      const errorData = typeof data === 'object' && data !== null ? data as { message?: string; code?: string } : {};
+      let message = errorData.message;
       
-      switch (data?.code) {
+      switch (errorData.code) {
         case 'RATE_LIMIT_EXCEEDED':
           message = 'Too many requests. Please wait a moment and try again.';
           break;
@@ -414,14 +427,17 @@ class ApiService {
           break;
       }
       
-      return new ApiError(message, status, data?.code, data);
-    } else if (error.request) {
+      const errorDataObj = typeof data === 'object' && data !== null ? data as Record<string, unknown> : undefined;
+      return new ApiError(message || 'An error occurred', status || 500, errorData.code, errorDataObj);
+    } else if (isAxiosError(error) && 'request' in error) {
       // Network error - provide more specific information
-      if (__DEV__) console.debug('🌐 Network Error:', {
-        url: error.config?.url,
-        method: error.config?.method,
-        timeout: error.code === 'ECONNABORTED' ? 'Request timeout' : 'No response received'
-      });
+      if (__DEV__) {
+        console.debug('🌐 Network Error:', {
+          url: error.config?.url,
+          method: error.config?.method,
+          timeout: error.code === 'ECONNABORTED' ? 'Request timeout' : 'No response received'
+        });
+      }
       
       if (error.code === 'ECONNABORTED') {
         return new ApiError('Request timeout - server is not responding', 0, 'TIMEOUT');
@@ -430,8 +446,12 @@ class ApiService {
       } else {
         return new ApiError('Network error - no response received from server', 0, 'NETWORK_ERROR');
       }
+    } else if (error instanceof Error) {
+      // Standard Error object
+      return new ApiError(error.message || 'An unexpected error occurred', 0);
     } else {
-      return new ApiError(error.message, 0);
+      // Unknown error
+      return new ApiError('An unexpected error occurred', 0);
     }
   }
 
@@ -576,11 +596,13 @@ class ApiService {
     textContent?: string;
     audioUrl?: string;
     durationSec?: number;
+    sessionId?: string;
   }): Promise<ApiResponse> {
     console.log('📝 Submitting drill attempt:', {
       drillItemId: params.drillItemId,
       hasText: !!params.textContent,
-      hasAudio: !!params.audioUrl
+      hasAudio: !!params.audioUrl,
+      hasSession: !!params.sessionId
     });
     return this.post('/drills/attempt', params);
   }
@@ -591,6 +613,46 @@ class ApiService {
   public async getDrillAggregate(assignmentId: string): Promise<ApiResponse> {
     console.log('📊 Fetching drill aggregate for assignment:', assignmentId);
     return this.get(`/drills/aggregate?assignmentId=${assignmentId}`);
+  }
+
+  /**
+   * Start or resume drill session
+   */
+  public async startDrillSession(assignmentId: string): Promise<ApiResponse> {
+    console.log('🎯 Starting drill session for assignment:', assignmentId);
+    return this.post('/drills/session/start', { assignmentId });
+  }
+
+  /**
+   * Get drill session status
+   */
+  public async getDrillSessionStatus(assignmentId: string): Promise<ApiResponse> {
+    console.log('📊 Getting drill session status for assignment:', assignmentId);
+    return this.get(`/drills/session/status?assignmentId=${assignmentId}`);
+  }
+
+  /**
+   * Update drill session activity (current drill position)
+   */
+  public async updateDrillSessionActivity(sessionId: string, currentDrillIndex: number): Promise<ApiResponse> {
+    console.log('🔄 Updating drill session activity:', { sessionId, currentDrillIndex });
+    return this.put(`/drills/session/${sessionId}/activity`, { currentDrillIndex });
+  }
+
+  /**
+   * Complete drill session
+   */
+  public async completeDrillSession(sessionId: string): Promise<ApiResponse> {
+    console.log('✅ Completing drill session:', sessionId);
+    return this.put(`/drills/session/${sessionId}/complete`, {});
+  }
+
+  /**
+   * Check if user has existing drill assignment for skill
+   */
+  public async checkExistingDrills(skillId: string): Promise<ApiResponse> {
+    console.log('🔍 Checking for existing drills for skill:', skillId);
+    return this.get(`/drills/check-existing?skillId=${skillId}`);
   }
 
 }

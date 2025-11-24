@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useEffect, useState } from "react";
 import { View, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -65,8 +64,11 @@ export default function SessionLoadingScreen() {
       setStatus("Checking assessment completion...");
       
       // Compute completion from user skills (no separate endpoint required)
+      interface UserSkill {
+        assessmentStatus?: string;
+      }
       const hasCompletedAssessments = Array.isArray(skillsData) && skillsData.length > 0
-        ? skillsData.every((s: any) => s.assessmentStatus === 'COMPLETED')
+        ? (skillsData as UserSkill[]).every((s) => s.assessmentStatus === 'COMPLETED')
         : false;
       
       // User has skills but no active session - go to dashboard

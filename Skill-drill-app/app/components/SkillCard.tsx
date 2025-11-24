@@ -1,10 +1,10 @@
-// @ts-nocheck
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { MotiView } from 'moti';
+import { Skill } from '../../features/skillsSlice';
 
 interface SkillCardProps {
-  skill: any;
+  skill: Skill;
   isSelected: boolean;
   onPress: () => void;
   index: number;

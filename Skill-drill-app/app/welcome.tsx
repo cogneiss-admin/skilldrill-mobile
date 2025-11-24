@@ -5,16 +5,16 @@ import { useRouter } from "expo-router";
 import Carousel from "react-native-reanimated-carousel";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Defs, RadialGradient as SvgRadialGradient, Rect, Stop } from "react-native-svg";
-import { Button } from "react-native-paper";
+import Button from "../components/Button";
 import { MotiView } from "moti";
 import { StatusBar } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useResponsive } from "../utils/responsive";
 
-const logoSrc = require("../assets/images/logo.png");
+import { BRAND, GRADIENTS, LOGO_SRC } from "./components/Brand";
+const logoSrc = LOGO_SRC;
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-const BRAND = "#0A66C2";
 
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -248,9 +248,9 @@ export default function WelcomeScreen() {
               }}
             >
               <Button
-                mode="contained"
+                variant="primary"
                 onPress={handleGetStarted}
-                contentStyle={{ height: responsive.button.height }}
+                size="large"
                 style={{ 
                   borderRadius: responsive.button.borderRadius,
                   backgroundColor: "#ffffff",
@@ -260,12 +260,6 @@ export default function WelcomeScreen() {
                   shadowRadius: 16,
                   elevation: 12,
                   paddingHorizontal: responsive.button.paddingHorizontal,
-                }}
-                labelStyle={{ 
-                  fontSize: responsive.button.fontSize, 
-                  fontWeight: "700",
-                  color: "#0A66C2",
-                  letterSpacing: 0.5,
                 }}
               >
                 🚀 Start Your Journey
@@ -386,7 +380,7 @@ function LogoPulse({ size = 200 }: { size?: number }) {
       >
         {/* Background gradient that matches our main background */}
         <LinearGradient
-          colors={["#0A66C2", "#0E75D1", "#1285E0"]}
+          colors={GRADIENTS.onboarding}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={{ 
@@ -436,8 +430,8 @@ function StaticBackground() {
             <Stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
           </SvgRadialGradient>
           <SvgRadialGradient id="brand-accent2" cx="70%" cy="80%" r="60%">
-            <Stop offset="0%" stopColor="#0A66C2" stopOpacity="0.4" />
-            <Stop offset="100%" stopColor="#0A66C2" stopOpacity="0" />
+            <Stop offset="0%" stopColor={BRAND} stopOpacity="0.4" />
+            <Stop offset="100%" stopColor={BRAND} stopOpacity="0" />
           </SvgRadialGradient>
         </Defs>
         <Rect x="0" y="0" width="100%" height="100%" fill="url(#brand-accent1)" />

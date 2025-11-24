@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
@@ -23,58 +22,29 @@ import DashboardSkeleton from './components/DashboardSkeleton';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { Dimensions } from 'react-native';
-import { BRAND, GRADIENTS, BORDER_RADIUS, SHADOWS, PADDING } from './components/Brand';
+import { 
+  BRAND, 
+  BRAND_LIGHT,
+  GRADIENTS, 
+  BORDER_RADIUS, 
+  SHADOWS, 
+  PADDING,
+  COLORS,
+  TYPOGRAPHY,
+  WHITE,
+  GRAY,
+  DARK_GRAY,
+  SUCCESS,
+  WARNING,
+  ERROR,
+  LOGO_SRC
+} from './components/Brand';
 import { useResponsive } from '../utils/responsive';
 import BottomNavigation from '../components/BottomNavigation';
 
-// Define constants
-const BRAND_LIGHT = "#E6F2FF";
-const WHITE = "#FFFFFF";
-const GRAY = "#9CA3AF";
-const DARK_GRAY = "#374151";
-const SUCCESS = "#22C55E";
-const WARNING = "#F59E0B";
-const ERROR = "#EF4444";
 const APP_NAME = "Skill Drill";
 const { width } = Dimensions.get('window');
-
-// Typography System
-const TYPOGRAPHY = {
-  // Headers - Plain black for better readability
-  h1: { fontSize: 24, fontWeight: '700', color: '#000000', letterSpacing: 0.1 },
-  h2: { fontSize: 20, fontWeight: '600', color: '#000000', letterSpacing: 0.1 },
-  h3: { fontSize: 18, fontWeight: '600', color: '#000000', letterSpacing: 0.1 },
-  h4: { fontSize: 16, fontWeight: '600', color: '#000000', letterSpacing: 0.1 },
-  
-  // Body Text
-  bodyLarge: { fontSize: 16, fontWeight: '500', color: DARK_GRAY, lineHeight: 24 },
-  bodyMedium: { fontSize: 14, fontWeight: '500', color: DARK_GRAY, lineHeight: 20 },
-  bodySmall: { fontSize: 12, fontWeight: '500', color: DARK_GRAY, lineHeight: 18 },
-  
-  // Labels and Captions
-  labelLarge: { fontSize: 14, fontWeight: '600', color: '#000000', letterSpacing: 0.1 },
-  labelMedium: { fontSize: 12, fontWeight: '600', color: '#000000', letterSpacing: 0.1 },
-  labelSmall: { fontSize: 10, fontWeight: '600', color: '#000000', letterSpacing: 0.1 },
-  
-  // Secondary Text
-  secondaryLarge: { fontSize: 14, fontWeight: '500', color: GRAY, lineHeight: 20 },
-  secondaryMedium: { fontSize: 12, fontWeight: '500', color: GRAY, lineHeight: 18 },
-  secondarySmall: { fontSize: 10, fontWeight: '500', color: GRAY, lineHeight: 16 },
-  
-  // Button Text
-  buttonLarge: { fontSize: 16, fontWeight: '600', letterSpacing: 0.1 },
-  buttonMedium: { fontSize: 14, fontWeight: '600', letterSpacing: 0.1 },
-  buttonSmall: { fontSize: 12, fontWeight: '600', letterSpacing: 0.1 },
-  
-  // Special Text
-  brand: { fontSize: 18, fontWeight: '900', color: WHITE, letterSpacing: 0.5 },
-  score: { fontSize: 20, fontWeight: '700', color: BRAND, letterSpacing: 0.2 },
-  success: { fontSize: 12, fontWeight: '600', color: SUCCESS, letterSpacing: 0.1 },
-  warning: { fontSize: 12, fontWeight: '600', color: WARNING, letterSpacing: 0.1 },
-};
-
-// Import logo
-const logoSrc = require('../assets/images/logo.png');
+const logoSrc = LOGO_SRC;
 
 interface UserSkill {
   id: string;

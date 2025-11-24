@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useEffect, useRef, useMemo, useCallback } from "react";
 import { Dimensions, StyleSheet, Image, Animated as RNAnimated } from "react-native";
 import Animated, {
@@ -9,7 +8,8 @@ import Animated, {
   runOnJS,
 } from "react-native-reanimated";
 import Svg, { Circle } from "react-native-svg";
-const logoSrc = require("../../assets/images/logo.png");
+import { LOGO_SRC } from "../components/Brand";
+const logoSrc = LOGO_SRC;
 
 const AnimatedLogo = RNAnimated.Image;
 

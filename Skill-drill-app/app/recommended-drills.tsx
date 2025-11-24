@@ -9,10 +9,12 @@ import { apiService } from "../services/api";
 import { useToast } from "../hooks/useToast";
 import { useAnimation } from "../hooks/useAnimation";
 import Button from "../components/Button";
+import { PricingCard, PricingData } from "../components/PricingCard";
 import { BRAND, BRAND_LIGHT, BRAND_ACCENT, TYPOGRAPHY, CARD, SPACING, COLORS, BORDER_RADIUS, SHADOWS, GRADIENTS } from "./components/Brand";
 
 type RecommendationResponse = {
-  id?: string; // Recommendation ID
+  id?: string; // Recommendation ID (legacy)
+  recommendationId?: string; // Recommendation ID (current backend field)
   assessmentId: string;
   skillId?: string;
   skillName?: string;
@@ -53,6 +55,8 @@ type RecommendationResponse = {
   };
   status?: string;
   createdAt?: string;
+  // New dynamic pricing structure
+  pricing?: PricingData;
 };
 
 type DrillItem = {
@@ -102,17 +106,70 @@ const normalizeDrillCount = (recommendation: RecommendationResponse | null): num
   );
 };
 
-const formatPrice = (pricing?: RecommendationResponse["recommendedNextSteps"]["packagePricing"]): string | null => {
-  if (!pricing) return null;
-  const { basePrice, currency } = pricing;
-  if (basePrice === undefined || basePrice === null) return null;
-  const formatter = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: currency || 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  });
-  return formatter.format(basePrice);
+// Get pricing data with fallback to old structure for backward compatibility
+const getPricingData = (recommendation: RecommendationResponse | null): PricingData | null => {
+  if (!recommendation) return null;
+
+  // New pricing structure from backend
+  const pricing = recommendation.pricing;
+  if (pricing) {
+    const drillCount = recommendation.recommendedDrills || 0;
+
+    // Handle FIXED pricing mode
+    if (pricing.pricingMode === 'FIXED') {
+      return {
+        finalPrice: pricing.totalPrice || 0,
+        recommendedDrills: drillCount,
+        validUntil: pricing.config?.expiresAt,
+        calculation: {
+          config: {
+            pricingMode: 'FIXED',
+            pricePerDrill: pricing.pricePerDrill,
+          }
+        }
+      };
+    }
+
+    // Handle DYNAMIC pricing mode
+    if (pricing.pricingMode === 'DYNAMIC') {
+      return {
+        finalPrice: pricing.pricing?.totalPrice || 0,
+        recommendedDrills: drillCount,
+        validUntil: pricing.config?.expiresAt,
+        calculation: {
+          config: {
+            pricingMode: 'DYNAMIC',
+            pricePerDrill: pricing.pricing?.finalCostPerDrill,
+            marginType: pricing.pricing?.marginType,
+            marginValue: pricing.pricing?.marginValue,
+            bufferPercent: pricing.config?.bufferPercent,
+          },
+          tokenEstimation: {
+            total: pricing.tokens?.breakdown?.scoring?.raw,
+            totalWithBuffer: pricing.tokens?.totalWithBuffer,
+            buffer: pricing.tokens?.buffer,
+          },
+          costCalculation: {
+            baseCost: pricing.pricing?.baseCost,
+            margin: pricing.pricing?.marginApplied,
+            costPerDrill: pricing.pricing?.finalCostPerDrill,
+            totalPrice: pricing.pricing?.totalPrice,
+          }
+        }
+      };
+    }
+  }
+
+  // Fallback to old structure (legacy)
+  const oldPricing = recommendation.recommendedNextSteps?.packagePricing;
+  if (oldPricing?.basePrice !== undefined) {
+    return {
+      finalPrice: oldPricing.basePrice,
+      recommendedDrills: oldPricing.drillCount || recommendation.recommendedDrills || 0,
+    };
+  }
+
+  return null;
 };
 
 const RecommendedDrillsScreen = () => {
@@ -129,6 +186,8 @@ const RecommendedDrillsScreen = () => {
   const [error, setError] = useState<string | null>(null);
   const [recommendation, setRecommendation] = useState<RecommendationResponse | null>(null);
   const [policyMissing, setPolicyMissing] = useState(false);
+  const [existingAssignment, setExistingAssignment] = useState<any>(null);
+  const [checkingExisting, setCheckingExisting] = useState(false);
 
   const assessmentId = useMemo(() => {
     if (Array.isArray(assessmentIdParam)) return assessmentIdParam[0];
@@ -148,13 +207,38 @@ const RecommendedDrillsScreen = () => {
 
   const drillCount = useMemo(() => normalizeDrillCount(recommendation), [recommendation]);
   const drillItems = useMemo(() => deriveDrillItems(recommendation, resolvedSkillName, drillCount), [recommendation, resolvedSkillName, drillCount]);
-  const priceLabel = useMemo(() => formatPrice(recommendation?.recommendedNextSteps?.packagePricing), [recommendation?.recommendedNextSteps?.packagePricing]);
+  const pricingData = useMemo(() => getPricingData(recommendation), [recommendation]);
 
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
     };
+  }, []);
+
+  const checkExistingDrills = useCallback(async (skillId: string) => {
+    if (!skillId) return;
+
+    setCheckingExisting(true);
+    try {
+      const response = await apiService.checkExistingDrills(skillId);
+      if (!isMountedRef.current) return;
+
+      if (response.success && response.data.exists) {
+        console.log('✅ Found existing drill assignment:', response.data.assignment);
+        setExistingAssignment(response.data.assignment);
+      } else {
+        setExistingAssignment(null);
+      }
+    } catch (err: unknown) {
+      console.error('❌ Failed to check existing drills:', err);
+      // Don't show error to user, just assume no existing drills
+      setExistingAssignment(null);
+    } finally {
+      if (isMountedRef.current) {
+        setCheckingExisting(false);
+      }
+    }
   }, []);
 
   const loadRecommendations = useCallback(async () => {
@@ -173,8 +257,14 @@ const RecommendedDrillsScreen = () => {
       if (!isMountedRef.current) return;
 
       if (response.success) {
-        setRecommendation(response.data as RecommendationResponse);
+        const recData = response.data as RecommendationResponse;
+        setRecommendation(recData);
         setPolicyMissing(false);
+
+        // Check if drills already exist for this skill
+        if (recData.skillId) {
+          await checkExistingDrills(recData.skillId);
+        }
       } else {
         const message = response.message || 'Unable to fetch recommendations.';
         if (message.toLowerCase().includes('no active drill recommendation policy')) {
@@ -186,7 +276,7 @@ const RecommendedDrillsScreen = () => {
           showError(message);
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('❌ Failed to load drill recommendations:', err);
       const message = err?.message || 'Failed to load recommendations. Please try again.';
       if (!isMountedRef.current) return;
@@ -204,7 +294,7 @@ const RecommendedDrillsScreen = () => {
         setIsLoading(false);
       }
     }
-  }, [assessmentId, showError, showInfo]);
+  }, [assessmentId, showError, showInfo, checkExistingDrills]);
 
   useEffect(() => {
     loadRecommendations();
@@ -220,22 +310,45 @@ const RecommendedDrillsScreen = () => {
     router.back();
   };
 
-  const handleUnlockDrills = () => {
+  const handleUnlockDrills = async () => {
     if (!recommendation) {
       showError('Recommendation data not available');
       return;
     }
 
-    // Navigate to subscription screen with all necessary parameters
-    router.push({
-      pathname: '/subscriptionScreen',
-      params: {
+    // If drills already exist, navigate to existing assignment
+    if (existingAssignment) {
+      console.log('🎯 Navigating to existing drill assignment:', existingAssignment.id);
+      router.push({
+        pathname: '/drillsScenarios',
+        params: { assignmentId: existingAssignment.id }
+      });
+      return;
+    }
+
+    // Otherwise create new assignment
+    try {
+      const res = await apiService.createDrillAssignment({
         skillId: recommendation.skillId || '',
-        assessmentId: recommendation.assessmentId,
-        recommendationId: recommendation.id || recommendation.assessmentId,
-        drillCount: drillCount.toString()
+        source: 'DrillPack',
+        recommendationId: recommendation.recommendationId || recommendation.id || assessmentId
+      });
+
+      if (!res.success) {
+        throw new Error(res.message || 'Failed to create drill assignment');
       }
-    });
+
+      const assignmentId = res.data.id;
+
+      router.push({
+        pathname: '/drillsScenarios',
+        params: { assignmentId }
+      });
+    } catch (error: unknown) {
+      console.error('Failed to unlock drills:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to unlock drills';
+      showError(errorMessage);
+    }
   };
 
   const renderContent = () => {
@@ -309,6 +422,35 @@ const RecommendedDrillsScreen = () => {
 
     return (
       <View style={{ gap: SPACING.gap.lg }}>
+        {existingAssignment && (
+          <MotiView
+            from={{ opacity: 0, translateY: -20 }}
+            animate={{ opacity: 1, translateY: 0 }}
+            transition={{ type: 'spring', delay: 50 }}
+          >
+            <View
+              style={{
+                backgroundColor: '#EFF6FF',
+                borderRadius: 16,
+                padding: 16,
+                borderLeftWidth: 4,
+                borderLeftColor: BRAND,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                <Ionicons name="information-circle" size={20} color={BRAND} />
+                <Text style={{ ...TYPOGRAPHY.subtitle, color: BRAND, marginLeft: 8, fontWeight: '700' }}>
+                  You Already Have Drills
+                </Text>
+              </View>
+              <Text style={{ color: '#1E40AF', fontSize: 14, lineHeight: 20 }}>
+                You have {existingAssignment.total} drills for this skill ({existingAssignment.completed} completed).
+                Tap "Continue Drills" to resume your practice.
+              </Text>
+            </View>
+          </MotiView>
+        )}
+
         <MotiView
           from={{ opacity: 0, translateY: 20 }}
           animate={{ opacity: 1, translateY: 0 }}
@@ -369,19 +511,23 @@ const RecommendedDrillsScreen = () => {
                 💡 {recommendation.recommendedNextSteps.reason}
               </Text>
             )}
-            {priceLabel && (
-              <View style={{ marginTop: 16, flexDirection: 'row', alignItems: 'center', paddingTop: SPACING.md, borderTopWidth: 1, borderTopColor: 'rgba(255, 255, 255, 0.2)' }}>
-                <Ionicons name="pricetag" size={18} color="#C4B5FD" />
-                <Text style={{ marginLeft: SPACING.xs, color: '#C4B5FD', fontWeight: '700', fontSize: 16 }}>
-                  {priceLabel}
-                </Text>
-                <Text style={{ marginLeft: SPACING.xs, color: '#EDE9FE', opacity: 0.8 }}>
-                  • {drillCount} drills included
-                </Text>
-              </View>
-            )}
           </LinearGradient>
         </MotiView>
+
+        {/* Pricing Card */}
+        {pricingData && (
+          <MotiView
+            from={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: 'spring', delay: 250 }}
+          >
+            <PricingCard
+              pricing={pricingData}
+              variant="expanded"
+              showDetails={true}
+            />
+          </MotiView>
+        )}
 
         <View style={{ gap: SPACING.gap.md }}>
           <MotiView
@@ -525,15 +671,29 @@ const RecommendedDrillsScreen = () => {
             borderTopColor: '#E5E7EB',
           }}
         >
-          <Button
-            variant="gradient"
-            size="large"
-            onPress={handleUnlockDrills}
-            icon="rocket"
-            fullWidth
-          >
-            Unlock All {drillCount} Drill{drillCount === 1 ? '' : 's'}
-          </Button>
+          {existingAssignment ? (
+            <Button
+              variant="gradient"
+              size="large"
+              onPress={handleUnlockDrills}
+              icon="play-circle"
+              fullWidth
+              disabled={checkingExisting}
+            >
+              Continue Drills ({existingAssignment.completed}/{existingAssignment.total})
+            </Button>
+          ) : (
+            <Button
+              variant="gradient"
+              size="large"
+              onPress={handleUnlockDrills}
+              icon="rocket"
+              fullWidth
+              disabled={checkingExisting}
+            >
+              Unlock All {drillCount} Drill{drillCount === 1 ? '' : 's'}
+            </Button>
+          )}
         </View>
       )}
     </SafeAreaView>

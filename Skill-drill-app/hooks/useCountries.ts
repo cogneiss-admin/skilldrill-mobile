@@ -35,7 +35,7 @@ export function useCountries() {
         } else {
           setError(res?.message || 'Failed to fetch countries')
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!isMounted) return
         setError(err?.message || 'Unknown error occurred')
       } finally {

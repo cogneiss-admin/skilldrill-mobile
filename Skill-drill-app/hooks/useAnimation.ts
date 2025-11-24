@@ -32,7 +32,7 @@ import { Animated, Easing } from 'react-native';
 interface AnimationConfig {
   duration?: number;
   delay?: number;
-  easing?: any;
+  easing?: (value: number) => number;
   useNativeDriver?: boolean;
 }
 

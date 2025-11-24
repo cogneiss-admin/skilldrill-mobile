@@ -170,7 +170,7 @@ export const validateAssessmentData = (assessment: Assessment): string[] => {
  * Handles different data formats from various API endpoints
  */
 export const normalizeProgressData = (
-  backendData: any
+  backendData: Record<string, unknown>
 ): AssessmentProgress | null => {
   if (!backendData) return null;
   
@@ -186,20 +186,16 @@ export const normalizeProgressData = (
   return calculateAssessmentProgress(completedResponses, totalQuestions);
 };
 
-/**
- * Safe number utility (moved from mathUtils for assessment-specific use)
- */
-export const safeNumber = (value: any, fallback: number = 0): number => {
-  const num = Number(value);
-  return isNaN(num) ? fallback : num;
-};
+// Import safe utilities from mathUtils (single source of truth)
+import { safeNumber, safePercentage as safePercentageUtil } from './mathUtils';
 
 /**
- * Safe percentage calculation
+ * Safe percentage calculation (assessment-specific wrapper)
+ * Uses mathUtils for consistency
  */
 export const safePercentage = (
-  numerator: any, 
-  denominator: any, 
+  numerator: unknown, 
+  denominator: unknown, 
   fallback: number = 0
 ): number => {
   const num = safeNumber(numerator);
@@ -208,3 +204,6 @@ export const safePercentage = (
   if (den === 0) return fallback;
   return Math.round((num / den) * 100);
 };
+
+// Re-export safeNumber for convenience
+export { safeNumber };

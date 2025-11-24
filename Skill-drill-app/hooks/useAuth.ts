@@ -99,7 +99,7 @@ export const useAuth = () => {
         isLoading: false,
         error: null,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (!isMountedRef.current) return;
       
       // Don't set error for aborted requests
@@ -118,7 +118,7 @@ export const useAuth = () => {
         isAuthenticated: false,
         user: null,
         isLoading: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : 'An error occurred',
       });
     }
   };
@@ -229,11 +229,11 @@ export const useAuth = () => {
       }
       
       return response;
-    } catch (error: any) {
+    } catch (error: unknown) {
       setAuthState(prev => ({
         ...prev,
         isLoading: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : 'An error occurred',
       }));
       throw error;
     }
@@ -284,11 +284,11 @@ export const useAuth = () => {
       }
       
       return response;
-    } catch (error: any) {
+    } catch (error: unknown) {
       setAuthState(prev => ({
         ...prev,
         isLoading: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : 'An error occurred',
       }));
       throw error;
     }
@@ -336,12 +336,12 @@ export const useAuth = () => {
       }
       
       return response;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ useAuth: OTP verification error:', error);
       setAuthState(prev => ({
         ...prev,
         isLoading: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : 'An error occurred',
       }));
       throw error;
     }
@@ -359,11 +359,11 @@ export const useAuth = () => {
         isLoading: false,
         error: null,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       setAuthState(prev => ({
         ...prev,
         isLoading: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : 'An error occurred',
       }));
       throw error;
     }
@@ -375,12 +375,12 @@ export const useAuth = () => {
       console.log('📊 useAuth: Profile data to update:', userData);
       
       // Use the API method to update profile on backend
-      const payload: any = {};
+      const payload: Record<string, unknown> = {};
       if (userData.careerLevelId) payload.careerLevelId = userData.careerLevelId;
-      if ((userData as any).roleType) payload.roleType = (userData as any).roleType;
-      if ((userData as any).onboardingStep) payload.onboardingStep = (userData as any).onboardingStep;
+      if (userData.roleType) payload.roleType = userData.roleType;
+      if (userData.onboardingStep) payload.onboardingStep = userData.onboardingStep;
       if (userData.name) payload.name = userData.name;
-      if ((userData as any).email) payload.email = (userData as any).email;
+      if (userData.email) payload.email = userData.email;
 
       const response = await authService.updateProfileViaAPI(payload);
       
@@ -404,11 +404,11 @@ export const useAuth = () => {
         console.error('❌ useAuth: Profile update failed:', response.message);
         throw new Error(response.message || 'Profile update failed');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ useAuth: Profile update error:', error);
       setAuthState(prev => ({
         ...prev,
-        error: error.message,
+        error: error instanceof Error ? error.message : 'An error occurred',
       }));
       throw error;
     }
@@ -423,11 +423,11 @@ export const useAuth = () => {
       await checkAuthStatus();
       
       console.log(`✅ useAuth: Onboarding step updated to: ${step}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ useAuth: Error updating onboarding step:', error);
       setAuthState(prev => ({
         ...prev,
-        error: error.message,
+        error: error instanceof Error ? error.message : 'An error occurred',
       }));
       throw error;
     }

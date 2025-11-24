@@ -27,7 +27,7 @@ export const useAssessmentSession = () => {
   
   // Legacy compatibility - for components that still expect these
   const [assessmentId, setAssessmentId] = useState<string | null>(null);
-  const [questions, setQuestions] = useState<any[]>([]);
+  const [questions, setQuestions] = useState<import('../types/assessment').AssessmentScenario[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 
   // Clear assessment data
@@ -92,9 +92,10 @@ export const useAssessmentSession = () => {
         throw new Error(response.message || 'Failed to start assessment');
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Error starting assessment:', error);
-      setError(error.message || 'Failed to start assessment');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to start assessment';
+      setError(errorMessage);
       throw error;
     } finally {
       setLoading(false);
@@ -139,9 +140,10 @@ export const useAssessmentSession = () => {
         throw new Error(response.message || 'Failed to submit answer');
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Error submitting answer:', error);
-      setError(error.message || 'Failed to submit answer');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to submit answer';
+      setError(errorMessage);
       throw error;
     } finally {
       setLoading(false);

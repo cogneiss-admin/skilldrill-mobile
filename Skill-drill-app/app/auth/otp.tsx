@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, View, Pressable, Text, KeyboardAvoidingView, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -80,7 +79,7 @@ export default function OtpScreen() {
     if (numeric && index < 5) refs[index + 1]?.current?.focus?.();
   };
 
-  const handleKeyPress = (index: number, e: any) => {
+  const handleKeyPress = (index: number, e: import('../../types/common').KeyboardEvent) => {
     if (e.nativeEvent.key === "Backspace" && !digits[index] && index > 0) {
       refs[index - 1]?.current?.focus?.();
       const next = [...digits];
@@ -122,14 +121,15 @@ export default function OtpScreen() {
         setErrorMessage(response.message || "Incorrect OTP. Please try again.");
         return false;
       }
-    } catch (error: any) {
-      const isOtpRateLimited = error?.code === 'OTP_RATE_LIMIT_EXCEEDED' || /Too many OTP requests/i.test(error?.message || '');
+    } catch (error: unknown) {
+      const errorObj = error as { code?: string; message?: string; data?: { retry_after?: number; retryAfter?: number } } | undefined;
+      const isOtpRateLimited = errorObj?.code === 'OTP_RATE_LIMIT_EXCEEDED' || /Too many OTP requests/i.test(errorObj?.message || '');
       if (isOtpRateLimited) {
-        const retryAfter = Number(error?.data?.retry_after || error?.data?.retryAfter || 300);
+        const retryAfter = Number(errorObj?.data?.retry_after || errorObj?.data?.retryAfter || 300);
         setTo(retryAfter);
         setErrorMessage(`Too many OTP requests. Try again in ${Math.ceil(retryAfter / 60)} minute(s).`);
       } else {
-        setErrorMessage(error.message || "Incorrect OTP. Please try again.");
+        setErrorMessage(errorObj?.message || "Incorrect OTP. Please try again.");
       }
       return false;
     } finally {
@@ -178,11 +178,12 @@ export default function OtpScreen() {
           Alert.alert("Error", response.message || "Failed to resend OTP");
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Resend OTP error:', error);
-      const isOtpRateLimited = error?.code === 'OTP_RATE_LIMIT_EXCEEDED' || /Too many OTP requests/i.test(error?.message || '');
+      const errorObj = error as { code?: string; message?: string; data?: { retry_after?: number; retryAfter?: number } } | undefined;
+      const isOtpRateLimited = errorObj?.code === 'OTP_RATE_LIMIT_EXCEEDED' || /Too many OTP requests/i.test(errorObj?.message || '');
       if (isOtpRateLimited) {
-        const retryAfter = Number(error?.data?.retry_after || error?.data?.retryAfter || 300);
+        const retryAfter = Number(errorObj?.data?.retry_after || errorObj?.data?.retryAfter || 300);
         setTo(retryAfter);
         Alert.alert("Please wait", `Too many OTP requests. Try again in ${Math.ceil(retryAfter / 60)} minute(s).`);
       } else {

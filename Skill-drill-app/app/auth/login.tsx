@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Pressable, View, Image, ScrollView, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -15,11 +14,10 @@ import { parseApiError, formatErrorMessage } from "../../utils/errorHandler";
 import { detectInputType, isValidEmail, isValidPhone, validationMessageFor } from "../components/validators";
 import { useSocialAuth } from "../../hooks/useSocialAuth";
 import { useResponsive } from "../../utils/responsive";
-import { BRAND } from "../components/Brand";
+import { BRAND, LOGO_SRC } from "../components/Brand";
 import { useCountries, getConvertedFlagUrl } from "../../hooks/useCountries";
 import CountryPickerModal from "../components/CountryPickerModal";
-
-const logoSrc = require("../../assets/images/logo.png");
+const logoSrc = LOGO_SRC;
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -46,7 +44,7 @@ export default function LoginScreen() {
 
   // Derive selected phone country from countries + selectedCountryCode
   const selectedPhoneCountry = useMemo(() => {
-    return countries.find((c: any) => c.code === selectedCountryCode) || {
+    return countries.find((c) => c.code === selectedCountryCode) || {
       code: "IN",
       name: "India",
       phoneCode: "+91",
@@ -147,7 +145,7 @@ export default function LoginScreen() {
           setShowSignupSuggestion(false);
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Send OTP error:', error);
       const apiError = parseApiError(error);
       const message = formatErrorMessage(apiError);

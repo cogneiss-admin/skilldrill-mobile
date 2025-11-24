@@ -15,7 +15,7 @@
  * await processPayment({
  *   priceId: 'price_123',
  *   metadata: { skillId, assessmentId, recommendationId },
- *   onSuccess: (assignmentId) => navigate(`/drillPractice?assignmentId=${assignmentId}`)
+ *   onSuccess: (assignmentId) => navigate(`/drillsScenarios?assignmentId=${assignmentId}`)
  * });
  */
 
@@ -25,8 +25,11 @@ import apiService from '../services/api';
 import { useToast } from './useToast';
 
 interface PaymentParams {
-  priceId: string;
-  metadata: {
+  // Legacy mode: use priceId for fixed pricing
+  priceId?: string;
+  // Dynamic mode: use recommendationId for token-based pricing
+  recommendationId?: string;
+  metadata?: {
     skillId: string;
     assessmentId?: string;
     recommendationId?: string;
@@ -52,14 +55,32 @@ export const usePayment = (): UsePaymentReturn => {
     setProcessing(true);
 
     try {
+      // Validate input parameters
+      if (!params.priceId && !params.recommendationId) {
+        throw new Error('Either priceId or recommendationId is required');
+      }
+
       // Step 1: Create checkout session on backend
       console.log('[Payment] Creating checkout session...');
 
-      const checkoutRes = await apiService.createCheckout({
-        priceId: params.priceId,
+      // Build checkout request based on mode
+      const checkoutRequest: import('../types/pricing').CheckoutRequest = {
         provider: 'stripe',
-        metadata: params.metadata
-      });
+      };
+
+      // Dynamic pricing mode (new)
+      if (params.recommendationId) {
+        console.log('[Payment] Using dynamic pricing with recommendationId:', params.recommendationId);
+        checkoutRequest.recommendationId = params.recommendationId;
+      }
+      // Legacy fixed pricing mode
+      else if (params.priceId) {
+        console.log('[Payment] Using fixed pricing with priceId:', params.priceId);
+        checkoutRequest.priceId = params.priceId;
+        checkoutRequest.metadata = params.metadata;
+      }
+
+      const checkoutRes = await apiService.createCheckout(checkoutRequest);
 
       if (!checkoutRes.success) {
         throw new Error(checkoutRes.message || 'Failed to create checkout session');
@@ -108,14 +129,23 @@ export const usePayment = (): UsePaymentReturn => {
 
       // Step 4: Poll for drill assignment
       // Backend webhook will create the assignment
-      const assignmentId = await pollForAssignment(params.metadata.skillId);
+      // Get skillId from metadata (legacy) or from checkout response (dynamic)
+      const skillId = params.metadata?.skillId || checkoutRes.data?.skillId;
+
+      if (!skillId) {
+        console.warn('[Payment] No skillId available for polling, skipping assignment check');
+        params.onSuccess('');
+        return;
+      }
+
+      const assignmentId = await pollForAssignment(skillId);
 
       console.log('[Payment] ✅ Drill assignment created:', assignmentId);
 
       // Step 5: Success callback
       params.onSuccess(assignmentId);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[Payment] Error:', error);
       showError(error.message || 'Payment processing failed');
       throw error;
@@ -151,9 +181,14 @@ export const usePayment = (): UsePaymentReturn => {
 
         if (res.success && res.data?.assignments) {
           // Find most recent assignment for this skill
-          const latestAssignment = res.data.assignments
-            .filter((a: any) => a.skillId === skillId)
-            .sort((a: any, b: any) =>
+          interface DrillAssignment {
+            skillId: string;
+            createdAt: string;
+          }
+          const assignments = (res.data.assignments as DrillAssignment[]) || [];
+          const latestAssignment = assignments
+            .filter((a) => a.skillId === skillId)
+            .sort((a, b) =>
               new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
             )[0];
 

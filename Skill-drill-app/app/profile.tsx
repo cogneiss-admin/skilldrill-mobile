@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, StatusBar, Modal, FlatList, Image, Pressable, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -200,12 +199,13 @@ export default function ProfileScreen() {
           // Valid and available - clear error
           setPhoneValidationError('');
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         // Only show error if it's about phone existing or validation
-        if (error?.response?.data?.code === 'PHONE_EXISTS') {
+        const errorObj = error as { response?: { data?: { code?: string; message?: string } } } | undefined;
+        if (errorObj?.response?.data?.code === 'PHONE_EXISTS') {
           setPhoneValidationError('Entered phone number already exists!');
-        } else if (error?.response?.data?.code === 'VALIDATION_ERROR') {
-          const errorMsg = error.response.data.message || 'Invalid phone number';
+        } else if (errorObj?.response?.data?.code === 'VALIDATION_ERROR') {
+          const errorMsg = errorObj.response.data.message || 'Invalid phone number';
           if (errorMsg.includes('same as') && !formattedPhoneNumber.trim()) {
             setPhoneValidationError('');
           } else {
@@ -280,9 +280,10 @@ export default function ProfileScreen() {
           // Valid and available - clear error
           setEmailValidationError('');
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         // Only show error if it's about email existing or validation
-        if (error?.response?.data?.code === 'EMAIL_EXISTS') {
+        const errorObj = error as { response?: { data?: { code?: string; message?: string } } } | undefined;
+        if (errorObj?.response?.data?.code === 'EMAIL_EXISTS') {
           setEmailValidationError('Entered email already exists!');
         } else if (error?.response?.data?.code === 'VALIDATION_ERROR') {
           const errorMsg = error.response.data.message || 'Invalid email address';
@@ -358,9 +359,10 @@ export default function ProfileScreen() {
           setPhoneValidationError(response.message || 'Failed to send OTP');
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       const { authService } = await import('../services/authService');
-      if (error?.response?.data?.code === 'PHONE_EXISTS') {
+      const errorObj = error as { response?: { data?: { code?: string } } } | undefined;
+      if (errorObj?.response?.data?.code === 'PHONE_EXISTS') {
         setPhoneValidationError('Entered phone number already exists!');
       } else {
         const errorMessage = authService.handleAuthError?.(error) || error?.message || 'Failed to send OTP';
@@ -399,9 +401,10 @@ export default function ProfileScreen() {
           setEmailValidationError(response.message || 'Failed to send OTP');
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       const { authService } = await import('../services/authService');
-      if (error?.response?.data?.code === 'EMAIL_EXISTS') {
+      const errorObj = error as { response?: { data?: { code?: string } } } | undefined;
+      if (errorObj?.response?.data?.code === 'EMAIL_EXISTS') {
         setEmailValidationError('Entered email already exists!');
       } else {
         const errorMessage = authService.handleAuthError?.(error) || error?.message || 'Failed to send OTP';
@@ -426,7 +429,7 @@ export default function ProfileScreen() {
       const { authService } = await import('../services/authService');
       
       // Use profile-specific OTP verification endpoint
-      const verifyPayload: any = { otp: code };
+      const verifyPayload: { otp: string } = { otp: code };
       if (otpMode === 'phone') {
         verifyPayload.phoneNo = otpTarget;
         verifyPayload.countryCode = selectedCountryCode;
@@ -478,9 +481,9 @@ export default function ProfileScreen() {
         setOtpError(response.message || 'Incorrect OTP. Please try again.');
         setOtpDigits(['', '', '', '', '', '']);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       const { authService } = await import('../services/authService');
-      const friendly = authService.handleAuthError?.(error);
+      const friendly = authService.handleAuthError?.(error as Error);
       if (friendly) {
         setOtpError(friendly);
       } else if (error?.code === 'INVALID_OTP') {
@@ -521,8 +524,9 @@ export default function ProfileScreen() {
         setResendRemaining(retryAfter);
         setOtpError(`Too many requests. Try again in ${Math.ceil(retryAfter / 60)} minute(s).`);
       }
-    } catch (error: any) {
-      setOtpError(error?.message || 'Failed to resend OTP');
+    } catch (error: unknown) {
+      const errorObj = error as { message?: string } | undefined;
+      setOtpError(errorObj?.message || 'Failed to resend OTP');
     }
   };
 
@@ -573,7 +577,7 @@ export default function ProfileScreen() {
               try {
                 const clResponse = await apiService.get('/career-levels');
                 if (clResponse?.success && Array.isArray(clResponse.data)) {
-                  const cl = clResponse.data.find((c: any) => c.id === user.careerLevelId);
+                  const cl = clResponse.data.find((c: { id: string; name: string }) => c.id === user.careerLevelId);
                   if (cl) {
                     setCareerLevelId(user.careerLevelId);
                     setCareerLevelName(cl.name);
@@ -614,7 +618,7 @@ export default function ProfileScreen() {
               try {
                 const rtResponse = await apiService.get('/role-types');
                 if (rtResponse?.success && Array.isArray(rtResponse.data)) {
-                  const rt = rtResponse.data.find((r: any) => r.id === user.roleTypeId);
+                  const rt = rtResponse.data.find((r: { id: string; name: string }) => r.id === user.roleTypeId);
                   if (rt) {
                     setRoleTypeId(user.roleTypeId);
                     setRoleTypeName(rt.name);
@@ -659,7 +663,7 @@ export default function ProfileScreen() {
               setOriginalCareerLevelId(user.careerLevelId || null);
             }
             if (user.roleType) {
-              const rt: any = user.roleType;
+              const rt = user.roleType;
               if (typeof rt === 'object' && rt?.id) {
                 setRoleTypeId(rt.id);
                 if (rt.name) setRoleTypeName(rt.name);
@@ -696,7 +700,7 @@ export default function ProfileScreen() {
               setOriginalCareerLevelId(user.careerLevelId || null);
             }
             if (user.roleType) {
-              const rt: any = user.roleType;
+              const rt = user.roleType;
               if (typeof rt === 'object' && rt?.id) {
                 setRoleTypeId(rt.id);
                 if (rt.name) setRoleTypeName(rt.name);
@@ -722,10 +726,10 @@ export default function ProfileScreen() {
         ]);
         
         if (clResponse?.success && Array.isArray(clResponse.data)) {
-          setCareerLevels(clResponse.data.map((c: any) => ({ id: c.id, name: c.name })));
+          setCareerLevels(clResponse.data.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })));
         }
         if (rtResponse?.success && Array.isArray(rtResponse.data)) {
-          setRoleTypes(rtResponse.data.map((r: any) => ({ id: r.id, name: r.name })));
+          setRoleTypes(rtResponse.data.map((r: { id: string; name: string }) => ({ id: r.id, name: r.name })));
         }
       } catch (error) {
         console.error('Error loading dropdown data:', error);
@@ -839,7 +843,7 @@ export default function ProfileScreen() {
               const { authService } = await import('../services/authService');
               
               // Prepare update payload - only include changed fields, validate no null values
-              const updatePayload: any = {};
+              const updatePayload: Record<string, unknown> = {};
 
               // Name - validate: must be at least 2 characters
               if (!name || name.trim().length < 2) {
@@ -922,7 +926,7 @@ export default function ProfileScreen() {
                   setOriginalCareerLevelId(user.careerLevelId || null);
                 }
                 if (user.roleType) {
-                  const rt: any = user.roleType;
+                  const rt = user.roleType;
                   if (typeof rt === 'object' && rt?.id) {
                     setOriginalRoleTypeId(rt.id);
                   } else {
@@ -947,9 +951,10 @@ export default function ProfileScreen() {
                   }
                 }
               }
-            } catch (e: any) {
+            } catch (e: unknown) {
               console.error('Failed to update profile:', e);
-              Alert.alert('Update Failed', e?.message || 'Failed to update profile. Please try again.');
+              const errorMessage = e instanceof Error ? e.message : 'Failed to update profile. Please try again.';
+              Alert.alert('Update Failed', errorMessage);
             } finally {
               setBusy(false);
             }

@@ -1,13 +1,15 @@
 import { PayloadAction, createSlice } from "@reduxjs/toolkit";
+import { Skill } from "./skillsSlice";
+import { User } from "../services/api";
 
 export type AppState = {
   ready: boolean;
   isOnline: boolean;
   lastSyncTime: number | null;
   cache: {
-    skills: any[];
-    userProfile: any | null;
-    onboardingData: any | null;
+    skills: Skill[];
+    userProfile: User | null;
+    onboardingData: Record<string, unknown> | null;
   };
   performance: {
     appLoadTime: number | null;
@@ -53,13 +55,13 @@ const appSlice = createSlice({
     setLastSyncTime(state, action: PayloadAction<number>) {
       state.lastSyncTime = action.payload;
     },
-    cacheSkills(state, action: PayloadAction<any[]>) {
+    cacheSkills(state, action: PayloadAction<Skill[]>) {
       state.cache.skills = action.payload;
     },
-    cacheUserProfile(state, action: PayloadAction<any>) {
+    cacheUserProfile(state, action: PayloadAction<User>) {
       state.cache.userProfile = action.payload;
     },
-    cacheOnboardingData(state, action: PayloadAction<any>) {
+    cacheOnboardingData(state, action: PayloadAction<Record<string, unknown>>) {
       state.cache.onboardingData = action.payload;
     },
     clearCache(state) {

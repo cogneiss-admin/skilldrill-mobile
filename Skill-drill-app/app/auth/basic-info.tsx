@@ -1,8 +1,8 @@
-// @ts-nocheck
 import React, { useMemo, useState } from "react";
 import { View, Pressable, ScrollView, Text, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Button, TextInput } from "react-native-paper";
+import { TextInput } from "react-native-paper";
+import Button from "../../components/Button";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { isValidEmail, isValidPhone } from "../components/validators";
@@ -10,11 +10,9 @@ import { LinearGradient } from "expo-linear-gradient";
 import { MotiView } from "moti";
 import { StatusBar } from "react-native";
 import { useAuth } from "../../hooks/useAuth";
-import { BRAND } from "../components/Brand";
+import { BRAND, GRADIENTS, LOGO_SRC } from "../components/Brand";
 const APP_NAME = "Skill Drill";
-const logoSrc = require("../../assets/images/logo.png");
-
-// Career details moved to separate screen
+const logoSrc = LOGO_SRC;
 
 export default function BasicInfoScreen() {
   const router = useRouter();
@@ -69,7 +67,7 @@ export default function BasicInfoScreen() {
         try { await Haptics.selectionAsync(); } catch {}
         router.push("/auth/careerRole");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Profile update error:', error);
     } finally {
       setBusy(false);
@@ -82,7 +80,7 @@ export default function BasicInfoScreen() {
       {/* Top brand header with animated title */}
       <View style={{ height: "35%", position: "relative" }}>
         <LinearGradient
-          colors={["#0A66C2", "#0E75D1", "#1285E0"]}
+          colors={GRADIENTS.onboarding}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }}
@@ -166,13 +164,12 @@ export default function BasicInfoScreen() {
           <MotiView from={{ opacity: 0, translateY: 16 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: "timing", duration: 500, delay: 420 }}>
             <View style={{ height: 20 }} />
             <Button
-              mode="contained"
+              variant="primary"
               onPress={handleContinue}
               loading={busy}
               disabled={!canContinue || busy}
-              contentStyle={{ height: 52 }}
+              size="large"
               style={{ borderRadius: 26, backgroundColor: BRAND, opacity: canContinue ? 1 : 0.7 }}
-              labelStyle={{ fontWeight: "700" }}
             >
               Next
             </Button>

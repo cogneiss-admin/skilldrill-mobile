@@ -42,7 +42,7 @@ export const useSocialAuth = () => {
       } else {
         throw new Error(response.message || `${provider} authentication failed`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(`❌ ${provider} authentication error:`, error);
       
       let errorMessage = error.message || `${provider} authentication failed`;

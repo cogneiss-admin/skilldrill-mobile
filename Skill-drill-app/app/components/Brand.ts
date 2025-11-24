@@ -2,6 +2,9 @@
 // Add a default export React component placeholder to satisfy expo-router route checks.
 import React from "react";
 
+// ===== ASSETS =====
+export const LOGO_SRC = require('../assets/images/logo.png');
+
 // ===== BRAND COLORS =====
 export const BRAND = "#0A66C2";
 export const BRAND_LIGHT = "#E6F2FF";
@@ -77,15 +80,46 @@ export const GRADIENTS = {
 
 // ===== TYPOGRAPHY =====
 export const TYPOGRAPHY = {
-  h1: { fontSize: 22, fontWeight: '800', color: '#111827', letterSpacing: 0.2 },
-  h2: { fontSize: 18, fontWeight: '700', color: '#1F2937', letterSpacing: 0.15 },
+  // Headers
+  h1: { fontSize: 24, fontWeight: '700', color: '#000000', letterSpacing: 0.1 },
+  h2: { fontSize: 20, fontWeight: '600', color: '#000000', letterSpacing: 0.1 },
+  h3: { fontSize: 18, fontWeight: '600', color: '#000000', letterSpacing: 0.1 },
+  h4: { fontSize: 16, fontWeight: '600', color: '#000000', letterSpacing: 0.1 },
   subtitle: { fontSize: 15, fontWeight: '500', color: '#374151' },
+  
+  // Body Text
   body: { fontSize: 14, color: '#4B5563', lineHeight: 20 },
+  bodyLarge: { fontSize: 16, fontWeight: '500', color: COLORS.gray[700], lineHeight: 24 },
+  bodyMedium: { fontSize: 14, fontWeight: '500', color: COLORS.gray[700], lineHeight: 20 },
+  bodySmall: { fontSize: 12, fontWeight: '500', color: COLORS.gray[700], lineHeight: 18 },
+  
+  // Labels and Captions
   label: { fontSize: 12, fontWeight: '600', color: '#6B7280', letterSpacing: 0.05 },
-  button: { fontSize: 16, fontWeight: '600', color: '#FFFFFF', letterSpacing: 0.3 },
+  labelLarge: { fontSize: 14, fontWeight: '600', color: '#000000', letterSpacing: 0.1 },
+  labelMedium: { fontSize: 12, fontWeight: '600', color: '#000000', letterSpacing: 0.1 },
+  labelSmall: { fontSize: 10, fontWeight: '600', color: '#000000', letterSpacing: 0.1 },
   caption: { fontSize: 12, color: '#6B7280', lineHeight: 16 },
+  
+  // Secondary Text
+  secondaryLarge: { fontSize: 14, fontWeight: '500', color: COLORS.gray[400], lineHeight: 20 },
+  secondaryMedium: { fontSize: 12, fontWeight: '500', color: COLORS.gray[400], lineHeight: 18 },
+  secondarySmall: { fontSize: 10, fontWeight: '500', color: COLORS.gray[400], lineHeight: 16 },
+  
+  // Button Text
+  button: { fontSize: 16, fontWeight: '600', color: '#FFFFFF', letterSpacing: 0.3 },
+  buttonLarge: { fontSize: 16, fontWeight: '600', letterSpacing: 0.1 },
+  buttonMedium: { fontSize: 14, fontWeight: '600', letterSpacing: 0.1 },
+  buttonSmall: { fontSize: 12, fontWeight: '600', letterSpacing: 0.1 },
+  
+  // Special Text
+  brand: { fontSize: 18, fontWeight: '900', color: COLORS.white, letterSpacing: 0.5 },
+  score: { fontSize: 20, fontWeight: '700', color: BRAND, letterSpacing: 0.2 },
+  success: { fontSize: 12, fontWeight: '600', color: COLORS.success, letterSpacing: 0.1 },
+  warning: { fontSize: 12, fontWeight: '600', color: COLORS.warning, letterSpacing: 0.1 },
   overline: { fontSize: 11, fontWeight: '700', color: BRAND, letterSpacing: 1.2 },
   pill: { fontSize: 12, fontWeight: '600', letterSpacing: 0.4 },
+  
+  // Utility
   fontSize: {
     xs: 12,
     sm: 14,

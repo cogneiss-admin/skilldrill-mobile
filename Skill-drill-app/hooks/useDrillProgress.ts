@@ -30,8 +30,11 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiService from '../services/api';
 import { useToast } from './useToast';
+
+const DRILL_SESSION_KEY = 'drill_session_data';
 
 interface DrillItem {
   id: string;
@@ -49,6 +52,8 @@ interface DrillItem {
 interface Assignment {
   id: string;
   skillId: string;
+  skillName?: string;
+  skillCategory?: string;
   source: string;
   status: string;
   total: number;
@@ -87,6 +92,7 @@ interface UseDrillProgressReturn {
   };
   submitting: boolean;
   milestoneData: MilestoneData | null;
+  sessionId: string | null;
   submitDrill: (params: SubmitDrillParams) => Promise<void>;
   nextDrill: () => void;
   previousDrill: () => void;
@@ -105,6 +111,120 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
   const [currentIndex, setCurrentIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [milestoneData, setMilestoneData] = useState<MilestoneData | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+
+  /**
+   * Save session data to AsyncStorage
+   */
+  const saveSessionData = useCallback(async (sessionId: string, assignmentId: string, currentIndex: number) => {
+    try {
+      const sessionData = {
+        sessionId,
+        assignmentId,
+        currentIndex,
+        timestamp: Date.now()
+      };
+      await AsyncStorage.setItem(DRILL_SESSION_KEY, JSON.stringify(sessionData));
+      console.log('[DrillProgress] Session data saved:', sessionData);
+    } catch (err) {
+      console.warn('[DrillProgress] Failed to save session data:', err);
+    }
+  }, []);
+
+  /**
+   * Load session data from AsyncStorage
+   */
+  const loadSessionData = useCallback(async (): Promise<{ sessionId: string; assignmentId: string; currentIndex: number } | null> => {
+    try {
+      const data = await AsyncStorage.getItem(DRILL_SESSION_KEY);
+      if (data) {
+        const sessionData = JSON.parse(data);
+        // Check if session is for current assignment and not too old (24 hours)
+        if (sessionData.assignmentId === assignmentId && 
+            Date.now() - sessionData.timestamp < 24 * 60 * 60 * 1000) {
+          console.log('[DrillProgress] Session data loaded:', sessionData);
+          return sessionData;
+        } else {
+          // Clear stale session data
+          await AsyncStorage.removeItem(DRILL_SESSION_KEY);
+        }
+      }
+      return null;
+    } catch (err) {
+      console.warn('[DrillProgress] Failed to load session data:', err);
+      return null;
+    }
+  }, [assignmentId]);
+
+  /**
+   * Start or resume drill session
+   */
+  const startOrResumeSession = useCallback(async (assignmentData: Assignment) => {
+    try {
+      // Check for existing session in AsyncStorage first
+      const savedSession = await loadSessionData();
+      
+      let sessionResponse;
+      if (savedSession) {
+        // Try to resume from saved session
+        try {
+          const statusRes = await apiService.getDrillSessionStatus(assignmentId);
+          if (statusRes.success && statusRes.data.hasActiveSession) {
+            // Use existing session
+            sessionResponse = {
+              success: true,
+              data: {
+                sessionId: statusRes.data.sessionId,
+                assignmentId: assignmentId,
+                currentDrillIndex: statusRes.data.currentDrillIndex,
+                isResuming: true
+              }
+            };
+          } else {
+            // Start new session
+            sessionResponse = await apiService.startDrillSession(assignmentId);
+          }
+        } catch (err) {
+          // Start new session if resume fails
+          sessionResponse = await apiService.startDrillSession(assignmentId);
+        }
+      } else {
+        // Start new session
+        sessionResponse = await apiService.startDrillSession(assignmentId);
+      }
+
+      if (!sessionResponse.success) {
+        throw new Error(sessionResponse.message || 'Failed to start session');
+      }
+
+      const sessionData = sessionResponse.data;
+      setSessionId(sessionData.sessionId);
+
+      // Use session's currentDrillIndex if available, otherwise find first incomplete
+      let initialIndex = sessionData.currentDrillIndex !== undefined 
+        ? sessionData.currentDrillIndex 
+        : assignmentData.items.findIndex((item: DrillItem) => !item.isCompleted);
+
+      if (initialIndex === -1) {
+        initialIndex = 0; // All completed, start from beginning
+      }
+
+      setCurrentIndex(initialIndex);
+      await saveSessionData(sessionData.sessionId, assignmentId, initialIndex);
+
+      console.log('[DrillProgress] Session started/resumed:', {
+        sessionId: sessionData.sessionId,
+        isResuming: sessionData.isResuming,
+        currentIndex: initialIndex
+      });
+
+      return sessionData.sessionId;
+    } catch (err: unknown) {
+      console.error('[DrillProgress] Session start error:', err);
+      // Don't fail completely, just continue without session tracking
+      return null;
+    }
+  }, [assignmentId, loadSessionData, saveSessionData]);
 
   /**
    * Load assignment and drill items
@@ -129,32 +249,41 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
 
       setAssignment(assignmentData);
 
-      // Find first incomplete drill
-      const firstIncompleteIndex = assignmentData.items.findIndex(
-        (item: DrillItem) => !item.isCompleted
-      );
+      // Start or resume session
+      const sessionId = await startOrResumeSession(assignmentData);
+      if (sessionId) {
+        setSessionId(sessionId);
+      }
 
-      if (firstIncompleteIndex !== -1) {
-        setCurrentIndex(firstIncompleteIndex);
-      } else {
-        // All drills completed - start from beginning for review
-        setCurrentIndex(0);
+      // If session didn't set index, find first incomplete drill
+      if (!sessionId) {
+        const firstIncompleteIndex = assignmentData.items.findIndex(
+          (item: DrillItem) => !item.isCompleted
+        );
+
+        if (firstIncompleteIndex !== -1) {
+          setCurrentIndex(firstIncompleteIndex);
+        } else {
+          // All drills completed - start from beginning for review
+          setCurrentIndex(0);
+        }
       }
 
       console.log('[DrillProgress] Assignment loaded:', {
         total: assignmentData.total,
         completed: assignmentData.completed,
-        percentage: assignmentData.completionPercentage
+        percentage: assignmentData.completionPercentage,
+        hasSession: !!sessionId
       });
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[DrillProgress] Load error:', err);
       setError(err.message || 'Failed to load drills');
       showError(err.message || 'Failed to load drills');
     } finally {
       setLoading(false);
     }
-  }, [assignmentId, showError]);
+  }, [assignmentId, showError, startOrResumeSession]);
 
   // Load assignment on mount
   useEffect(() => {
@@ -185,7 +314,8 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
         drillItemId: currentDrill.id,
         textContent: params.textContent,
         audioUrl: params.audioUrl,
-        durationSec: params.durationSec
+        durationSec: params.durationSec,
+        sessionId: sessionId || undefined
       });
 
       if (!res.success) {
@@ -224,11 +354,12 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
         completionPercentage: result.progress.completionPercentage
       });
 
-      // Check for milestone
-      if (result.milestone?.reached) {
-        console.log('[DrillProgress] 🎉 Milestone reached!', {
+      // Check if milestone reached and set milestone data
+      if (result.milestone?.reached && result.milestone.aggregate) {
+        console.log('[DrillProgress] Milestone reached!', {
           percentage: result.progress.completionPercentage,
-          avgScore: result.milestone.aggregate.averageScore
+          averageScore: result.milestone.aggregate.averageScore,
+          attemptsCount: result.milestone.aggregate.attemptsCount
         });
 
         setMilestoneData({
@@ -237,24 +368,55 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
           averageScore: result.milestone.aggregate.averageScore,
           attemptsCount: result.milestone.aggregate.attemptsCount
         });
-      } else {
-        // No milestone - show brief success and auto-advance
-        showSuccess('Drill completed!');
 
-        // Auto-advance to next drill after short delay
-        setTimeout(() => {
-          nextDrill();
-        }, 1500);
+        // Keep submitting=true to prevent re-submission while modal is showing
+        // Modal will call dismissMilestone which will clear submitting state
+        return;
       }
 
-    } catch (err: any) {
+      // Show success and auto-advance to next drill
+      showSuccess('Drill completed!');
+      setSubmitting(false);
+
+      // Check if all drills are completed
+      const allCompleted = updatedItems.every(item => item.isCompleted);
+      if (allCompleted && sessionId) {
+        // Complete the session
+        try {
+          await apiService.completeDrillSession(sessionId);
+          await AsyncStorage.removeItem(DRILL_SESSION_KEY);
+          setSessionId(null);
+        } catch (err) {
+          console.warn('[DrillProgress] Failed to complete session:', err);
+        }
+      }
+
+      // Auto-advance to next drill after short delay
+      setTimeout(() => {
+        nextDrill();
+      }, 1500);
+
+    } catch (err: unknown) {
       console.error('[DrillProgress] Submit error:', err);
       showError(err.message || 'Failed to submit drill');
-      throw err;
-    } finally {
       setSubmitting(false);
+      throw err;
     }
   };
+
+  /**
+   * Update session activity when navigating
+   */
+  const updateSessionActivity = useCallback(async (newIndex: number) => {
+    if (sessionId && assignmentId) {
+      try {
+        await apiService.updateDrillSessionActivity(sessionId, newIndex);
+        await saveSessionData(sessionId, assignmentId, newIndex);
+      } catch (err) {
+        console.warn('[DrillProgress] Failed to update session activity:', err);
+      }
+    }
+  }, [sessionId, assignmentId, saveSessionData]);
 
   /**
    * Navigate to next drill
@@ -263,8 +425,10 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
     if (!assignment) return;
 
     if (currentIndex < assignment.items.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-      console.log('[DrillProgress] Advanced to drill', currentIndex + 2);
+      const newIndex = currentIndex + 1;
+      setCurrentIndex(newIndex);
+      updateSessionActivity(newIndex);
+      console.log('[DrillProgress] Advanced to drill', newIndex + 1);
     } else {
       console.log('[DrillProgress] Already at last drill');
     }
@@ -275,8 +439,10 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
    */
   const previousDrill = () => {
     if (currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1);
-      console.log('[DrillProgress] Moved to drill', currentIndex);
+      const newIndex = currentIndex - 1;
+      setCurrentIndex(newIndex);
+      updateSessionActivity(newIndex);
+      console.log('[DrillProgress] Moved to drill', newIndex + 1);
     } else {
       console.log('[DrillProgress] Already at first drill');
     }
@@ -290,6 +456,7 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
 
     if (index >= 0 && index < assignment.items.length) {
       setCurrentIndex(index);
+      updateSessionActivity(index);
       console.log('[DrillProgress] Jumped to drill', index + 1);
     } else {
       console.warn('[DrillProgress] Invalid drill index:', index);
@@ -302,6 +469,7 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
   const dismissMilestone = () => {
     console.log('[DrillProgress] Dismissing milestone');
     setMilestoneData(null);
+    setSubmitting(false); // Re-enable submit button for next drill
     nextDrill();
   };
 
@@ -335,6 +503,7 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
     progress,
     submitting,
     milestoneData,
+    sessionId,
     submitDrill,
     nextDrill,
     previousDrill,

@@ -27,7 +27,7 @@ export const safePercentage = (current: number, total: number, fallback: number 
 /**
  * Ensure a number is safe for React Native bridge
  */
-export const safeNumber = (value: any, fallback: number = 0): number => {
+export const safeNumber = (value: unknown, fallback: number = 0): number => {
   const num = Number(value);
   return isFinite(num) ? num : fallback;
 };

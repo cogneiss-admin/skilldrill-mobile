@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useEffect, useRef } from "react";
 import { TextInput, View, useWindowDimensions } from "react-native";
 import { useResponsive } from "../utils/responsive";
@@ -69,7 +68,7 @@ export default function CodeBoxes({ length = 6, value, onChange, color = DEFAULT
     if (index < length - 1) refs[index + 1]?.current?.focus?.();
   };
 
-  const handleKeyPress = (index: number, e: any) => {
+  const handleKeyPress = (index: number, e: import('../types/common').KeyboardEvent) => {
     if (e.nativeEvent.key !== "Backspace") return;
     const next = [...value];
     if (value[index]) {

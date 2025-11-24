@@ -1,8 +1,7 @@
-// @ts-nocheck
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { View, Pressable, ScrollView, Text, StyleSheet, Dimensions, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Button } from "react-native-paper";
+import Button from "../../components/Button";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { MotiView } from "moti";
@@ -14,9 +13,9 @@ import { apiService } from "../../services/api";
 import CareerSkeleton from "../components/CareerSkeleton";
 import ErrorBanner from "../../components/ErrorBanner";
 
-const BRAND = "#0A66C2";
+import { BRAND, LOGO_SRC } from '../components/Brand';
 const APP_NAME = "Skill Drill";
-const logoSrc = require("../../assets/images/logo.png");
+const logoSrc = LOGO_SRC;
 const { width } = Dimensions.get("window");
 
 type CareerLevel = { id: string; name: string; description?: string; order: number };
@@ -42,9 +41,11 @@ export default function CareerRoleScreen() {
   };
 
   const fetchRoleTypes = async (): Promise<RoleType[]> => {
-    if ((apiService as any).fetchRoleTypes) {
-      const res = await (apiService as any).fetchRoleTypes();
-      return (res?.data as unknown as RoleType[]) || [];
+    // Check if apiService has fetchRoleTypes method (it might not exist)
+    const apiServiceWithRoleTypes = apiService as typeof apiService & { fetchRoleTypes?: () => Promise<{ data?: RoleType[] }> };
+    if (apiServiceWithRoleTypes.fetchRoleTypes) {
+      const res = await apiServiceWithRoleTypes.fetchRoleTypes();
+      return (res?.data as RoleType[]) || [];
     }
     const res = await apiService.get<RoleType[]>(`/role-types`);
     return (res?.data as unknown as RoleType[]) || [];
@@ -59,7 +60,7 @@ export default function CareerRoleScreen() {
         const [levels, types] = await Promise.all([fetchCareerLevels(), fetchRoleTypes()]);
         setCareerLevels(levels);
         setRoleTypes(types);
-      } catch (e: any) {
+      } catch (e: unknown) {
         setErrorMessage(e?.message || 'Failed to load career information. Please try again.');
       }
     })();

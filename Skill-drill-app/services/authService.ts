@@ -202,11 +202,12 @@ class AuthService {
     const response = await apiService.post<AuthSuccessResponse>('/multi-auth/signup/password', data);
     
     if (response.success) {
-      const at = (response.data as any)?.accessToken;
-      const rt = (response.data as any)?.refreshToken;
+      const authData = response.data as import('./api').AuthResponse;
+      const at = authData?.accessToken;
+      const rt = authData?.refreshToken;
       if (at) await this.setAccessToken(at);
       if (rt) await this.setRefreshToken(rt);
-      if ((response.data as any)?.user) await this.setUserData((response.data as any).user);
+      if (authData?.user) await this.setUserData(authData.user);
     }
     
     return response;
@@ -216,11 +217,12 @@ class AuthService {
     const response = await apiService.post<AuthSuccessResponse>('/multi-auth/signup/social', data);
     
     if (response.success) {
-      const at = (response.data as any)?.accessToken;
-      const rt = (response.data as any)?.refreshToken;
+      const authData = response.data as import('./api').AuthResponse;
+      const at = authData?.accessToken;
+      const rt = authData?.refreshToken;
       if (at) await this.setAccessToken(at);
       if (rt) await this.setRefreshToken(rt);
-      if ((response.data as any)?.user) await this.setUserData((response.data as any).user);
+      if (authData?.user) await this.setUserData(authData.user);
     }
     
     return response;
@@ -239,11 +241,12 @@ class AuthService {
     const response = await apiService.post<AuthSuccessResponse>('/multi-auth/login/password', data);
     
     if (response.success) {
-      const at = (response.data as any)?.accessToken;
-      const rt = (response.data as any)?.refreshToken;
+      const authData = response.data as import('./api').AuthResponse;
+      const at = authData?.accessToken;
+      const rt = authData?.refreshToken;
       if (at) await this.setAccessToken(at);
       if (rt) await this.setRefreshToken(rt);
-      if ((response.data as any)?.user) await this.setUserData((response.data as any).user);
+      if (authData?.user) await this.setUserData(authData.user);
     }
     
     return response;
@@ -254,11 +257,12 @@ class AuthService {
     const response = await apiService.post<AuthSuccessResponse>('/multi-auth/verify-otp', data);
     
     if (response.success) {
-      const at = (response.data as any)?.accessToken;
-      const rt = (response.data as any)?.refreshToken;
+      const authData = response.data as import('./api').AuthResponse;
+      const at = authData?.accessToken;
+      const rt = authData?.refreshToken;
       if (at) await this.setAccessToken(at);
       if (rt) await this.setRefreshToken(rt);
-      if ((response.data as any)?.user) await this.setUserData((response.data as any).user);
+      if (authData?.user) await this.setUserData(authData.user);
     }
     
     return response;
@@ -275,8 +279,9 @@ class AuthService {
     });
     
     if (response.success) {
-      const at = (response.data as any)?.accessToken;
-      const rt = (response.data as any)?.refreshToken;
+      const authData = response.data as import('./api').AuthResponse;
+      const at = authData?.accessToken;
+      const rt = authData?.refreshToken;
       if (at) await this.setAccessToken(at);
       if (rt) await this.setRefreshToken(rt);
     }
@@ -347,7 +352,7 @@ class AuthService {
     
     try {
       // Map fields to backend expected names
-      const payload: any = {};
+      const payload: Record<string, unknown> = {};
       if (profileData.careerLevelId) payload.careerLevelId = profileData.careerLevelId;
       if (profileData.roleType) payload.roleType = profileData.roleType; // backend expects roleType → roleTypeId
       if (profileData.onboardingStep) payload.onboardingStep = profileData.onboardingStep;
@@ -400,7 +405,7 @@ class AuthService {
         };
       }
       
-      return response as any;
+      return response;
     } catch (error) {
       console.error('Get profile API error:', error);
       throw error;

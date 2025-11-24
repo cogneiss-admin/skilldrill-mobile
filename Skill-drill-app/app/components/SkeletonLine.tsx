@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Dimensions } from 'react-native';
+import { View, Dimensions, StyleProp, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti';
 import { COLORS, BORDER_RADIUS } from './Brand';
@@ -10,7 +10,7 @@ interface SkeletonLineProps {
   width?: string | number;
   height?: number;
   radius?: number;
-  style?: any;
+  style?: StyleProp<ViewStyle>;
 }
 
 const SkeletonLine: React.FC<SkeletonLineProps> = ({ 
