@@ -6,7 +6,7 @@ import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { MotiView } from "moti";
 import { StatusBar } from "react-native";
-import { AntDesign } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "../../hooks/useAuth";
 import { apiService } from "../../services/api";

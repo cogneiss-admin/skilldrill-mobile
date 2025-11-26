@@ -15,7 +15,7 @@ import { StatusBar } from "react-native";
 import Button from '../../components/Button';
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
-import { AntDesign } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 
 import { useAssessmentSession } from "../../hooks/useAssessmentSession";
 import { useToast } from "../../hooks/useToast";
@@ -306,7 +306,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
         <SafeAreaView style={{ flex: 1, backgroundColor: BRAND }}>
           <StatusBar barStyle="light-content" />
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-            <AntDesign name="exclamationcircle" size={64} color="white" />
+            <Ionicons name="alert-circle" size={64} color="white" />
             <Text style={{ color: 'white', fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginTop: 16 }}>
               Assessment Error
             </Text>

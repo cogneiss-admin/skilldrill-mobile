@@ -4,12 +4,11 @@
  * Single source of truth for assessment logic across the app
  */
 
-import { 
-  AssessmentStatus, 
-  AssessmentActionType, 
+import {
+  AssessmentStatus,
+  AssessmentActionType,
   AssessmentProgress,
-  Assessment,
-  ActivityCardProgressData 
+  Assessment
 } from '../types/assessment';
 
 /**
@@ -33,57 +32,6 @@ export const calculateAssessmentProgress = (
     percentage,
     isComplete
   };
-};
-
-/**
- * Determine what action button should be shown for an assessment
- * Centralized logic for all assessment card components
- */
-export const determineAssessmentAction = (
-  assessmentStatus: AssessmentStatus,
-  progressData?: ActivityCardProgressData,
-  templateExists?: boolean
-): AssessmentActionType => {
-  
-  // If assessment is completed, show results
-  if (assessmentStatus === AssessmentStatus.COMPLETED) {
-    return AssessmentActionType.ViewResults;
-  }
-  
-  // If assessment is pending and has progress data, show resume
-  if (assessmentStatus === AssessmentStatus.PENDING && progressData && progressData.completedResponses > 0) {
-    return AssessmentActionType.ResumeAssessment;
-  }
-  
-  // Otherwise show start (handles both new assessments and generation)
-  return AssessmentActionType.StartAssessment;
-};
-
-/**
- * Get user-friendly action button text
- * Centralized button text logic
- */
-export const getActionButtonText = (
-  action: AssessmentActionType,
-  isLoading?: boolean,
-  templateExists?: boolean
-): string => {
-  if (isLoading) {
-    return action === AssessmentActionType.StartAssessment && !templateExists 
-      ? 'Generating...' 
-      : 'Loading...';
-  }
-
-  switch (action) {
-    case AssessmentActionType.StartAssessment:
-      return templateExists ? 'Start Assessment' : 'Generate Assessment';
-    case AssessmentActionType.ResumeAssessment:
-      return 'Resume Assessment';
-    case AssessmentActionType.ViewResults:
-      return 'View Details';
-    default:
-      return 'Start Assessment';
-  }
 };
 
 /**

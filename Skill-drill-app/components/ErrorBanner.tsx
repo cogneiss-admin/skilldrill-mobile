@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, Pressable, ViewStyle, Animated, StyleSheet } from 'react-native';
-import { AntDesign, Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useResponsive } from '../utils/responsive';
 import * as Haptics from 'expo-haptics';
 
@@ -153,12 +153,12 @@ export default function ErrorBanner({
       <View style={styles.content}>
         {showIcon && (
           <View style={styles.iconContainer}>
-            <AntDesign 
-              name={tone === 'success' ? 'checkcircle' : 
-                    tone === 'info' ? 'infocirlceo' : 
-                    tone === 'warning' ? 'warning' : 'exclamationcircleo'} 
-              size={responsive.size(16)} 
-              color={palette.icon} 
+            <Ionicons
+              name={tone === 'success' ? 'checkmark-circle' :
+                    tone === 'info' ? 'information-circle-outline' :
+                    tone === 'warning' ? 'warning-outline' : 'alert-circle-outline'}
+              size={responsive.size(16)}
+              color={palette.icon}
             />
           </View>
         )}

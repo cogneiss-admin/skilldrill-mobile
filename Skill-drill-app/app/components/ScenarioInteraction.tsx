@@ -22,7 +22,6 @@ import Button from '../../components/Button';
 import { LinearGradient } from "expo-linear-gradient";
 import { MotiView } from "moti";
 import { Ionicons } from '@expo/vector-icons';
-import AIGenerationLoader from './AIGenerationLoader';
 import {
   BRAND,
   COLORS,
@@ -338,12 +337,6 @@ const ScenarioInteraction: React.FC<ScenarioInteractionProps> = ({
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor }}>
       <StatusBar barStyle={statusBarStyle} />
-
-      <AIGenerationLoader
-        visible={loading}
-        message={loadingMessage}
-        subMessage={loadingSubMessage}
-      />
 
       {renderHeader()}
 

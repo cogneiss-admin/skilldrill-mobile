@@ -136,22 +136,3 @@ export interface AssessmentComponentProps {
   onExit?: () => void;
 }
 
-// Activity Card Specific Types (for backward compatibility)
-export interface ActivityCardProgressData {
-  totalPrompts: number;
-  completedResponses: number;
-  status: string;
-}
-
-export interface ActivitySkillCardData {
-  id: string;
-  skillName: string;
-  assessmentStatus: AssessmentStatus;
-  aiInsights: string;
-  aiTag: string;
-  score?: number;
-  skillId?: string;
-  progressData?: ActivityCardProgressData;
-  templateExists?: boolean;
-  isGenerating?: boolean;
-}

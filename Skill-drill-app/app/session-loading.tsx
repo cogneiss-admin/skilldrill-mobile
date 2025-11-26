@@ -5,7 +5,7 @@ import { StatusBar } from "react-native";
 import { useRouter } from "expo-router";
 import { apiService } from "../services/api";
 import { MotiView } from "moti";
-import { AntDesign } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import SessionManager from "../utils/sessionManager";
 
 const BRAND = "#0A66C2";
@@ -147,7 +147,7 @@ export default function SessionLoadingScreen() {
             shadowRadius: 10,
             elevation: 5
           }}>
-            <AntDesign name="user" size={40} color={BRAND} />
+            <Ionicons name="person-outline" size={40} color={BRAND} />
           </View>
         </MotiView>
 

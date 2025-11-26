@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, Pressable, Animated, Dimensions, StyleSheet } from 'react-native';
-import { AntDesign, Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useResponsive } from '../utils/responsive';
 import * as Haptics from 'expo-haptics';
 
@@ -27,7 +27,7 @@ const TOAST_CONFIG = {
     border: '#A7F3D0',
     text: '#065F46',
     icon: '#059669',
-    iconName: 'checkcircle',
+    iconName: 'checkmark-circle' as const,
     title: 'Success',
   },
   error: {
@@ -35,7 +35,7 @@ const TOAST_CONFIG = {
     border: '#FCA5A5',
     text: '#991B1B',
     icon: '#B91C1C',
-    iconName: 'exclamationcircleo',
+    iconName: 'alert-circle-outline' as const,
     title: 'Error',
   },
   warning: {
@@ -43,7 +43,7 @@ const TOAST_CONFIG = {
     border: '#FCD34D',
     text: '#92400E',
     icon: '#D97706',
-    iconName: 'warning',
+    iconName: 'warning-outline' as const,
     title: 'Warning',
   },
   info: {
@@ -51,10 +51,10 @@ const TOAST_CONFIG = {
     border: '#BFDBFE',
     text: '#1E40AF',
     icon: '#2563EB',
-    iconName: 'infocirlceo',
+    iconName: 'information-circle-outline' as const,
     title: 'Info',
   },
-} as const;
+};
 
 export default function ToastNotification({
   visible,
@@ -184,7 +184,7 @@ export default function ToastNotification({
         <View style={styles.content}>
           {showIcon && (
             <View style={styles.iconContainer}>
-              <AntDesign
+              <Ionicons
                 name={config.iconName}
                 size={responsive.size(20)}
                 color={config.icon}

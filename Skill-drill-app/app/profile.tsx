@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, StatusBar, Modal, FlatList, Image, Pressable, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AntDesign } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { TextInput } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -981,7 +981,7 @@ export default function ProfileScreen() {
       {/* Header - match careerRole/skills layout */}
       <View style={{ paddingVertical: 16, paddingHorizontal: width * 0.06, borderBottomWidth: 1.5, borderBottomColor: '#D1D5DB', marginHorizontal: -(width * 0.06), backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center' }}>
         <TouchableOpacity onPress={() => router.replace('/dashboard')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <AntDesign name="left" size={20} color="#0F172A" />
+          <Ionicons name="chevron-back" size={20} color="#0F172A" />
         </TouchableOpacity>
         <Text style={{ flex: 1, textAlign: 'center', fontSize: width * 0.048, fontWeight: '700', color: '#0F172A', marginRight: 20 }}>Your Profile</Text>
       </View>
@@ -1070,7 +1070,7 @@ export default function ProfileScreen() {
                           ) : (
                             <View style={{ width: 20, height: 14, marginRight: 6, backgroundColor: '#e9ecef', borderRadius: 2 }} />
                           )}
-                          <AntDesign name="down" size={12} color="#6B7280" />
+                          <Ionicons name="chevron-down" size={12} color="#6B7280" />
                         </View>
                       </View>
                     </Pressable>
@@ -1133,7 +1133,7 @@ export default function ProfileScreen() {
                         }}
                         style={styles.cancelButton}
                       >
-                        <AntDesign name="close" size={18} color="#6B7280" />
+                        <Ionicons name="close" size={18} color="#6B7280" />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -1195,7 +1195,7 @@ export default function ProfileScreen() {
               <TouchableOpacity activeOpacity={0.85} onPress={() => setShowCLPicker(true)}>
                 <View style={styles.selectInput}>
                   <Text style={styles.selectValue}>{careerLevelName || 'Select career level'}</Text>
-                  <AntDesign name="down" size={14} color="#6B7280" />
+                  <Ionicons name="chevron-down" size={14} color="#6B7280" />
                 </View>
               </TouchableOpacity>
               <Text style={[styles.warningText, { marginTop: 4 }]}>
@@ -1209,7 +1209,7 @@ export default function ProfileScreen() {
               <TouchableOpacity activeOpacity={0.85} onPress={() => setShowRTPicker(true)}>
                 <View style={styles.selectInput}>
                   <Text style={styles.selectValue}>{roleTypeName || 'Select career role'}</Text>
-                  <AntDesign name="down" size={14} color="#6B7280" />
+                  <Ionicons name="chevron-down" size={14} color="#6B7280" />
                 </View>
               </TouchableOpacity>
             </View>
@@ -1396,7 +1396,7 @@ function PickerModal({ visible, title, items, selectedId, loading, onClose, onSe
           <View style={pickerStyles.modalHeader}>
             <Text style={pickerStyles.modalTitle}>{title}</Text>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <AntDesign name="close" size={20} color="#6B7280" />
+              <Ionicons name="close" size={20} color="#6B7280" />
             </TouchableOpacity>
           </View>
 

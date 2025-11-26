@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AntDesign, Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { BRAND } from '../app/components/Brand';
 
 // Define constants
@@ -53,7 +53,7 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab }) => {
       <View style={styles.bottomNavRow}>
         {/* Home Tab */}
         <TouchableOpacity onPress={() => handleTabPress('home')} style={styles.navButton} activeOpacity={0.85}>
-          <AntDesign name="home" size={22} color={currentActiveTab === 'home' ? BRAND : GRAY} />
+          <Ionicons name="home-outline" size={22} color={currentActiveTab === 'home' ? BRAND : GRAY} />
           <Text style={[TYPOGRAPHY.labelSmall, currentActiveTab === 'home' ? styles.tabLabelActive : styles.tabLabelInactive]}>Home</Text>
         </TouchableOpacity>
 
@@ -65,7 +65,7 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab }) => {
 
         {/* Activity Tab */}
         <TouchableOpacity onPress={() => handleTabPress('activity')} style={styles.navButton} activeOpacity={0.85}>
-          <Ionicons name="time-outline" size={22} color={currentActiveTab === 'activity' ? BRAND : GRAY} />
+          <Ionicons name="checkbox-outline" size={22} color={currentActiveTab === 'activity' ? BRAND : GRAY} />
           <Text style={[TYPOGRAPHY.labelSmall, currentActiveTab === 'activity' ? styles.tabLabelActive : styles.tabLabelInactive]}>Activity</Text>
         </TouchableOpacity>
 

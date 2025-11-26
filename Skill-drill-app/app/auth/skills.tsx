@@ -8,7 +8,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { useAuth } from "../../hooks/useAuth";
 import { apiService } from "../../services/api";
 import { useToast } from "../../hooks/useToast";
-import { AntDesign } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useSkillsData } from "../../hooks/useSkillsData";
 import SkillsSkeleton from "../components/SkillsSkeleton";
 
@@ -447,7 +447,7 @@ export default function SkillsScreen() {
                           <View style={{ position: 'absolute', left: 7.25, width: 20, height: 20, alignItems: 'center', justifyContent: 'center', zIndex: 20 }}>
                             {locked ? (
                               <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#000000', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' }}>
-                                <AntDesign name="lock" size={12} color="#000000" />
+                                <Ionicons name="lock-closed" size={12} color="#000000" />
                               </View>
                             ) : (
                               <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#000000', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' }}>

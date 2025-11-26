@@ -10,7 +10,7 @@ import * as Haptics from "expo-haptics";
 import { isValidEmail } from "../components/validators";
 import { useSocialAuth } from "../../hooks/useSocialAuth";
 import { StatusBar } from "react-native";
-import { AntDesign } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import GoogleGIcon from "../../components/GoogleGIcon";
 import LinkedInIcon from "../../components/LinkedInIcon";
 import CodeBoxes from "../../components/CodeBoxes";
@@ -641,7 +641,7 @@ export default function SignupScreen() {
                     ) : (
                       <View style={{ width: 20, height: 14, marginRight: 6, backgroundColor: '#e9ecef', borderRadius: 2 }} />
                     )}
-                    <AntDesign name="down" size={12} color="#6B7280" />
+                    <Ionicons name="chevron-down" size={12} color="#6B7280" />
                   </View>
                 </View>
               </Pressable>

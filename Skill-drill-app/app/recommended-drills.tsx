@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StatusBar, ActivityIndicator,
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { MotiView } from "moti";
 import { apiService } from "../services/api";
 import { useToast } from "../hooks/useToast";
@@ -364,7 +364,7 @@ const RecommendedDrillsScreen = () => {
     if (error) {
       return (
         <View style={{ alignItems: 'center', paddingVertical: 60 }}>
-          <MaterialCommunityIcons name="alert-circle-outline" size={48} color="#DC2626" />
+          <Ionicons name="alert-circle-outline" size={48} color="#DC2626" />
           <Text style={{ marginTop: 16, color: '#B91C1C', fontWeight: '600' }}>{error}</Text>
           <TouchableOpacity
             onPress={loadRecommendations}
@@ -385,7 +385,7 @@ const RecommendedDrillsScreen = () => {
     if (policyMissing) {
       return (
         <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 80, paddingHorizontal: 24 }}>
-          <MaterialCommunityIcons name="alert-circle-outline" size={56} color="#B91C1C" style={{ marginBottom: 16 }} />
+          <Ionicons name="alert-circle-outline" size={56} color="#B91C1C" style={{ marginBottom: 16 }} />
           <Text style={{ color: '#B91C1C', fontWeight: '700', fontSize: 18, marginBottom: 8, textAlign: 'center' }}>
             No active drill recommendation policy
           </Text>
@@ -412,7 +412,7 @@ const RecommendedDrillsScreen = () => {
     if (!recommendation) {
       return (
         <View style={{ alignItems: 'center', paddingVertical: 60 }}>
-          <MaterialCommunityIcons name="cloud-question" size={52} color="#9CA3AF" />
+          <Ionicons name="help-circle-outline" size={52} color="#9CA3AF" />
           <Text style={{ marginTop: 16, color: '#4B5563', textAlign: 'center' }}>
             We couldn't generate a drill path just yet. Please try again later.
           </Text>
@@ -567,7 +567,7 @@ const RecommendedDrillsScreen = () => {
                     justifyContent: 'center',
                   }}
                 >
-                  <MaterialCommunityIcons name="target-variant" size={28} color={BRAND} />
+                  <Ionicons name="disc-outline" size={28} color={BRAND} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 17, fontWeight: '700', color: '#111827', marginBottom: SPACING.xs }}>{drill.name}</Text>
@@ -603,7 +603,7 @@ const RecommendedDrillsScreen = () => {
 
           {drillItems.length === 0 && (
             <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-              <MaterialCommunityIcons name="clock-fast" size={48} color="#9CA3AF" />
+              <Ionicons name="time-outline" size={48} color="#9CA3AF" />
               <Text style={{ marginTop: 16, color: '#6B7280', textAlign: 'center' }}>
                 Drill scenarios load after your Pro access or drill pack purchase generates an assignment.
               </Text>

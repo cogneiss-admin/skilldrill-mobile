@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { MaterialIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -81,7 +81,7 @@ export const AssessmentCompletionDialog: React.FC<AssessmentCompletionDialogProp
               justifyContent: 'center',
               marginBottom: 16,
             }}>
-              <MaterialIcons name="workspace-premium" size={32} color="#1380EC" />
+              <Ionicons name="ribbon-outline" size={32} color="#1380EC" />
             </View>
 
             {/* Title */}

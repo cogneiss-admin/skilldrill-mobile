@@ -4,7 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { StatusBar } from "react-native";
-import { AntDesign } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import CodeBoxes from "../../components/CodeBoxes";
 
 import { useAuth } from "../../hooks/useAuth";
@@ -221,7 +221,7 @@ export default function OtpScreen() {
             opacity: pressed ? 0.7 : 1
           })}
         >
-          <AntDesign name="left" size={22} color="#111827" />
+          <Ionicons name="chevron-back" size={22} color="#111827" />
         </Pressable>
         <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827", marginLeft: 8 }}>OTP Verification</Text>
       </View>
