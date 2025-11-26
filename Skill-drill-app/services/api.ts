@@ -655,6 +655,14 @@ class ApiService {
     return this.get(`/drills/check-existing?skillId=${skillId}`);
   }
 
+  /**
+   * Get user's recommendations (pending assessments + unpurchased drill packs)
+   */
+  public async getUserRecommendations(): Promise<ApiResponse> {
+    console.log('📋 Fetching user recommendations');
+    return this.get('/user/recommendations');
+  }
+
 }
 
 // Create and export singleton instance

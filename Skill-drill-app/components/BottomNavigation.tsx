@@ -26,6 +26,7 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab }) => {
   const currentActiveTab = activeTab || (() => {
     if (pathname === '/dashboard' || pathname === '/') return 'home';
     if (pathname === '/activity') return 'activity';
+    if (pathname === '/discover') return 'discover';
     if (pathname === '/profile') return 'profile';
     return 'home';
   })();
@@ -37,6 +38,9 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab }) => {
         break;
       case 'activity':
         router.replace('/activity');
+        break;
+      case 'discover':
+        router.replace('/discover');
         break;
       case 'profile':
         router.replace('/profile');
@@ -51,6 +55,12 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab }) => {
         <TouchableOpacity onPress={() => handleTabPress('home')} style={styles.navButton} activeOpacity={0.85}>
           <AntDesign name="home" size={22} color={currentActiveTab === 'home' ? BRAND : GRAY} />
           <Text style={[TYPOGRAPHY.labelSmall, currentActiveTab === 'home' ? styles.tabLabelActive : styles.tabLabelInactive]}>Home</Text>
+        </TouchableOpacity>
+
+        {/* Discover Tab */}
+        <TouchableOpacity onPress={() => handleTabPress('discover')} style={styles.navButton} activeOpacity={0.85}>
+          <Ionicons name="compass" size={22} color={currentActiveTab === 'discover' ? BRAND : GRAY} />
+          <Text style={[TYPOGRAPHY.labelSmall, currentActiveTab === 'discover' ? styles.tabLabelActive : styles.tabLabelInactive]}>Discover</Text>
         </TouchableOpacity>
 
         {/* Activity Tab */}

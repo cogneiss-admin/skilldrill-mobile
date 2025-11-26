@@ -24,6 +24,7 @@ export default function SkillsScreen() {
   const isAddToAssessmentMode = params.mode === 'add-to-assessment';
   const isFromCompleted = params.fromCompleted === 'true';
   const isAddMoreSkillsMode = params.mode === 'add-more-skills';
+  const returnTo = params.returnTo as string;
 
   console.log('🎯 Skills Screen - Assessment Mode:', isAssessmentMode, 'Add-to-Assessment Mode:', isAddToAssessmentMode, 'Add More Skills Mode:', isAddMoreSkillsMode, 'Params:', params);
   
@@ -57,7 +58,7 @@ export default function SkillsScreen() {
       try {
         console.log('🔍 Skills Screen: Checking if user already has skills...');
         console.log('🔍 Add-to-assessment mode:', isAddToAssessmentMode);
-        
+
         // Don't redirect if we're in add-to-assessment mode
         if (isAddToAssessmentMode) {
           console.log('➕ Add-to-assessment mode: Allowing user to add more skills');
@@ -67,6 +68,12 @@ export default function SkillsScreen() {
         // Don't redirect if we're in add-more-skills mode
         if (isAddMoreSkillsMode) {
           console.log('➕ Add-more-skills mode: Allowing user to add more skills');
+          return;
+        }
+
+        // Don't redirect if user came from discover page
+        if (returnTo === 'discover') {
+          console.log('🔍 Came from discover page: Allowing user to explore skills');
           return;
         }
 
@@ -98,7 +105,7 @@ export default function SkillsScreen() {
     };
 
     checkExistingSkills();
-  }, [router, isAddToAssessmentMode, isAddMoreSkillsMode]);
+  }, [router, isAddToAssessmentMode, isAddMoreSkillsMode, returnTo]);
 
   useEffect(() => {
     if (selected) {
@@ -217,13 +224,18 @@ export default function SkillsScreen() {
 
         if (response.success) {
           console.log('✅ Skills added to session successfully');
-          
+
           // Clear persisted selection
           AsyncStorage.removeItem('selectedSkills').catch(console.error);
-          
+
           showToast('success', 'Skills Added!', `${response.data.addedSkills} skill(s) added to your assessment.`);
-          
-          router.replace('/dashboard');
+
+          // Navigate back to discover if returnTo is set
+          if (returnTo === 'discover') {
+            router.replace('/discover');
+          } else {
+            router.replace('/dashboard');
+          }
           return;
         } else {
           console.error('❌ Failed to add skills to session:', response.message);
@@ -289,10 +301,10 @@ export default function SkillsScreen() {
         
         if (response.success) {
           showToast('success', 'Success', 'Skills saved successfully!');
-          
+
           // Clear persisted selection
           AsyncStorage.removeItem('selectedSkills').catch(console.error);
-          
+
           // Only update onboarding step if NOT in assessment mode
           if (!isAssessmentMode) {
             try {
@@ -302,7 +314,12 @@ export default function SkillsScreen() {
             }
           }
 
-          router.replace("/dashboard");
+          // Navigate back to discover if returnTo is set
+          if (returnTo === 'discover') {
+            router.replace('/discover');
+          } else {
+            router.replace('/dashboard');
+          }
         } else {
           showToast('error', 'Save Error', response.message || 'Failed to save skills');
         }

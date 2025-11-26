@@ -191,6 +191,13 @@ const AuthMiddleware = React.memo(({ children }: { children: React.ReactNode }) 
       return;
     }
 
+    // Don't redirect if we're on the discover screen
+    const isDiscoverScreen = segments[0] === 'discover';
+    if (isDiscoverScreen) {
+      console.log('🔍 AuthMiddleware: On discover screen, not redirecting');
+      return;
+    }
+
     // Don't redirect if we're on the profile screen (protected)
     const isProfileScreen = segments[0] === 'profile';
     if (isProfileScreen) {
