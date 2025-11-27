@@ -121,17 +121,24 @@ export const normalizeProgressData = (
   backendData: Record<string, unknown>
 ): AssessmentProgress | null => {
   if (!backendData) return null;
-  
-  // Handle different backend response formats
-  const completedResponses = backendData.completedResponses || 
-                            backendData.responses?.length || 
-                            0;
-  const totalQuestions = backendData.totalQuestions || 
-                        backendData.totalPrompts || 
-                        backendData.total || 
-                        1;
-  
-  return calculateAssessmentProgress(completedResponses, totalQuestions);
+
+  // Use exact field names from backend: currentQuestion, totalQuestions
+  const currentQuestion = Number(backendData.currentQuestion);
+  const totalQuestions = Number(backendData.totalQuestions);
+
+  if (!currentQuestion || !totalQuestions) return null;
+
+  const completedResponses = currentQuestion - 1;
+  const percentage = Math.round((completedResponses / totalQuestions) * 100);
+  const isComplete = completedResponses >= totalQuestions;
+
+  return {
+    currentQuestion,
+    totalQuestions,
+    completedResponses,
+    percentage,
+    isComplete
+  };
 };
 
 // Import safe utilities from mathUtils (single source of truth)

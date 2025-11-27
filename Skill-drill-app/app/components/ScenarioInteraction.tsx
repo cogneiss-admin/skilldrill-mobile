@@ -95,23 +95,21 @@ const ScenarioInteraction: React.FC<ScenarioInteractionProps> = ({
     setUserResponse('');
   };
 
-  const isLastItem = currentIndex === totalItems - 1;
+  const isLastItem = currentIndex !== undefined && totalItems !== undefined && currentIndex === totalItems - 1;
   const canSubmit = userResponse.trim().length > 0 && !submitting;
   const isDrill = type === 'drill';
   const isAssessment = type === 'assessment';
 
-  // Conditional colors and icons
   const headerBgColor = isAssessment ? ASSESSMENT_BRAND : BRAND;
   const buttonColor = isAssessment ? ASSESSMENT_BRAND : BRAND;
-  const backButtonText = isAssessment ? 'Exit' : 'Back';
-  const backButtonIcon = isAssessment ? 'arrow-left' : 'arrow-back';
-  const progressText = isAssessment 
+  const backButtonIcon = 'chevron-back';
+  const progressText = isAssessment
     ? `Question ${currentIndex + 1} of ${totalItems}`
     : subtitle || `Drill ${currentIndex + 1} of ${totalItems}`;
-  const submitButtonText = submitting 
-    ? 'Processing...' 
-    : isLastItem 
-      ? (isAssessment ? 'Complete Assessment' : 'Complete Drill')
+  const submitButtonText = submitting
+    ? 'Processing...'
+    : isLastItem
+      ? (isAssessment ? 'Submit Assessment' : 'Submit Drill')
       : 'Submit & Next';
 
   // Render Header - Same structure for both
@@ -125,17 +123,14 @@ const ScenarioInteraction: React.FC<ScenarioInteractionProps> = ({
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <TouchableOpacity
           onPress={onBack || onExit}
-          style={{ flexDirection: "row", alignItems: "center" }}
+          style={{ width: 40, alignItems: "flex-start" }}
         >
-          <Ionicons name={backButtonIcon} size={20} color="white" style={{ marginRight: 4 }} />
-          <Text style={{ color: "white", fontSize: 16, fontWeight: "500" }}>
-            {backButtonText}
-          </Text>
+          <Ionicons name={backButtonIcon} size={20} color="white" />
         </TouchableOpacity>
-        <Text style={{ color: "white", fontSize: 18, fontWeight: "bold" }}>
+        <Text style={{ color: "white", fontSize: 18, fontWeight: "bold", flex: 1, textAlign: "center" }}>
           {title}
         </Text>
-        <View style={{ width: 80 }} />
+        <View style={{ width: 40 }} />
       </View>
 
       {/* Progress Bar */}
@@ -164,42 +159,91 @@ const ScenarioInteraction: React.FC<ScenarioInteractionProps> = ({
     </View>
   );
 
-  // Render Scenario Card - Same structure (Surface) for both
-  const renderScenarioCard = () => (
+  // Render Unified Content Card
+  const renderContentCard = () => (
     <MotiView
       from={{ opacity: 0, translateY: 20 }}
       animate={{ opacity: 1, translateY: 0 }}
       transition={{ type: 'timing', duration: 600 }}
     >
       <Surface style={{
-        padding: 20,
+        padding: 24,
         borderRadius: 16,
         backgroundColor: 'white',
         elevation: 4,
         marginBottom: 24,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
       }}>
+        {/* Scenario Section */}
+        <Text style={{
+          fontSize: 22,
+          fontWeight: 'bold',
+          color: '#111827',
+          marginBottom: 16,
+          letterSpacing: -0.5,
+        }}>
+          Scenario Question
+        </Text>
+        <Text style={{
+          fontSize: 16,
+          color: '#4B5563',
+          lineHeight: 26,
+          marginBottom: 32,
+        }}>
+          {scenarioText}
+        </Text>
+
+        {/* Response Section */}
         <Text style={{
           fontSize: 16,
           fontWeight: '600',
-          color: '#333',
-          marginBottom: 16,
-          lineHeight: 24,
+          color: '#111827',
+          marginBottom: 12,
         }}>
-          Scenario:
+          Your Response
         </Text>
-        <Text style={{
-          fontSize: 15,
-          color: '#666',
-          lineHeight: 22,
+
+        <View style={{
+          borderWidth: 1,
+          borderColor: '#E5E7EB',
+          borderRadius: 12,
+          backgroundColor: '#F9FAFB',
+          overflow: 'hidden',
         }}>
-          {scenarioText}
+          <TextInput
+            style={{
+              minHeight: 350,
+              padding: 16,
+              fontSize: 16,
+              color: '#111827',
+              textAlignVertical: 'top',
+            }}
+            multiline
+            placeholder="Type your response here..."
+            placeholderTextColor="#9CA3AF"
+            value={userResponse}
+            onChangeText={setUserResponse}
+            maxLength={2400}
+            editable={!submitting}
+          />
+        </View>
+        <Text style={{
+          fontSize: 12,
+          color: '#9CA3AF',
+          textAlign: 'right',
+          marginTop: 8,
+        }}>
+          {userResponse.length}/2400 characters
         </Text>
 
         {isCompleted && (
           <View style={{
             flexDirection: 'row',
             alignItems: 'center',
-            marginTop: 16,
+            marginTop: 24,
             paddingTop: 16,
             borderTopWidth: 1,
             borderTopColor: '#E5E7EB',
@@ -215,60 +259,6 @@ const ScenarioInteraction: React.FC<ScenarioInteractionProps> = ({
             </Text>
           </View>
         )}
-      </Surface>
-    </MotiView>
-  );
-
-  // Render Response Input - Same structure (Surface) for both
-  const renderResponseInput = () => (
-    <MotiView
-      from={{ opacity: 0, translateY: 20 }}
-      animate={{ opacity: 1, translateY: 0 }}
-      transition={{ type: 'timing', duration: 600, delay: 200 }}
-    >
-      <Surface style={{
-        borderRadius: 16,
-        backgroundColor: 'white',
-        elevation: 4,
-        marginBottom: 24,
-      }}>
-        <Text style={{
-          fontSize: 16,
-          fontWeight: '600',
-          color: '#333',
-          padding: 20,
-          paddingBottom: 12,
-        }}>
-          Your Response:
-        </Text>
-
-        <TextInput
-          style={{
-            minHeight: 120,
-            paddingHorizontal: 20,
-            paddingBottom: 20,
-            fontSize: 15,
-            color: '#333',
-            textAlignVertical: 'top',
-          }}
-          multiline
-          placeholder="Type your detailed response here..."
-          placeholderTextColor="#999"
-          value={userResponse}
-          onChangeText={setUserResponse}
-          maxLength={2400}
-          editable={!submitting}
-        />
-
-        <Text style={{
-          fontSize: 12,
-          color: '#999',
-          textAlign: 'right',
-          paddingHorizontal: 20,
-          paddingBottom: 16,
-        }}>
-          {userResponse.length}/2400 characters
-        </Text>
       </Surface>
     </MotiView>
   );
@@ -308,28 +298,7 @@ const ScenarioInteraction: React.FC<ScenarioInteractionProps> = ({
     return null;
   };
 
-  // Render Submit Button - Same structure, different color
-  const renderSubmitButton = () => (
-    <MotiView
-      from={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ type: 'timing', duration: 600, delay: 400 }}
-    >
-      <View style={{ marginBottom: 32 }}>
-        <Button
-          variant="primary"
-          onPress={handleSubmitResponse}
-          loading={submitting}
-          disabled={!canSubmit}
-          style={{
-            marginHorizontal: 16,
-          }}
-        >
-          {submitButtonText}
-        </Button>
-      </View>
-    </MotiView>
-  );
+
 
   const backgroundColor = headerBgColor;
   const statusBarStyle = 'light-content';
@@ -352,14 +321,35 @@ const ScenarioInteraction: React.FC<ScenarioInteractionProps> = ({
           >
             <ScrollView
               style={{ flex: 1 }}
-              contentContainerStyle={{ padding: 16, paddingTop: 24 }}
+              contentContainerStyle={{ padding: 16, paddingTop: 24, paddingBottom: 100 }}
               showsVerticalScrollIndicator={false}
             >
-              {renderScenarioCard()}
-              {renderResponseInput()}
+              {renderContentCard()}
               {renderNavigationButtons()}
-              {renderSubmitButton()}
             </ScrollView>
+
+            {/* Fixed Bottom Button */}
+            <View style={{
+              padding: 16,
+              backgroundColor: 'white',
+              borderTopWidth: 1,
+              borderTopColor: '#E5E7EB',
+            }}>
+              <Button
+                variant="primary"
+                onPress={handleSubmitResponse}
+                loading={submitting}
+                disabled={!canSubmit}
+                fullWidth
+                size="large"
+                style={{
+                  backgroundColor: buttonColor,
+                  borderRadius: 12,
+                }}
+              >
+                {submitButtonText}
+              </Button>
+            </View>
           </LinearGradient>
         </View>
       </KeyboardAvoidingView>

@@ -476,12 +476,12 @@ class ApiService {
   // ADAPTIVE ASSESSMENT METHODS
   // ===========================================
 
-  /**
-   * Start new adaptive assessment session (Sequential)
-   */
   public async startAssessment(skillId: string): Promise<ApiResponse> {
-    console.log('🎯 Starting assessment for skill:', skillId);
     return this.post('/assessment/start', { skillId });
+  }
+
+  public async resumeAssessment(skillId: string): Promise<ApiResponse> {
+    return this.post('/assessment/resume', { skillId });
   }
 
   /**

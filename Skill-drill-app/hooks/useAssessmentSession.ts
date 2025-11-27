@@ -3,7 +3,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiService } from '../services/api';
 import { useToast } from './useToast';
 import { AssessmentProgress } from '../types/assessment';
-import { calculateAssessmentProgress, normalizeProgressData } from '../utils/assessmentUtils';
 
 // Constants
 const ASSESSMENT_SESSION_KEY = 'assessment_session_data';
@@ -40,13 +39,44 @@ export const useAssessmentSession = () => {
       setProgress(null);
       setSkillName(null);
       setUserResponses([]);
-      
+
       // Legacy compatibility
       setAssessmentId(null);
       setQuestions([]);
       setCurrentQuestionIndex(0);
     } catch (error) {
       console.error('❌ Error clearing assessment data:', error);
+    }
+  }, []);
+
+  // Load session data from AsyncStorage (for when session started externally)
+  const loadSessionFromStorage = useCallback(async () => {
+    try {
+      const storedData = await AsyncStorage.getItem(ASSESSMENT_SESSION_KEY);
+      if (storedData) {
+        const data = JSON.parse(storedData);
+        console.log('📦 Loading session from storage:', data.sessionId);
+
+        setSessionId(data.sessionId);
+        setCurrentQuestion(data.currentQuestion);
+        setProgress(data.progress);
+        setSkillName(data.skillName);
+        setIsAssessmentActive(true);
+
+        // Legacy compatibility
+        setAssessmentId(data.sessionId);
+        if (data.currentQuestion) {
+          setQuestions([data.currentQuestion]);
+        }
+        setCurrentQuestionIndex(0);
+        setUserResponses([]);
+
+        return data;
+      }
+      return null;
+    } catch (error) {
+      console.error('❌ Error loading session from storage:', error);
+      return null;
     }
   }, []);
 
@@ -63,11 +93,9 @@ export const useAssessmentSession = () => {
       if (response.success) {
         console.log('✅ Assessment started:', response.data);
         
-        // Set sequential state
         setSessionId(response.data.sessionId);
         setCurrentQuestion(response.data.question);
-        setProgress(normalizeProgressData(response.data.progress) || 
-                   calculateAssessmentProgress(0, response.data.totalQuestions || 1));
+        setProgress(response.data.progress);
         setSkillName(response.data.skillName);
         setIsAssessmentActive(true);
         
@@ -126,9 +154,8 @@ export const useAssessmentSession = () => {
           // Got next question
           console.log('✅ Answer submitted, got next question');
           
-          // Update state with next question
           setCurrentQuestion(response.data.question);
-          setProgress(normalizeProgressData(response.data.progress));
+          setProgress(response.data.progress);
           
           // Legacy compatibility - update questions array
           setQuestions(prev => [...prev, response.data.question]);
@@ -222,6 +249,7 @@ export const useAssessmentSession = () => {
     // Actions
     startAssessmentSession,
     startAdaptiveSession: startAssessmentSession, // Legacy alias for backward compatibility
+    loadSessionFromStorage,
     saveAnswer,
     nextQuestion,
     previousQuestion,

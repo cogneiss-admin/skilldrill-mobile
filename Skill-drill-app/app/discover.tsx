@@ -275,6 +275,15 @@ export default function Discover() {
                   recommendation.type === 'drillPack' && styles.paidDrillCard
                 ]}
                 activeOpacity={0.8}
+                onPress={() => {
+                  if (recommendation.type === 'assessment') {
+                    // Navigate to Activity screen with assessments tab
+                    router.push({ pathname: '/activity', params: { tab: 'assessments' } });
+                  } else {
+                    // Navigate to Activity screen with drills tab
+                    router.push({ pathname: '/activity', params: { tab: 'drills' } });
+                  }
+                }}
               >
                 <View style={styles.skillIconContainer}>
                   <Text style={styles.skillInitials}>{getInitials(recommendation.skillName)}</Text>

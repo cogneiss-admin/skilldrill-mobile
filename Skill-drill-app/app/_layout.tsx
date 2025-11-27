@@ -7,6 +7,8 @@ import { View, Animated as RNAnimated } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Provider as PaperProvider, MD3LightTheme } from "react-native-paper";
 import { Provider as ReduxProvider } from "react-redux";
+import { useFonts } from "expo-font";
+import { Ionicons } from "@expo/vector-icons";
 import { store } from "../store";
 import { useAuth } from "../hooks/useAuth";
 import ToastContainer from "../components/ToastContainer";
@@ -259,6 +261,11 @@ const RootLayout = React.memo(() => {
   const segments = useSegments();
   const [routeOverlayVisible, setRouteOverlayVisible] = useState(false);
   const { toasts, dismissToast } = useToast();
+
+  // Load Ionicons font to prevent "?" rendering
+  const [fontsLoaded] = useFonts({
+    ...Ionicons.font,
+  });
 
   // Initialize SessionManager when app starts
   useEffect(() => {
