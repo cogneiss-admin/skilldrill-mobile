@@ -34,10 +34,6 @@ const AssessmentScenariosRoute = () => {
   const parsedQuestion = parseJsonParam(params.question);
   const parsedProgress = parseJsonParam(params.progress);
 
-  console.log('🔍 AssessmentScenarios Params:', params);
-  console.log('✅ Parsed Question:', parsedQuestion);
-  console.log('✅ Parsed Progress:', parsedProgress);
-
   return (
     <AssessmentScreen
       mode="questions"

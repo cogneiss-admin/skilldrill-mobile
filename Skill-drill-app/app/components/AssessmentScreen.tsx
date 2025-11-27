@@ -9,11 +9,13 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { View, Text, Alert } from "react-native";
+import { View, Text, Alert, Modal, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
+import { BlurView } from 'expo-blur';
+import LottieView from 'lottie-react-native';
 
 import { useAssessmentSession } from "../../hooks/useAssessmentSession";
 import { useToast } from "../../hooks/useToast";
@@ -22,6 +24,8 @@ import { apiService } from "../../services/api";
 import ScenarioInteraction from './ScenarioInteraction';
 import Results from './Results';
 import AssessmentCompletionDialog from './AssessmentCompletionDialog';
+
+const AI_LOADING_ANIMATION = require('../../assets/lottie/AiLoadingAnime.json');
 
 const BRAND = "#0A66C2";
 
@@ -63,6 +67,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   const [assessmentResults, setAssessmentResults] = useState(null);
   const [isLoadingResults, setIsLoadingResults] = useState(false);
   const [completedSessionId, setCompletedSessionId] = useState<string | null>(null);
+  const [showAiLoader, setShowAiLoader] = useState(false);
 
   // ==================== RESULTS MODE STATE ====================
   const [parsedResults, setParsedResults] = useState<any>(null);
@@ -133,14 +138,18 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
       return;
     }
 
+    // Hide completion dialog and show AI loader
+    setShowCompletionDialog(false);
+    setShowAiLoader(true);
     setIsLoadingResults(true);
+
     try {
       const targetSessionId = completedSessionId || currentSessionId;
       const response = await apiService.getAdaptiveResults(targetSessionId);
 
       if (response.success) {
         setAssessmentResults(response.data);
-        setShowCompletionDialog(false);
+        setShowAiLoader(false);
 
         if (onComplete) {
           onComplete(response.data);
@@ -155,9 +164,11 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
           });
         }
       } else {
+        setShowAiLoader(false);
         showToast('error', 'Error', 'Failed to load assessment results');
       }
     } catch (error) {
+      setShowAiLoader(false);
       showToast('error', 'Error', 'Failed to load assessment results');
     } finally {
       setIsLoadingResults(false);
@@ -266,6 +277,30 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
           onContinueNext={handleContinueNext}
           isLoadingResults={isLoadingResults}
         />
+
+        {/* AI Loader Modal for Results Generation */}
+        <Modal
+          visible={showAiLoader}
+          transparent
+          animationType="fade"
+          statusBarTranslucent
+        >
+          <BlurView intensity={100} tint="dark" style={styles.blurContainer}>
+            <View style={styles.aiLoaderContent}>
+              <View style={styles.aiAnimationContainer}>
+                <LottieView
+                  source={AI_LOADING_ANIMATION}
+                  autoPlay
+                  loop
+                  style={styles.aiAnimation}
+                />
+              </View>
+              <Text style={styles.aiLoaderTitle}>
+                Generating your results for {skillName}
+              </Text>
+            </View>
+          </BlurView>
+        </Modal>
       </>
     );
   }
@@ -298,5 +333,38 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
 
   return null;
 };
+
+const styles = StyleSheet.create({
+  blurContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  aiLoaderContent: {
+    alignItems: 'center',
+    padding: 32,
+  },
+  aiAnimationContainer: {
+    width: 200,
+    height: 200,
+    marginBottom: 24,
+  },
+  aiAnimation: {
+    width: '100%',
+    height: '100%',
+  },
+  aiLoaderTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  aiLoaderSubtitle: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+  },
+});
 
 export default AssessmentScreen;

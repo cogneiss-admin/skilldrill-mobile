@@ -20,6 +20,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from "expo-linear-gradient";
 import { MotiView } from "moti";
+import LottieView from "lottie-react-native";
 import Button from '../../components/Button';
 import {
   BRAND,
@@ -54,6 +55,27 @@ const ASSESSMENT_BRAND = "#0A66C2";
 
 // Golden Star Rating Component (Assessment only)
 const GoldenStarRating = ({ score }: { score: number }) => {
+  const [showAnimation, setShowAnimation] = React.useState(true);
+  const lottieRef = React.useRef<LottieView>(null);
+
+  React.useEffect(() => {
+    // Play full animation (0-60 frames) as an intro
+    // The animation is approx 2 seconds (60 frames / 30fps)
+    const playTimer = setTimeout(() => {
+      lottieRef.current?.play(0, 60);
+    }, 100);
+
+    // Switch to static stars showing actual score after animation completes
+    const switchTimer = setTimeout(() => {
+      setShowAnimation(false);
+    }, 2100); // Slightly longer than 2s to ensure full playback
+
+    return () => {
+      clearTimeout(playTimer);
+      clearTimeout(switchTimer);
+    };
+  }, []);
+
   const convertScoreToStars = (score: number) => {
     if (score >= 9.0) return 5;
     if (score >= 7.0) return 4;
@@ -65,26 +87,53 @@ const GoldenStarRating = ({ score }: { score: number }) => {
   const stars = convertScoreToStars(score);
 
   return (
-    <View style={{ alignItems: 'center', marginVertical: 24 }}>
+    <View style={{ alignItems: 'center', marginVertical: 12 }}>
       <Text style={{
         fontSize: 16,
         color: '#111827',
         fontWeight: '600',
         textAlign: 'center',
-        marginBottom: 16,
+        marginBottom: 8,
       }}>
         Your Score
       </Text>
-      <View style={{ flexDirection: 'row' }}>
-        {Array.from({ length: 5 }).map((_, index) => (
-          <Ionicons
-            key={index}
-            name={index < stars ? "star" : "star-outline"}
-            size={32}
-            color={index < stars ? "#FFD700" : "#E0E0E0"}
-            style={{ marginHorizontal: 2 }}
+
+      <View style={{ height: 80, justifyContent: 'center', alignItems: 'center' }}>
+        {showAnimation ? (
+          <LottieView
+            ref={lottieRef}
+            source={require('../../assets/lottie/StarRatingAnime.json')}
+            loop={false}
+            style={{
+              width: 300,
+              height: 300,
+            }}
+            resizeMode="contain"
           />
-        ))}
+        ) : (
+          <MotiView
+            from={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: 'spring' }}
+            style={{ flexDirection: 'row' }}
+          >
+            {Array.from({ length: 5 }).map((_, index) => (
+              <Ionicons
+                key={index}
+                name={index < stars ? "star" : "star-outline"}
+                size={48} // Increased size
+                color={index < stars ? "#FFD700" : "#E0E0E0"}
+                style={{
+                  marginHorizontal: 4,
+                  // Add shadow for "glowing" effect
+                  textShadowColor: index < stars ? 'rgba(255, 215, 0, 0.5)' : 'transparent',
+                  textShadowOffset: { width: 0, height: 0 },
+                  textShadowRadius: 10
+                }}
+              />
+            ))}
+          </MotiView>
+        )}
       </View>
     </View>
   );
@@ -135,6 +184,7 @@ const Results: React.FC<ResultsProps> = ({
       <StatusBar barStyle="dark-content" />
 
       {/* Header */}
+      {/* Header */}
       <View style={{
         paddingHorizontal: 16,
         paddingVertical: 12,
@@ -152,21 +202,22 @@ const Results: React.FC<ResultsProps> = ({
             height: 40,
             alignItems: 'center',
             justifyContent: 'center',
+            zIndex: 10,
           }}
         >
-          <Ionicons name="chevron-back" size={24} color="#374151" />
+          <Ionicons name="chevron-back" size={24} color="#111827" />
         </TouchableOpacity>
 
-        <Text style={{
-          fontSize: 18,
-          fontWeight: '600',
-          color: '#111827',
-          flex: 1,
-          textAlign: 'center',
-          marginHorizontal: 16,
-        }}>
-          {title || 'Assessment Result'}
-        </Text>
+        <View style={{ position: 'absolute', left: 0, right: 0, alignItems: 'center' }}>
+          <Text style={{
+            fontSize: 20, // Slightly smaller than 28 but bigger than 18 to fit centered
+            fontWeight: '700',
+            color: '#111827',
+            textAlign: 'center',
+          }}>
+            {title || 'Assessment Result'}
+          </Text>
+        </View>
 
         <View style={{ width: 40 }} />
       </View>
@@ -181,7 +232,7 @@ const Results: React.FC<ResultsProps> = ({
         <View style={{
           backgroundColor: '#FFFFFF',
           borderRadius: 16,
-          padding: 24,
+          padding: 16, // Reduced from 24
           marginBottom: 16,
           alignItems: 'center',
           shadowColor: '#000',
@@ -190,36 +241,57 @@ const Results: React.FC<ResultsProps> = ({
           shadowRadius: 8,
           elevation: 2,
         }}>
-          {/* Trophy Icon */}
+          {/* Trophy Animation with Celebration */}
           <View style={{
-            width: 80,
-            height: 80,
-            borderRadius: 40,
-            backgroundColor: '#FEF3C7',
+            width: 140, // Reduced from 180
+            height: 140, // Reduced from 180
             alignItems: 'center',
             justifyContent: 'center',
-            marginBottom: 24,
+            marginBottom: 8, // Reduced from 16
+            overflow: 'visible',
           }}>
-            <Ionicons name="trophy" size={40} color="#F59E0B" />
+            {/* Celebration Animation (background) */}
+            <LottieView
+              source={require('../../assets/lottie/CelebrationAnime.json')}
+              autoPlay
+              loop={false}
+              style={{
+                position: 'absolute',
+                width: 240, // Reduced from 300
+                height: 240, // Reduced from 300
+                zIndex: 1,
+              }}
+            />
+            {/* Trophy Animation (foreground) */}
+            <LottieView
+              source={require('../../assets/lottie/TrophyAnime.json')}
+              autoPlay
+              loop={false}
+              style={{
+                width: 120, // Reduced from 160
+                height: 120, // Reduced from 160
+                zIndex: 0,
+              }}
+            />
           </View>
 
           {/* Congratulations Text */}
           <Text style={{
-            fontSize: 28,
+            fontSize: 24, // Reduced from 28
             fontWeight: 'bold',
             color: '#111827',
             textAlign: 'center',
-            marginBottom: 12,
+            marginBottom: 4, // Reduced from 12
           }}>
             Congratulations!
           </Text>
 
           {/* Completion Text */}
           <Text style={{
-            fontSize: 16,
+            fontSize: 14, // Reduced from 16
             color: '#6B7280',
             textAlign: 'center',
-            marginBottom: 8,
+            marginBottom: 4, // Reduced from 8
           }}>
             {completionText || "You've completed the assessment"}
           </Text>
@@ -263,10 +335,9 @@ const Results: React.FC<ResultsProps> = ({
             elevation: 2,
           }}>
             <Text style={{
-              fontSize: 16,
+              fontSize: 18,
               color: '#111827',
-              fontWeight: '600',
-              textAlign: 'center',
+              fontWeight: '700',
               marginBottom: 20,
             }}>
               Assessment Feedback
@@ -275,60 +346,100 @@ const Results: React.FC<ResultsProps> = ({
             {/* What You Did Well */}
             {feedbackGood && (
               <View style={{ marginBottom: 16 }}>
+                <View style={{ marginBottom: 8 }}>
+                  <Text style={{
+                    fontSize: 12,
+                    color: '#4B5563',
+                    fontWeight: '700',
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                  }}>
+                    What You Did Well
+                  </Text>
+                  <View style={{
+                    height: 2,
+                    width: 40,
+                    backgroundColor: '#22C55E',
+                    marginTop: 4,
+                    borderRadius: 1
+                  }} />
+                </View>
                 <Text style={{
                   fontSize: 14,
-                  color: '#059669',
-                  fontWeight: '600',
-                  marginBottom: 8,
-                }}>
-                  ✅ What You Did Well
-                </Text>
-                <Text style={{
-                  fontSize: 14,
-                  color: '#4B5563',
-                  lineHeight: 20,
+                  color: '#1F2937',
+                  lineHeight: 22,
                 }}>
                   {feedbackGood}
                 </Text>
               </View>
             )}
 
+            {/* Divider */}
+            {(feedbackGood && (feedbackImprove || feedbackSummary)) && (
+              <View style={{ height: 1, backgroundColor: '#E5E7EB', marginVertical: 16 }} />
+            )}
+
             {/* Areas for Improvement */}
             {feedbackImprove && (
               <View style={{ marginBottom: 16 }}>
+                <View style={{ marginBottom: 8 }}>
+                  <Text style={{
+                    fontSize: 12,
+                    color: '#4B5563',
+                    fontWeight: '700',
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                  }}>
+                    Areas for Improvement
+                  </Text>
+                  <View style={{
+                    height: 2,
+                    width: 40,
+                    backgroundColor: '#22C55E',
+                    marginTop: 4,
+                    borderRadius: 1
+                  }} />
+                </View>
                 <Text style={{
                   fontSize: 14,
-                  color: '#DC2626',
-                  fontWeight: '600',
-                  marginBottom: 8,
-                }}>
-                  🎯 Areas for Improvement
-                </Text>
-                <Text style={{
-                  fontSize: 14,
-                  color: '#4B5563',
-                  lineHeight: 20,
+                  color: '#1F2937',
+                  lineHeight: 22,
                 }}>
                   {feedbackImprove}
                 </Text>
               </View>
             )}
 
+            {/* Divider */}
+            {(feedbackImprove && feedbackSummary) && (
+              <View style={{ height: 1, backgroundColor: '#E5E7EB', marginVertical: 16 }} />
+            )}
+
             {/* Overall Summary */}
             {feedbackSummary && (
               <View>
+                <View style={{ marginBottom: 8 }}>
+                  <Text style={{
+                    fontSize: 12,
+                    color: '#4B5563',
+                    fontWeight: '700',
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                  }}>
+                    Overall Assessment
+                  </Text>
+                  <View style={{
+                    height: 2,
+                    width: 40,
+                    backgroundColor: '#22C55E',
+                    marginTop: 4,
+                    borderRadius: 1
+                  }} />
+                </View>
                 <Text style={{
                   fontSize: 14,
                   color: '#1F2937',
-                  fontWeight: '600',
-                  marginBottom: 8,
-                }}>
-                  📝 Overall Assessment
-                </Text>
-                <Text style={{
-                  fontSize: 14,
-                  color: '#4B5563',
-                  lineHeight: 20,
+                  lineHeight: 22,
                 }}>
                   {feedbackSummary}
                 </Text>
@@ -410,22 +521,43 @@ const Results: React.FC<ResultsProps> = ({
               alignItems: 'center',
             }}
           >
-            {/* Trophy Icon */}
+            {/* Trophy Animation with Celebration */}
             <MotiView
-              from={{ scale: 0, rotate: '-180deg' }}
-              animate={{ scale: 1, rotate: '0deg' }}
+              from={{ scale: 0 }}
+              animate={{ scale: 1 }}
               transition={{ type: 'spring', delay: 200 }}
               style={{
-                width: 100,
-                height: 100,
-                borderRadius: BORDER_RADIUS.full,
-                backgroundColor: COLORS.white,
+                width: 160,
+                height: 160,
                 alignItems: 'center',
                 justifyContent: 'center',
                 marginBottom: SPACING.lg,
+                overflow: 'visible',
               }}
             >
-              <Ionicons name="trophy" size={64} color={COLORS.warning} />
+              {/* Celebration Animation (background) */}
+              <LottieView
+                source={require('../../assets/lottie/CelebrationAnime.json')}
+                autoPlay
+                loop={false}
+                style={{
+                  position: 'absolute',
+                  width: 280,
+                  height: 280,
+                  zIndex: 1,
+                }}
+              />
+              {/* Trophy Animation (foreground) */}
+              <LottieView
+                source={require('../../assets/lottie/TrophyAnime.json')}
+                autoPlay
+                loop={false}
+                style={{
+                  width: 140,
+                  height: 140,
+                  zIndex: 0,
+                }}
+              />
             </MotiView>
 
             {/* Milestone Title */}

@@ -156,10 +156,8 @@ export default function Activity() {
 
     try {
       const response = await apiService.resumeAssessment(skillId);
-      console.log('🔍 Resume Assessment Response:', JSON.stringify(response, null, 2));
 
       if (response.success && response.data) {
-        console.log('✅ Resume Data:', response.data);
         setShowAiLoader(false);
         router.push({
           pathname: '/assessmentScenarios',
