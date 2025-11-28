@@ -7,6 +7,7 @@ export interface ActivityCardProps {
     type: 'assessment' | 'drill';
     data: {
         id: string;
+        skillId?: string; // For drill recommendations - needed for subscription screen
         skillName: string;
         // Assessment statuses: NOT_STARTED, IN_PROGRESS, COMPLETED
         // Drill statuses: Active, Completed, NOT_STARTED (locked)
@@ -17,7 +18,7 @@ export interface ActivityCardProps {
             percentage: number;
         };
         startedAt?: string; // ISO date string - when assessment was started
-        assessmentId?: string; // For navigating to results (completed assessments)
+        assessmentId?: string; // For navigating to results (completed assessments) or linking after purchase
         // Drill-specific fields
         score?: {
             average?: number;
@@ -26,8 +27,9 @@ export interface ActivityCardProps {
             amount: number;
             currency: string;
         };
+        drillCount?: number; // Number of drills in the pack (for recommendations)
     };
-    onAction: (action: 'start' | 'resume' | 'view_results' | 'unlock', id: string, assessmentId?: string) => void;
+    onAction: (action: 'start' | 'resume' | 'view_results' | 'unlock', id: string, assessmentId?: string, skillName?: string) => void;
 }
 
 // Helper to format date as "Nov 25, 2025"
@@ -142,13 +144,13 @@ export default function ActivityCard({ type, data, onAction }: ActivityCardProps
                     </View>
 
                     <View style={styles.lockedContent}>
-                        <Text style={styles.drillCountText}>5 Drills</Text>
-                        <Text style={styles.priceText}>${data.pricing?.amount || '4.99'}</Text>
+                        <Text style={styles.drillCountText}>{data.drillCount} Drills</Text>
+                        <Text style={styles.priceText}>${data.pricing?.amount}</Text>
                     </View>
 
                     <TouchableOpacity
                         style={styles.unlockButton}
-                        onPress={() => onAction('unlock', data.id)}
+                        onPress={() => onAction('unlock', data.id, data.assessmentId, data.skillName)}
                     >
                         <Text style={styles.unlockButtonText}>Unlock Drills</Text>
                     </TouchableOpacity>

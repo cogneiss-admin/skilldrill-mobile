@@ -80,14 +80,17 @@ export default function Activity() {
         setAssessments(mappedAssessments);
       }
 
-      // --- DRILLS: Fetch drill assignments ---
+      // --- DRILLS: Fetch drill assignments (purchased/active drills) ---
       const assignmentsResponse = await apiService.getDrillAssignments();
 
+      let allDrills: ActivityCardProps['data'][] = [];
+
       if (assignmentsResponse.success && assignmentsResponse.data?.assignments) {
-        const mappedDrills: ActivityCardProps['data'][] = assignmentsResponse.data.assignments.map((assignment: any) => ({
+        const mappedAssignments: ActivityCardProps['data'][] = assignmentsResponse.data.assignments.map((assignment: any) => ({
           id: assignment.id,
           skillName: assignment.skillName,
-          status: assignment.status === 'COMPLETED' ? 'Completed' : 'Active',
+          // Fix status mapping - backend returns 'Completed', 'InProgress', 'Pending'
+          status: (assignment.status === 'Completed' || assignment.status === 'COMPLETED') ? 'Completed' : 'Active',
           progress: {
             current: assignment.completed,
             total: assignment.total,
@@ -98,8 +101,30 @@ export default function Activity() {
           } : undefined
         }));
 
-        setDrills(mappedDrills);
+        allDrills = [...mappedAssignments];
       }
+
+      // --- DRILLS: Fetch recommended drills (unpurchased) ---
+      const recommendationsResponse = await apiService.getUserRecommendations();
+
+      if (recommendationsResponse.success && recommendationsResponse.data?.unpurchasedDrills) {
+        const mappedRecommendations: ActivityCardProps['data'][] = recommendationsResponse.data.unpurchasedDrills.map((rec: any) => ({
+          id: rec.recommendationId,
+          skillId: rec.skillId, // Need skillId for subscription screen
+          skillName: rec.skillName,
+          status: 'NOT_STARTED' as const,
+          pricing: {
+            amount: rec.price || 4.99,
+            currency: rec.currency || 'USD'
+          },
+          assessmentId: rec.assessmentId, // For linking after purchase
+          drillCount: rec.drillCount // Number of drills in the pack
+        }));
+
+        allDrills = [...allDrills, ...mappedRecommendations];
+      }
+
+      setDrills(allDrills);
 
     } catch (error) {
       console.error('Error loading activity data:', error);
@@ -178,25 +203,88 @@ export default function Activity() {
     }
   };
 
+  // Drill handlers - similar to assessment but navigates to drillsScenarios
+  const handleStartDrill = async (assignmentId: string, skillName: string) => {
+    setLoadingSkillName(skillName);
+    setIsResuming(false);
+    setShowAiLoader(true);
+
+    try {
+      // Navigate to drillsScenarios - useDrillProgress hook will handle session creation
+      setShowAiLoader(false);
+      router.push({
+        pathname: '/drillsScenarios',
+        params: { assignmentId }
+      });
+    } catch (error: any) {
+      setShowAiLoader(false);
+      showError(error.message || 'Failed to start drills');
+    }
+  };
+
+  const handleResumeDrill = async (assignmentId: string, skillName: string) => {
+    setLoadingSkillName(skillName);
+    setIsResuming(true);
+    setShowAiLoader(true);
+
+    try {
+      // Navigate to drillsScenarios - useDrillProgress hook will handle session resume
+      setShowAiLoader(false);
+      router.push({
+        pathname: '/drillsScenarios',
+        params: { assignmentId }
+      });
+    } catch (error: any) {
+      setShowAiLoader(false);
+      showError(error.message || 'Failed to resume drills');
+    }
+  };
+
   const handleAction = async (action: 'start' | 'resume' | 'view_results' | 'unlock', id: string, assessmentId?: string, skillName?: string) => {
     const skill = assessments.find(a => a.id === id);
-    const derivedSkillName = skillName || skill?.skillName || 'Assessment';
+    const drill = drills.find(d => d.id === id);
+    const isDrill = !!drill;
+    const derivedSkillName = skillName || skill?.skillName || drill?.skillName || 'Activity';
 
     switch (action) {
       case 'start':
-        handleStartAssessment(id, derivedSkillName);
+        if (isDrill) {
+          handleStartDrill(id, derivedSkillName);
+        } else {
+          handleStartAssessment(id, derivedSkillName);
+        }
         break;
       case 'resume':
-        handleResumeAssessment(id, derivedSkillName);
+        if (isDrill) {
+          handleResumeDrill(id, derivedSkillName);
+        } else {
+          handleResumeAssessment(id, derivedSkillName);
+        }
         break;
       case 'view_results':
         setLoadingResults(true);
         try {
-          if (assessmentId) {
+          if (isDrill) {
+            // Fetch drill aggregate data for results
+            const aggregateResponse = await apiService.getDrillAggregate(id);
+            if (aggregateResponse.success && aggregateResponse.data) {
+              const aggregate = aggregateResponse.data;
+              router.push({
+                pathname: '/drillsResults',
+                params: {
+                  assignmentId: id,
+                  percentage: String(drill?.progress?.percentage || 100),
+                  averageScore: String(aggregate.averageScore || 0),
+                  attemptsCount: String(aggregate.attemptsCount || 0)
+                }
+              });
+            } else {
+              showError('Failed to load drill results');
+            }
+          } else if (assessmentId) {
             // Fetch assessment results
             const response = await apiService.getAdaptiveResults(assessmentId);
             if (response.success) {
-              // Navigate to assessment results with fetched data
               router.push({
                 pathname: '/assessmentResults',
                 params: {
@@ -212,15 +300,6 @@ export default function Activity() {
             } else {
               showError('Failed to load results');
             }
-          } else {
-            // Navigate to drill results (drills seem to handle their own loading or use different params)
-            // For now, keeping existing behavior for drills but with delay if needed, or just push
-            // If drills need fetching, we should do it here too, but based on DrillsScreen it takes params directly.
-            // Assuming drillsResults route handles it or we need to fetch drill results here too?
-            // DrillsResultsRoute takes percentage, averageScore etc.
-            // But here we only have assignmentId.
-            // Let's just push for now as the user specifically mentioned "See Results" which usually implies Assessment.
-            router.push({ pathname: '/drillsResults', params: { assignmentId: id } });
           }
         } catch (error) {
           console.error('Failed to load results:', error);
@@ -230,7 +309,16 @@ export default function Activity() {
         }
         break;
       case 'unlock':
-        router.push({ pathname: '/subscriptionScreen', params: { recommendationId: id } });
+        // For unlock, id is recommendationId, get drill data for skillId and drillCount
+        router.push({
+          pathname: '/subscriptionScreen',
+          params: {
+            recommendationId: id,
+            skillId: drill?.skillId,
+            assessmentId: drill?.assessmentId,
+            drillCount: drill?.drillCount ? String(drill.drillCount) : undefined
+          }
+        });
         break;
     }
   };

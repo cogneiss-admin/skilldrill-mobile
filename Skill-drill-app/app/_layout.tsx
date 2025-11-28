@@ -186,6 +186,13 @@ const AuthMiddleware = React.memo(({ children }: { children: React.ReactNode }) 
       return;
     }
 
+    // Don't redirect if we're on the subscription screen
+    const isSubscriptionScreen = segments[0] === 'subscriptionScreen';
+    if (isSubscriptionScreen) {
+      console.log('💳 AuthMiddleware: On subscription screen, not redirecting');
+      return;
+    }
+
     // Don't redirect if we're on the activity screen
     const isActivityScreen = segments[0] === 'activity';
     if (isActivityScreen) {

@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import LottieView from 'lottie-react-native';
 import { useAuth } from '../hooks/useAuth';
 import DashboardShimmer from './components/DashboardShimmer';
@@ -22,7 +23,8 @@ const DASH_ANIME_LOTTIE = require('../assets/lottie/DashAnime.json');
 
 export default function Dashboard() {
   const { user, isLoading: authLoading } = useAuth();
-  
+  const router = useRouter();
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [hasDrills, setHasDrills] = useState<boolean>(false);
@@ -85,12 +87,26 @@ export default function Dashboard() {
     }
 
     try {
-      const response = await apiService.getDrillAssignments({ limit: 1 });
-      if (response.success && response.data?.data && Array.isArray(response.data.data)) {
-        setHasDrills(response.data.data.length > 0);
-      } else {
-        setHasDrills(false);
+      // Check for purchased/assigned drills
+      const assignmentsResponse = await apiService.getDrillAssignments({ limit: 1 });
+      const hasAssignments = assignmentsResponse.success &&
+        assignmentsResponse.data?.assignments &&
+        Array.isArray(assignmentsResponse.data.assignments) &&
+        assignmentsResponse.data.assignments.length > 0;
+
+      if (hasAssignments) {
+        setHasDrills(true);
+        return;
       }
+
+      // Also check for recommended drills (unpurchased)
+      const recommendationsResponse = await apiService.getUserRecommendations();
+      const hasRecommendations = recommendationsResponse.success &&
+        recommendationsResponse.data?.unpurchasedDrills &&
+        Array.isArray(recommendationsResponse.data.unpurchasedDrills) &&
+        recommendationsResponse.data.unpurchasedDrills.length > 0;
+
+      setHasDrills(hasRecommendations);
     } catch (error) {
       setHasDrills(false);
     }
@@ -387,6 +403,7 @@ export default function Dashboard() {
             <TouchableOpacity
               style={styles.quickActionButton}
               activeOpacity={0.8}
+              onPress={() => router.push({ pathname: '/activity', params: { tab: 'assessments' } })}
             >
               <Ionicons name="document-text" size={24} color={COLORS.white} style={styles.quickActionIcon} />
               <Text style={styles.quickActionButtonText} numberOfLines={2}>New Assessment</Text>
@@ -395,15 +412,16 @@ export default function Dashboard() {
               <TouchableOpacity
                 style={styles.quickActionButton}
                 activeOpacity={0.8}
+                onPress={() => router.push({ pathname: '/activity', params: { tab: 'drills' } })}
               >
-                <Ionicons 
-                  name="sparkles" 
-                  size={24} 
-                  color={COLORS.white} 
-                  style={styles.quickActionIcon} 
+                <Ionicons
+                  name="sparkles"
+                  size={24}
+                  color={COLORS.white}
+                  style={styles.quickActionIcon}
                 />
-                <Text 
-                  style={styles.quickActionButtonText} 
+                <Text
+                  style={styles.quickActionButtonText}
                   numberOfLines={2}
                 >
                   Practice Drills
