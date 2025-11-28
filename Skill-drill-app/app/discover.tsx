@@ -341,7 +341,11 @@ export default function Discover() {
             <Text style={styles.premiumDescription}>
               Get unlimited access to all drills, advanced analytics, and personalized feedback with Premium.
             </Text>
-            <TouchableOpacity style={styles.premiumButton} activeOpacity={0.8}>
+            <TouchableOpacity
+              style={styles.premiumButton}
+              activeOpacity={0.8}
+              onPress={() => router.push({ pathname: '/subscriptionScreen', params: { mode: 'subscription' } })}
+            >
               <Text style={styles.premiumButtonText}>Upgrade to Premium</Text>
             </TouchableOpacity>
           </LinearGradient>

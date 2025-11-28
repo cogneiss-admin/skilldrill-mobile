@@ -67,6 +67,7 @@ interface ButtonProps {
   iconPosition?: 'left' | 'right';
   fullWidth?: boolean;
   style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
   testID?: string;
 }
 
@@ -81,6 +82,7 @@ const Button: React.FC<ButtonProps> = ({
   iconPosition = 'left',
   fullWidth = false,
   style,
+  textStyle: textStyleProp,
   testID
 }) => {
   // Size configurations
@@ -252,7 +254,7 @@ const Button: React.FC<ButtonProps> = ({
             />
           )}
 
-          <Text style={textStyle} numberOfLines={1}>
+          <Text style={[textStyle, textStyleProp]} numberOfLines={1}>
             {children}
           </Text>
 

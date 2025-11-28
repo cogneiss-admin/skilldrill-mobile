@@ -96,7 +96,7 @@ function WelcomeScreen({ onGetStarted }: { onGetStarted: () => void }) {
               ))}
             </View>
             <View className="mt-8" />
-            <Button variant="primary" onPress={onGetStarted} size="large" style={{ borderRadius: 28, backgroundColor: "#ffffff", shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 8 }}>
+            <Button variant="primary" onPress={onGetStarted} size="large" style={{ borderRadius: 28, backgroundColor: "#ffffff", shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 8 }} textStyle={{ color: "#000000" }}>
               Get Started
             </Button>
           </View>

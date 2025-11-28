@@ -291,7 +291,7 @@ const WelcomeScreen = React.memo(({ onGetStarted }: { onGetStarted: () => void }
               variant="primary"
               onPress={onGetStarted}
               size="large"
-              style={{ 
+              style={{
                 borderRadius: 28,
                 backgroundColor: "#ffffff",
                 shadowColor: "#000",
@@ -300,6 +300,7 @@ const WelcomeScreen = React.memo(({ onGetStarted }: { onGetStarted: () => void }
                 shadowRadius: 12,
                 elevation: 8,
               }}
+              textStyle={{ color: "#000000" }}
             >
               Get Started
             </Button>

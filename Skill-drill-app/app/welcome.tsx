@@ -251,7 +251,7 @@ export default function WelcomeScreen() {
                 variant="primary"
                 onPress={handleGetStarted}
                 size="large"
-                style={{ 
+                style={{
                   borderRadius: responsive.button.borderRadius,
                   backgroundColor: "#ffffff",
                   shadowColor: "#000",
@@ -261,6 +261,7 @@ export default function WelcomeScreen() {
                   elevation: 12,
                   paddingHorizontal: responsive.button.paddingHorizontal,
                 }}
+                textStyle={{ color: "#000000" }}
               >
                 🚀 Start Your Journey
               </Button>

@@ -12,9 +12,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSkillsData } from "../../hooks/useSkillsData";
 import SkillsSkeleton from "../components/SkillsSkeleton";
 
-import { BRAND, PADDING } from "../components/Brand";
+import { BRAND, SCREEN_BACKGROUND, COLORS, BORDER_RADIUS } from "../components/Brand";
 import { Dimensions } from 'react-native';
-const { width } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 
 
@@ -334,7 +334,7 @@ export default function SkillsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.white }}>
         <StatusBar barStyle="dark-content" />
         <SkillsSkeleton />
       </SafeAreaView>
@@ -342,21 +342,21 @@ export default function SkillsScreen() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.white }}>
       <StatusBar barStyle="dark-content" />
 
       {/* Header with divider */}
-      <View style={{ paddingVertical: 16, paddingHorizontal: width * 0.06, borderBottomWidth: 1.5, borderBottomColor: '#D1D5DB', marginHorizontal: -(width * 0.06) }}>
-        <Text style={{ textAlign: 'center', fontSize: width * 0.048, fontWeight: '700', color: '#0F172A' }}>
+      <View style={{ paddingVertical: SCREEN_WIDTH * 0.04, paddingHorizontal: SCREEN_WIDTH * 0.06, borderBottomWidth: 1.5, borderBottomColor: COLORS.border.medium, marginHorizontal: -(SCREEN_WIDTH * 0.06) }}>
+        <Text style={{ textAlign: 'center', fontSize: SCREEN_WIDTH * 0.048, fontWeight: '700', color: COLORS.gray[900] }}>
               {isAddToAssessmentMode ? 'Add More Skills' : isAddMoreSkillsMode ? 'Add More Skills' : 'Select Your Skills'}
             </Text>
       </View>
 
       {/* Body */}
-      <View style={{ flex: 1, backgroundColor: '#F3F4F6', marginHorizontal: -(width * 0.06), paddingHorizontal: width * 0.06 }}>
-          <ScrollView contentContainerStyle={{ paddingBottom: 100, paddingHorizontal: width * 0.06, maxWidth: 560, width: '100%', alignSelf: 'center', paddingTop: 16 }} showsVerticalScrollIndicator={false}>
-            <Text style={{ fontSize: 14, color: '#4B5563', marginBottom: 4 }}>Choose the skills you want to assess and improve</Text>
-            <Text style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>{isAddToAssessmentMode
+      <View style={{ flex: 1, backgroundColor: SCREEN_BACKGROUND, marginHorizontal: -(SCREEN_WIDTH * 0.06), paddingHorizontal: SCREEN_WIDTH * 0.06 }}>
+          <ScrollView contentContainerStyle={{ paddingBottom: 100, paddingHorizontal: SCREEN_WIDTH * 0.06, maxWidth: 560, width: '100%', alignSelf: 'center', paddingTop: 16 }} showsVerticalScrollIndicator={false}>
+            <Text style={{ fontSize: 14, color: COLORS.text.secondary, marginBottom: 4 }}>Choose the skills you want to assess and improve</Text>
+            <Text style={{ fontSize: 13, color: COLORS.text.tertiary, marginBottom: 16 }}>{isAddToAssessmentMode
                 ? (selected.length > 0 ? `${selected.length} skill${selected.length !== 1 ? 's' : ''} will be added to assessment` : 'Select additional skills to add')
                 : isAddMoreSkillsMode
                 ? (selected.length > 0 ? `${selected.length} skill${selected.length !== 1 ? 's' : ''} will be added to your profile` : 'Select additional skills to add')
@@ -367,9 +367,9 @@ export default function SkillsScreen() {
             {(() => { try { console.log('🔎 Render keys:', { tiers: tiers.map(t=>t.key), skillsTierKeys: Object.keys(skillsByTier) }); } catch {} return null; })()}
             <View ref={timelineContainerRef} style={{ position: 'relative' }}>
               {timelineEndY != null ? (
-                <View style={{ position: 'absolute', left: 16, top: 14, height: Math.max(0, timelineEndY - 14), width: 2.5, backgroundColor: '#000000', zIndex: 10 }} />
+                <View style={{ position: 'absolute', left: 16, top: 14, height: Math.max(0, timelineEndY - 14), width: 2.5, backgroundColor: COLORS.black, zIndex: 10 }} />
               ) : (
-                <View style={{ position: 'absolute', left: 16, top: 14, bottom: 0, width: 2.5, backgroundColor: '#000000', zIndex: 10 }} />
+                <View style={{ position: 'absolute', left: 16, top: 14, bottom: 0, width: 2.5, backgroundColor: COLORS.black, zIndex: 10 }} />
               )}
             {tiers.map((t, tierIdx) => [t.key, skillsByTier[t.key] || [], t.name, tierIdx] as const).map(([tierKey, tierSkills, tierName, tierIdx]) => {
               const isLastTier = tierIdx === tiers.length - 1;
@@ -396,14 +396,14 @@ export default function SkillsScreen() {
                   } : undefined}
                 >
                   {/* Tier header with connector */}
-                  <View 
+                  <View
                     style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}
                   >
                     {/* Spacer to align connector start with vertical line center (17.25px) */}
                     <View style={{ width: 17.25 }} />
                     {/* Horizontal connector starting from vertical line center */}
-                    <View style={{ width: 18, height: 2.5, backgroundColor: '#000000', marginRight: 8, zIndex: 10 }} />
-                    <Text style={{ fontSize: 18, fontWeight: '700', color: '#0F172A' }}>{tierName}</Text>
+                    <View style={{ width: 18, height: 2.5, backgroundColor: COLORS.black, marginRight: 8, zIndex: 10 }} />
+                    <Text style={{ fontSize: 18, fontWeight: '700', color: COLORS.gray[900] }}>{tierName}</Text>
                   </View>
 
                   {/* Skills list (empty allowed) */}
@@ -446,11 +446,11 @@ export default function SkillsScreen() {
                           {/* Circle: 20px wide, needs center at 17.25px, so left edge at 17.25 - 10 = 7.25px */}
                           <View style={{ position: 'absolute', left: 7.25, width: 20, height: 20, alignItems: 'center', justifyContent: 'center', zIndex: 20 }}>
                             {locked ? (
-                              <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#000000', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' }}>
-                                <Ionicons name="lock-closed" size={12} color="#000000" />
+                              <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: COLORS.black, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.white }}>
+                                <Ionicons name="lock-closed" size={12} color={COLORS.black} />
                               </View>
                             ) : (
-                              <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#000000', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' }}>
+                              <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: COLORS.black, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.white }}>
                                 {isSelected ? <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: BRAND }} /> : null}
                               </View>
                             )}
@@ -462,20 +462,20 @@ export default function SkillsScreen() {
                           <View
                             style={{
                               flex: 1,
-                              backgroundColor: locked ? '#F9FAFB' : (isSelected ? '#E6F2FF' : '#FFFFFF'),
-                              borderRadius: 14,
+                              backgroundColor: locked ? COLORS.gray[50] : (isSelected ? '#E6F2FF' : COLORS.white),
+                              borderRadius: BORDER_RADIUS.lg,
                               paddingVertical: 12,
                               paddingHorizontal: 14,
                               borderWidth: 1,
-                              borderColor: locked ? '#E5E7EB' : (isSelected ? BRAND : '#E5E7EB')
+                              borderColor: locked ? COLORS.border.light : (isSelected ? BRAND : COLORS.border.light)
                             }}
                             onStartShouldSetResponder={() => !locked}
                             onResponderRelease={() => { if (!locked) handleToggleSkill(skill.id); }}
                           >
-                            <Text style={{ fontSize: 16, fontWeight: '700', color: locked ? '#9CA3AF' : '#111827' }} numberOfLines={1}>
+                            <Text style={{ fontSize: 16, fontWeight: '700', color: locked ? COLORS.text.disabled : COLORS.gray[900] }} numberOfLines={1}>
                               {skill.name}
                             </Text>
-                            <Text style={{ marginTop: 4, fontSize: 12, color: locked ? '#9CA3AF' : '#6B7280' }} numberOfLines={1}>
+                            <Text style={{ marginTop: 4, fontSize: 12, color: locked ? COLORS.text.disabled : COLORS.text.tertiary }} numberOfLines={1}>
                               {skill?.category || ''}
                             </Text>
                           </View>
@@ -493,13 +493,13 @@ export default function SkillsScreen() {
             <View style={{
               backgroundColor: "#FEF2F2",
               borderLeftWidth: 4,
-              borderLeftColor: "#DC2626",
+              borderLeftColor: COLORS.errorDark,
                 padding: 16,
-                borderRadius: 8,
+                borderRadius: BORDER_RADIUS.md,
                 marginTop: 16
             }}>
               <Text style={{
-                color: "#DC2626",
+                color: COLORS.errorDark,
                   fontSize: 14,
                 fontWeight: "500"
               }}>
@@ -509,16 +509,16 @@ export default function SkillsScreen() {
         )}
 
           </ScrollView>
-          
+
           {/* Sticky footer CTA */}
-          <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: width * 0.06, paddingTop: 12, paddingBottom: 12, zIndex: 1000, backgroundColor: "#ffffff", borderTopWidth: 1, borderTopColor: '#D1D5DB' }}>
+          <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: SCREEN_WIDTH * 0.06, paddingTop: 12, paddingBottom: 12, zIndex: 1000, backgroundColor: COLORS.white, borderTopWidth: 1, borderTopColor: COLORS.border.medium }}>
             <TouchableOpacity
               onPress={handleContinue}
               activeOpacity={0.85}
               disabled={!canContinue || busy}
-              style={{ backgroundColor: BRAND, borderRadius: 22, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, marginHorizontal: 6, opacity: (!canContinue || busy) ? 0.6 : 1 }}
+              style={{ backgroundColor: BRAND, borderRadius: BORDER_RADIUS['2xl'], alignItems: 'center', justifyContent: 'center', paddingVertical: 12, marginHorizontal: 6, opacity: (!canContinue || busy) ? 0.6 : 1 }}
             >
-              <Text style={{ color: '#fff', fontSize: width * 0.038, fontWeight: '600' }}>Continue</Text>
+              <Text style={{ color: COLORS.white, fontSize: SCREEN_WIDTH * 0.038, fontWeight: '600' }}>Continue</Text>
             </TouchableOpacity>
         </View>
       </View>

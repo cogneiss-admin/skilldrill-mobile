@@ -8,8 +8,8 @@ import { Ionicons } from "@expo/vector-icons";
 import CodeBoxes from "../../components/CodeBoxes";
 
 import { useAuth } from "../../hooks/useAuth";
-
-const BRAND = "#0A66C2";
+import { useResponsive } from "../../utils/responsive";
+import { BRAND, SCREEN_BACKGROUND, COLORS, BORDER_RADIUS, SPACING } from "../components/Brand";
 
 function useCountdown(initialSeconds: number) {
   const [remaining, setRemaining] = useState(initialSeconds);
@@ -26,6 +26,7 @@ function useCountdown(initialSeconds: number) {
 export default function OtpScreen() {
   console.log('🎯 OTP Screen loaded!');
   const router = useRouter();
+  const responsive = useResponsive();
   const { phone, email } = useLocalSearchParams<{ phone?: string; email?: string }>();
   const { verifyOtp: verifyOtpFromAuth } = useAuth();
   
@@ -193,12 +194,12 @@ export default function OtpScreen() {
   }, [remaining, contactInfo, isEmail, reset, setTo]);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#ffffff" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: SCREEN_BACKGROUND }}>
       <StatusBar barStyle="dark-content" />
 
       {/* Header */}
-      <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingVertical: 12 }}>
-        <Pressable 
+      <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: responsive.padding.xs, paddingVertical: responsive.padding.sm }}>
+        <Pressable
           onPress={() => {
             console.log('🔙 Back button pressed, attempting to go back...');
             try {
@@ -211,33 +212,33 @@ export default function OtpScreen() {
               console.log('🔄 Falling back to login screen...');
               router.replace('/auth/login');
             }
-          }} 
-          hitSlop={12} 
+          }}
+          hitSlop={12}
           style={({ pressed }) => ({
-            padding: 8, 
-            marginRight: 12,
-            backgroundColor: pressed ? '#e5e7eb' : '#f3f4f6',
-            borderRadius: 8,
+            padding: responsive.padding.xs,
+            marginRight: responsive.margin.sm,
+            backgroundColor: pressed ? COLORS.gray[200] : COLORS.gray[100],
+            borderRadius: BORDER_RADIUS.md,
             opacity: pressed ? 0.7 : 1
           })}
         >
-          <Ionicons name="chevron-back" size={22} color="#111827" />
+          <Ionicons name="chevron-back" size={responsive.size(22)} color={COLORS.gray[900]} />
         </Pressable>
-        <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827", marginLeft: 8 }}>OTP Verification</Text>
+        <Text style={{ fontSize: responsive.typography.h3, fontWeight: "700", color: COLORS.gray[900], marginLeft: responsive.margin.xs }}>OTP Verification</Text>
       </View>
 
       <KeyboardAvoidingView behavior={Platform.select({ ios: "padding", android: undefined })} style={{ flex: 1 }}>
-        <View style={{ flex: 1, paddingHorizontal: 24 }}>
+        <View style={{ flex: 1, paddingHorizontal: responsive.padding.lg }}>
           {/* Info */}
-          <View style={{ alignItems: "center", marginTop: 24 }}>
-            <Text style={{ fontSize: 16, color: "#374151", textAlign: "center" }}>
+          <View style={{ alignItems: "center", marginTop: responsive.margin.lg }}>
+            <Text style={{ fontSize: responsive.typography.body1, color: COLORS.text.secondary, textAlign: "center" }}>
               We have sent a verification code to
             </Text>
-            <Text style={{ marginTop: 8, fontSize: 18, fontWeight: "800", color: "#111827" }}>{masked}</Text>
+            <Text style={{ marginTop: responsive.margin.xs, fontSize: responsive.typography.h4, fontWeight: "800", color: COLORS.gray[900] }}>{masked}</Text>
           </View>
 
           {/* OTP boxes */}
-          <View style={{ marginTop: 28 }}>
+          <View style={{ marginTop: responsive.margin.xl }}>
             <CodeBoxes
               length={6}
               value={digits}
@@ -248,24 +249,24 @@ export default function OtpScreen() {
                   if (errorMessage) setErrorMessage("");
                 }
               }}
-              color={verified ? "#16A34A" : "#0A66C2"}
+              color={verified ? COLORS.successDark : BRAND}
               error={!!errorMessage}
               focusIndex={focusIndex}
             />
             {errorMessage ? (
-              <Text style={{ color: "#DC2626", marginTop: 10, textAlign: "center", fontWeight: "700" }}>{errorMessage}</Text>
+              <Text style={{ color: COLORS.errorDark, marginTop: responsive.spacing(10), textAlign: "center", fontWeight: "700" }}>{errorMessage}</Text>
             ) : verified ? (
-              <Text style={{ color: "#16A34A", marginTop: 10, textAlign: "center", fontWeight: "700" }}>OTP verified! Redirecting…</Text>
+              <Text style={{ color: COLORS.successDark, marginTop: responsive.spacing(10), textAlign: "center", fontWeight: "700" }}>OTP verified! Redirecting…</Text>
             ) : null}
           </View>
 
           {/* Resend */}
-          <View style={{ alignItems: "center", marginTop: 24 }}>
-            <Text style={{ fontSize: 15, color: "#6B7280", fontWeight: '700' }}>
+          <View style={{ alignItems: "center", marginTop: responsive.margin.lg }}>
+            <Text style={{ fontSize: responsive.typography.body2, color: COLORS.text.tertiary, fontWeight: '700' }}>
               Didn&apos;t get the OTP?{" "}
               <Text
                 onPress={resend}
-                style={{ color: remaining > 0 ? "#9CA3AF" : BRAND, fontWeight: "700" }}
+                style={{ color: remaining > 0 ? COLORS.text.disabled : BRAND, fontWeight: "700" }}
               >
                 {remaining > 0
                   ? `Resend ${isEmail ? 'email' : 'SMS'} in ${
@@ -282,8 +283,8 @@ export default function OtpScreen() {
         </View>
 
         {/* Bottom link */}
-        <Pressable onPress={() => router.replace("/auth/login")} style={{ alignItems: "center", paddingVertical: 24 }}>
-          <Text style={{ color: "#E23744", fontSize: 15, fontWeight: "700" }}>Go back to login methods</Text>
+        <Pressable onPress={() => router.replace("/auth/login")} style={{ alignItems: "center", paddingVertical: responsive.padding.lg }}>
+          <Text style={{ color: COLORS.error, fontSize: responsive.typography.body2, fontWeight: "700" }}>Go back to login methods</Text>
         </Pressable>
       </KeyboardAvoidingView>
     </SafeAreaView>

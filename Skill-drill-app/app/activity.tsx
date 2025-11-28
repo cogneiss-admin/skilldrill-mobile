@@ -108,18 +108,20 @@ export default function Activity() {
       const recommendationsResponse = await apiService.getUserRecommendations();
 
       if (recommendationsResponse.success && recommendationsResponse.data?.unpurchasedDrills) {
-        const mappedRecommendations: ActivityCardProps['data'][] = recommendationsResponse.data.unpurchasedDrills.map((rec: any) => ({
-          id: rec.recommendationId,
-          skillId: rec.skillId, // Need skillId for subscription screen
-          skillName: rec.skillName,
-          status: 'NOT_STARTED' as const,
-          pricing: {
-            amount: rec.price || 4.99,
-            currency: rec.currency || 'USD'
-          },
-          assessmentId: rec.assessmentId, // For linking after purchase
-          drillCount: rec.drillCount // Number of drills in the pack
-        }));
+        const mappedRecommendations: ActivityCardProps['data'][] = recommendationsResponse.data.unpurchasedDrills
+          .filter((rec: any) => rec.price && rec.currency && rec.drillCount)
+          .map((rec: any) => ({
+            id: rec.recommendationId,
+            skillId: rec.skillId,
+            skillName: rec.skillName,
+            status: 'NOT_STARTED' as const,
+            pricing: {
+              amount: rec.price,
+              currency: rec.currency
+            },
+            assessmentId: rec.assessmentId,
+            drillCount: rec.drillCount
+          }));
 
         allDrills = [...allDrills, ...mappedRecommendations];
       }
@@ -309,14 +311,19 @@ export default function Activity() {
         }
         break;
       case 'unlock':
-        // For unlock, id is recommendationId, get drill data for skillId and drillCount
+        if (!drill?.skillId || !drill?.pricing?.amount || !drill?.pricing?.currency || !drill?.drillCount) {
+          showError('Unable to load pricing information. Please try again.');
+          return;
+        }
         router.push({
           pathname: '/subscriptionScreen',
           params: {
             recommendationId: id,
-            skillId: drill?.skillId,
-            assessmentId: drill?.assessmentId,
-            drillCount: drill?.drillCount ? String(drill.drillCount) : undefined
+            skillId: drill.skillId,
+            assessmentId: drill.assessmentId,
+            drillCount: String(drill.drillCount),
+            price: String(drill.pricing.amount),
+            currency: drill.pricing.currency
           }
         });
         break;
@@ -497,7 +504,7 @@ export default function Activity() {
         <View style={styles.blurContainer}>
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#FFFFFF" />
-            <Text style={[styles.loadingText, { color: '#FFFFFF', marginTop: 16 }]}>Fetching Results...</Text>
+            <Text style={[styles.loadingText, { color: '#FFFFFF', marginTop: SCREEN_WIDTH * 0.04 }]}>Fetching Results...</Text>
           </View>
         </View>
       </Modal>
@@ -515,42 +522,42 @@ const styles = StyleSheet.create({
     backgroundColor: SCREEN_BACKGROUND,
   },
   scrollContent: {
-    paddingBottom: 60,
+    paddingBottom: SCREEN_WIDTH * 0.15,
     flexGrow: 1,
   },
   header: {
     backgroundColor: COLORS.white,
-    paddingTop: SPACING.padding.lg,
-    paddingBottom: SPACING.padding.md,
-    paddingHorizontal: SPACING.padding.lg,
+    paddingTop: SCREEN_WIDTH * 0.05,
+    paddingBottom: SCREEN_WIDTH * 0.04,
+    paddingHorizontal: SCREEN_WIDTH * 0.06,
     borderBottomWidth: 1,
-    borderBottomColor: '#D0D0D0',
+    borderBottomColor: COLORS.gray[300],
   },
   headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.padding.md,
+    marginBottom: SCREEN_WIDTH * 0.04,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: SCREEN_WIDTH * 0.07,
     fontWeight: '700',
     color: COLORS.text.primary,
     letterSpacing: 0.3,
   },
   notificationButton: {
-    padding: SPACING.xs,
+    padding: SCREEN_WIDTH * 0.015,
   },
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: '#F1F5F9', // Light gray background for the tab container
+    backgroundColor: COLORS.gray[100],
     borderRadius: BORDER_RADIUS.lg,
-    padding: 4,
-    marginTop: SPACING.padding.xs,
+    padding: SCREEN_WIDTH * 0.01,
+    marginTop: SCREEN_WIDTH * 0.02,
   },
   tabButton: {
     flex: 1,
-    paddingVertical: SPACING.padding.sm,
+    paddingVertical: SCREEN_WIDTH * 0.03,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: BORDER_RADIUS.md,
@@ -564,7 +571,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   tabText: {
-    fontSize: TYPOGRAPHY.fontSize.md,
+    fontSize: SCREEN_WIDTH * 0.04,
     fontWeight: '500',
     color: COLORS.text.secondary,
   },
@@ -574,17 +581,17 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingTop: SPACING.padding.lg,
+    paddingTop: SCREEN_WIDTH * 0.05,
   },
   listContainer: {
-    paddingHorizontal: SPACING.padding.lg,
+    paddingHorizontal: SCREEN_WIDTH * 0.06,
   },
   sectionHeader: {
-    marginTop: SPACING.padding.md,
-    marginBottom: SPACING.padding.md,
+    marginTop: SCREEN_WIDTH * 0.04,
+    marginBottom: SCREEN_WIDTH * 0.04,
   },
   sectionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontSize: SCREEN_WIDTH * 0.045,
     fontWeight: '700',
     color: COLORS.text.primary,
   },
@@ -592,26 +599,26 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: SPACING.padding.xl,
+    padding: SCREEN_WIDTH * 0.06,
   },
   loadingText: {
-    marginTop: SPACING.sm,
-    fontSize: TYPOGRAPHY.fontSize.md,
+    marginTop: SCREEN_WIDTH * 0.025,
+    fontSize: SCREEN_WIDTH * 0.04,
     color: COLORS.text.tertiary,
   },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: SPACING.padding.xl,
-    marginTop: SPACING.padding.xl,
+    padding: SCREEN_WIDTH * 0.06,
+    marginTop: SCREEN_WIDTH * 0.06,
   },
   emptyStateText: {
-    fontSize: TYPOGRAPHY.fontSize.md,
+    fontSize: SCREEN_WIDTH * 0.04,
     color: COLORS.text.tertiary,
-    marginBottom: SPACING.sm,
+    marginBottom: SCREEN_WIDTH * 0.025,
   },
   emptyStateLink: {
-    fontSize: TYPOGRAPHY.fontSize.md,
+    fontSize: SCREEN_WIDTH * 0.04,
     fontWeight: '700',
     color: BRAND,
   },
@@ -620,16 +627,16 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.8)', // Darker overlay to hide background content
+    backgroundColor: 'rgba(0,0,0,0.8)',
   },
   aiLoaderContent: {
     alignItems: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: SCREEN_WIDTH * 0.08,
     width: '100%',
     backgroundColor: 'transparent',
   },
   aiAnimationContainer: {
-    width: SCREEN_WIDTH * 0.8, // Enlarged loader
+    width: SCREEN_WIDTH * 0.8,
     height: SCREEN_WIDTH * 0.8,
     justifyContent: 'center',
     alignItems: 'center',
@@ -641,22 +648,22 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   aiLoaderTitle: {
-    fontSize: 24,
+    fontSize: SCREEN_WIDTH * 0.06,
     fontWeight: '700',
     color: '#FFFFFF',
     textAlign: 'center',
-    marginTop: 20,
+    marginTop: SCREEN_WIDTH * 0.05,
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
   },
   aiLoaderSubtitle: {
-    fontSize: 16,
+    fontSize: SCREEN_WIDTH * 0.04,
     color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'center',
-    marginTop: 12,
-    lineHeight: 24,
-    paddingHorizontal: 20,
+    marginTop: SCREEN_WIDTH * 0.03,
+    lineHeight: SCREEN_WIDTH * 0.06,
+    paddingHorizontal: SCREEN_WIDTH * 0.05,
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,

@@ -14,7 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import GoogleGIcon from "../../components/GoogleGIcon";
 import LinkedInIcon from "../../components/LinkedInIcon";
 import CodeBoxes from "../../components/CodeBoxes";
-import { BRAND, LOGO_SRC } from "../components/Brand";
+import { BRAND, LOGO_SRC, SCREEN_BACKGROUND, COLORS, BORDER_RADIUS, SPACING } from "../components/Brand";
 import { useResponsive } from "../../utils/responsive";
 import CountryPickerModal from "../components/CountryPickerModal";
 import { useCountries, getConvertedFlagUrl } from "../../hooks/useCountries";
@@ -553,20 +553,20 @@ export default function SignupScreen() {
         />
       </View>
 
-      {/* Bottom half - White form section with square top edges */}
-      <View style={{ flex: 1, backgroundColor: "#ffffff", borderTopLeftRadius: 0, borderTopRightRadius: 0, marginTop: -20 }}>
+      {/* Bottom half - Form section */}
+      <View style={{ flex: 1, backgroundColor: SCREEN_BACKGROUND, borderTopLeftRadius: 0, borderTopRightRadius: 0, marginTop: -20 }}>
         <ScrollView
           contentContainerStyle={{ paddingTop: 16, paddingHorizontal: 24, paddingBottom: 20, alignItems: "center", maxWidth: 560, width: '100%', alignSelf: 'center' }}
           showsVerticalScrollIndicator={false}
         >
           {/* Heading */}
-          <View style={{ width: "100%", alignItems: "center", marginBottom: 8 }}>
-            <Text style={{ fontSize: 28, fontWeight: "700", color: "#1a1a1a", marginBottom: 8 }}>Create your account</Text>
-            <Text style={{ fontSize: 16, color: "#666666", marginBottom: 24, textAlign: "center" }}>Enter your name and email or phone number</Text>
+          <View style={{ width: "100%", alignItems: "center", marginBottom: responsive.spacing(8) }}>
+            <Text style={{ fontSize: responsive.typography.h2, fontWeight: "700", color: COLORS.text.primary, marginBottom: responsive.spacing(8) }}>Create your account</Text>
+            <Text style={{ fontSize: responsive.typography.body1, color: COLORS.text.tertiary, marginBottom: responsive.spacing(24), textAlign: "center" }}>Enter your name and email or phone number</Text>
           </View>
 
           {/* Name */}
-          <View style={{ width: "100%", marginBottom: 12 }}>
+          <View style={{ width: "100%", marginBottom: responsive.spacing(12) }}>
             <TextInput
               mode="outlined"
               label="Full Name"
@@ -574,18 +574,18 @@ export default function SignupScreen() {
               value={name}
               onChangeText={setName}
               autoCapitalize="words"
-              style={{ backgroundColor: "#f8f9fa", height: responsive.input.height }}
-              textColor="#333333"
-              placeholderTextColor="#999999"
-              outlineColor="#e9ecef"
+              style={{ backgroundColor: COLORS.white, height: responsive.input.height }}
+              textColor={COLORS.text.secondary}
+              placeholderTextColor={COLORS.text.disabled}
+              outlineColor={COLORS.border.light}
               activeOutlineColor={BRAND}
               contentStyle={{ fontSize: responsive.input.fontSize, fontWeight: '700', paddingVertical: 0 }}
-              theme={{ colors: { onSurfaceVariant: '#666666' }, roundness: 12 }}
+              theme={{ colors: { onSurfaceVariant: COLORS.text.tertiary }, roundness: BORDER_RADIUS.lg }}
             />
           </View>
 
           {/* Email */}
-          <View style={{ width: "100%", marginBottom: 12 }}>
+          <View style={{ width: "100%", marginBottom: responsive.spacing(12) }}>
             <TextInput
               mode="outlined"
               label="Email"
@@ -596,52 +596,52 @@ export default function SignupScreen() {
               textContentType="emailAddress"
               value={email}
               onChangeText={setEmail}
-              style={{ backgroundColor: "#f8f9fa", height: responsive.input.height }}
-              textColor="#333333"
-              placeholderTextColor="#999999"
-              outlineColor="#e9ecef"
+              style={{ backgroundColor: COLORS.white, height: responsive.input.height }}
+              textColor={COLORS.text.secondary}
+              placeholderTextColor={COLORS.text.disabled}
+              outlineColor={COLORS.border.light}
               activeOutlineColor={BRAND}
               contentStyle={{ fontSize: responsive.input.fontSize, fontWeight: '700', paddingVertical: 0 }}
-              theme={{ colors: { onSurfaceVariant: '#666666' }, roundness: 12 }}
+              theme={{ colors: { onSurfaceVariant: COLORS.text.tertiary }, roundness: BORDER_RADIUS.lg }}
               right={undefined}
             />
           </View>
 
           {/* Phone Number with International Picker */}
-          <View style={{ width: "100%", marginBottom: 12 }}>
-            <Text style={{ 
-              fontSize: 14, 
-              color: "#666666", 
-              marginBottom: 8,
+          <View style={{ width: "100%", marginBottom: responsive.spacing(12) }}>
+            <Text style={{
+              fontSize: responsive.typography.body2,
+              color: COLORS.text.tertiary,
+              marginBottom: responsive.spacing(8),
               fontWeight: "500"
             }}>
               Phone Number
             </Text>
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <Pressable 
+            <View style={{ flexDirection: 'row', gap: responsive.spacing(12) }}>
+              <Pressable
                 onPress={() => setCountryPickerVisible(true)}
                 style={{ width: 60 }}
               >
                 <View style={{
-                  backgroundColor: '#f8f9fa',
+                  backgroundColor: COLORS.white,
                   borderWidth: 1,
-                  borderColor: '#e9ecef',
-                  borderRadius: 12,
+                  borderColor: COLORS.border.light,
+                  borderRadius: BORDER_RADIUS.lg,
                   height: responsive.input.height,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  paddingHorizontal: 8
+                  paddingHorizontal: SPACING.xs
                 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     {selectedPhoneCountry.flag ? (
-                      <Image 
+                      <Image
                         source={{ uri: getConvertedFlagUrl(selectedPhoneCountry.flag) }}
-                        style={{ width: 18, height: 12, marginRight: 6 }}
+                        style={{ width: 18, height: 12, marginRight: SPACING.xs }}
                       />
                     ) : (
-                      <View style={{ width: 20, height: 14, marginRight: 6, backgroundColor: '#e9ecef', borderRadius: 2 }} />
+                      <View style={{ width: 20, height: 14, marginRight: SPACING.xs, backgroundColor: COLORS.border.light, borderRadius: BORDER_RADIUS.sm }} />
                     )}
-                    <Ionicons name="chevron-down" size={12} color="#6B7280" />
+                    <Ionicons name="chevron-down" size={12} color={COLORS.text.tertiary} />
                   </View>
                 </View>
               </Pressable>
@@ -654,13 +654,13 @@ export default function SignupScreen() {
                 keyboardType="phone-pad"
                 maxLength={15}
                 style={{
-                  backgroundColor: '#f8f9fa',
+                  backgroundColor: COLORS.white,
                   height: responsive.input.height,
                   flex: 1
                 }}
-                textColor="#333333"
-                placeholderTextColor="#999999"
-                outlineColor="#e9ecef"
+                textColor={COLORS.text.secondary}
+                placeholderTextColor={COLORS.text.disabled}
+                outlineColor={COLORS.border.light}
                 activeOutlineColor={BRAND}
                 contentStyle={{
                   paddingVertical: 0,
@@ -669,11 +669,11 @@ export default function SignupScreen() {
                   textAlignVertical: 'center'
                 }}
                 theme={{
-                  colors: { onSurfaceVariant: '#666666' },
-                  roundness: 12,
+                  colors: { onSurfaceVariant: COLORS.text.tertiary },
+                  roundness: BORDER_RADIUS.lg,
                 }}
                 left={<TextInput.Icon icon={() => (
-                  <Text style={{ color: '#111827', fontWeight: '700', fontSize: responsive.input.fontSize }}>
+                  <Text style={{ color: COLORS.gray[900], fontWeight: '700', fontSize: responsive.input.fontSize }}>
                     {`${selectedPhoneCountry.phoneCode} `}
                   </Text>
                 )} />}
@@ -682,24 +682,24 @@ export default function SignupScreen() {
           </View>
 
           {/* Country of Residence */}
-          <View style={{ width: "100%", marginBottom: 12 }}>
-            <Text style={{ 
-              fontSize: 14, 
-              color: "#666666", 
-              marginBottom: 8,
+          <View style={{ width: "100%", marginBottom: responsive.spacing(12) }}>
+            <Text style={{
+              fontSize: responsive.typography.body2,
+              color: COLORS.text.tertiary,
+              marginBottom: responsive.spacing(8),
               fontWeight: "500"
             }}>
               Country of Residence
             </Text>
-            <Pressable 
+            <Pressable
               style={{
-                backgroundColor: "#f8f9fa",
+                backgroundColor: COLORS.white,
                 borderWidth: 1,
-                borderColor: "#e9ecef",
-                borderRadius: 12,
-                minHeight: 56,
+                borderColor: COLORS.border.light,
+                borderRadius: BORDER_RADIUS.lg,
+                minHeight: responsive.input.height,
                 justifyContent: 'center',
-                paddingHorizontal: 16,
+                paddingHorizontal: responsive.padding.md,
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'space-between'
@@ -707,19 +707,19 @@ export default function SignupScreen() {
               onPress={() => setResidencePickerVisible(true)}
             >
               <Text style={{
-                fontSize: 16,
-                color: "#333333"
+                fontSize: responsive.typography.body1,
+                color: COLORS.text.secondary
               }}>
                 {selectedResidenceCountryData?.name || "Select Country"}
               </Text>
-              <Text style={{ fontSize: 12, color: "#999999" }}>▼</Text>
+              <Text style={{ fontSize: responsive.typography.caption, color: COLORS.text.disabled }}>▼</Text>
             </Pressable>
           </View>
 
           {/* Contact method validation message */}
           {!emailOk && !phoneOk && (email.trim() || formattedPhoneNumber.trim()) && (
-            <View style={{ width: "100%", marginTop: 2, marginBottom: 8 }}>
-              <Text style={{ color: "#DC2626", fontSize: 13, fontWeight: '700' }}>
+            <View style={{ width: "100%", marginTop: 2, marginBottom: responsive.spacing(8) }}>
+              <Text style={{ color: COLORS.errorDark, fontSize: responsive.typography.caption, fontWeight: '700' }}>
                 * Please provide a valid email address or phone number
               </Text>
             </View>
@@ -728,9 +728,9 @@ export default function SignupScreen() {
 
 
           {/* Continue */}
-          <View style={{ width: "100%", marginTop: 8 }}>
+          <View style={{ width: "100%", marginTop: responsive.spacing(8) }}>
             {errorMessage ? (
-              <Text style={{ color: '#DC2626', fontSize: 13, fontWeight: '700', marginBottom: 8 }}>
+              <Text style={{ color: COLORS.errorDark, fontSize: responsive.typography.caption, fontWeight: '700', marginBottom: responsive.spacing(8) }}>
                 * {errorMessage}
               </Text>
             ) : null}
@@ -741,7 +741,7 @@ export default function SignupScreen() {
               loading={busy}
               disabled={!canContinue || busy}
               size="large"
-              style={{ borderRadius: 26, backgroundColor: BRAND, opacity: canContinue ? 1 : 0.7 }}
+              style={{ borderRadius: BORDER_RADIUS['2xl'], backgroundColor: BRAND, opacity: canContinue ? 1 : 0.7 }}
             >
               {verifiedOk ? 'Continue' : 'Verify & Continue'}
             </Button>
@@ -750,35 +750,35 @@ export default function SignupScreen() {
           {/* Inline verify links handle OTP; no extra buttons needed */}
 
           {/* Divider (reduced vertical spacing) */}
-          <View style={{ 
-            alignItems: "center", 
-            flexDirection: "row", 
-            marginTop: 14,
-            marginBottom: 14, 
+          <View style={{
+            alignItems: "center",
+            flexDirection: "row",
+            marginTop: responsive.spacing(14),
+            marginBottom: responsive.spacing(14),
             width: "100%",
-            maxWidth: 360,
+            maxWidth: responsive.maxWidth.form,
           }}>
-            <View style={{ flex: 1, height: 1, backgroundColor: "#e9ecef" }} />
-            <Text style={{ marginHorizontal: 20, color: "#666666", fontSize: 14, fontWeight: "500" }}>or</Text>
-            <View style={{ flex: 1, height: 1, backgroundColor: "#e9ecef" }} />
+            <View style={{ flex: 1, height: 1, backgroundColor: COLORS.border.light }} />
+            <Text style={{ marginHorizontal: responsive.spacing(20), color: COLORS.text.tertiary, fontSize: responsive.typography.body2, fontWeight: "500" }}>or</Text>
+            <View style={{ flex: 1, height: 1, backgroundColor: COLORS.border.light }} />
           </View>
 
           {/* OAuth buttons - placed earlier and with tighter spacing */}
-          <View style={{ flexDirection: "row", justifyContent: "center", gap: 20, marginBottom: 12, width: "100%", alignItems: "center" }}>
+          <View style={{ flexDirection: "row", justifyContent: "center", gap: responsive.spacing(20), marginBottom: responsive.spacing(12), width: "100%", alignItems: "center" }}>
             {isProviderAvailable('GOOGLE') && (
               <Pressable
                 style={({ pressed }) => [
                   {
-                    width: 56,
-                    height: 56,
-                    borderRadius: 9999,
+                    width: responsive.size(56),
+                    height: responsive.size(56),
+                    borderRadius: BORDER_RADIUS.full,
                     backgroundColor: "transparent",
                     borderWidth: 2,
-                    borderColor: "#d1d5db",
+                    borderColor: COLORS.border.medium,
                     alignItems: "center",
                     justifyContent: "center",
                     transform: [{ scale: pressed ? 0.95 : 1 }],
-                    shadowColor: "#000",
+                    shadowColor: COLORS.black,
                     shadowOffset: { width: 0, height: 3 },
                     shadowOpacity: 0.12,
                     shadowRadius: 10,
@@ -789,7 +789,7 @@ export default function SignupScreen() {
                 onPress={signInWithGoogle}
                 disabled={socialLoading || busy}
               >
-                <GoogleGIcon size={26} />
+                <GoogleGIcon size={responsive.size(26)} />
               </Pressable>
             )}
 
@@ -797,16 +797,16 @@ export default function SignupScreen() {
               <Pressable
                 style={({ pressed }) => [
                   {
-                    width: 56,
-                    height: 56,
-                    borderRadius: 9999,
+                    width: responsive.size(56),
+                    height: responsive.size(56),
+                    borderRadius: BORDER_RADIUS.full,
                     backgroundColor: "transparent",
                     borderWidth: 2,
-                    borderColor: "#d1d5db",
+                    borderColor: COLORS.border.medium,
                     alignItems: "center",
                     justifyContent: "center",
                     transform: [{ scale: pressed ? 0.95 : 1 }],
-                    shadowColor: "#000",
+                    shadowColor: COLORS.black,
                     shadowOffset: { width: 0, height: 3 },
                     shadowOpacity: 0.12,
                     shadowRadius: 10,
@@ -817,7 +817,7 @@ export default function SignupScreen() {
                 onPress={signInWithLinkedIn}
                 disabled={socialLoading || busy}
               >
-                <LinkedInIcon size={26} />
+                <LinkedInIcon size={responsive.size(26)} />
               </Pressable>
             )}
           </View>
@@ -826,19 +826,19 @@ export default function SignupScreen() {
         {/* OTP Bottom Sheet moved outside white card */}
 
         {/* Footer - Terms and login link */}
-        <View style={{ paddingHorizontal: 24, paddingBottom: 20, paddingTop: 10, backgroundColor: "#ffffff" }}>
-          <Text style={{ fontSize: 12, color: "#999999", textAlign: "center", lineHeight: 18, marginBottom: 12 }}>
+        <View style={{ paddingHorizontal: responsive.padding.lg, paddingBottom: responsive.padding.lg, paddingTop: responsive.padding.sm, backgroundColor: SCREEN_BACKGROUND }}>
+          <Text style={{ fontSize: responsive.typography.caption, color: COLORS.text.disabled, textAlign: "center", lineHeight: responsive.fontSize(18), marginBottom: responsive.spacing(12) }}>
             By continuing, you agree to our{"\n"}
-            <Text style={{ color: "#666666", textDecorationLine: "underline" }}>Terms of Service</Text>{" "}
-            <Text style={{ color: "#666666", textDecorationLine: "underline" }}>Privacy Policy</Text>{" "}
-            <Text style={{ color: "#666666", textDecorationLine: "underline" }}>Content Policy</Text>
+            <Text style={{ color: COLORS.text.tertiary, textDecorationLine: "underline" }}>Terms of Service</Text>{" "}
+            <Text style={{ color: COLORS.text.tertiary, textDecorationLine: "underline" }}>Privacy Policy</Text>{" "}
+            <Text style={{ color: COLORS.text.tertiary, textDecorationLine: "underline" }}>Content Policy</Text>
           </Text>
 
-          <Pressable 
+          <Pressable
             onPress={() => router.replace("/auth/login")}
-            style={({ pressed }) => [{ transform: [{ scale: pressed ? 0.98 : 1 }], paddingVertical: 8, alignItems: "center" }]}
-          > 
-            <Text style={{ color: "#666666", textAlign: "center", fontSize: 14, lineHeight: 20 }}>
+            style={({ pressed }) => [{ transform: [{ scale: pressed ? 0.98 : 1 }], paddingVertical: responsive.padding.xs, alignItems: "center" }]}
+          >
+            <Text style={{ color: COLORS.text.tertiary, textAlign: "center", fontSize: responsive.typography.body2, lineHeight: responsive.fontSize(20) }}>
               Already have an account? {" "}
               <Text style={{ color: BRAND, fontWeight: "600" }}>Log in</Text>
             </Text>
@@ -851,35 +851,35 @@ export default function SignupScreen() {
         <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'flex-end' }}>
           <Pressable
             onPress={() => { if (!otpBusy) setOtpSheetVisible(false); }}
-            style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)' }}
+            style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: COLORS.background.overlay }}
           />
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 40}>
-          <View style={{ backgroundColor: '#ffffff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 12 }}>
+          <View style={{ backgroundColor: COLORS.white, borderTopLeftRadius: BORDER_RADIUS['2xl'], borderTopRightRadius: BORDER_RADIUS['2xl'], paddingHorizontal: responsive.padding.lg, paddingTop: responsive.padding.md, paddingBottom: responsive.padding.lg, shadowColor: COLORS.black, shadowOpacity: 0.2, shadowRadius: 12 }}>
             <View style={{ alignItems: 'center' }}>
-              <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: '#E5E7EB', marginBottom: 12 }} />
+              <View style={{ width: 40, height: 4, borderRadius: BORDER_RADIUS.sm, backgroundColor: COLORS.gray[200], marginBottom: responsive.spacing(12) }} />
             </View>
-            <Text style={{ fontSize: 18, fontWeight: '900', color: '#0f172a' }}>Verify your contact</Text>
-            <Text style={{ marginTop: 6, color: '#64748b' }}>{buildOtpSentMessage()}</Text>
+            <Text style={{ fontSize: responsive.typography.h4, fontWeight: '900', color: COLORS.gray[900] }}>Verify your contact</Text>
+            <Text style={{ marginTop: responsive.spacing(6), color: COLORS.text.tertiary }}>{buildOtpSentMessage()}</Text>
 
-            <View style={{ marginTop: 16, paddingBottom: 28 }}>
+            <View style={{ marginTop: responsive.spacing(16), paddingBottom: responsive.spacing(28) }}>
               <CodeBoxes
                 length={6}
                 value={otpDigits}
                 onChange={(v) => { if (!otpVerified) setOtpDigits(v); }}
-                color={otpError ? '#DC2626' : otpVerified ? '#16A34A' : BRAND}
+                color={otpError ? COLORS.errorDark : otpVerified ? COLORS.successDark : BRAND}
               />
               <View style={{ minHeight: 24, justifyContent: 'center' }}>
                 {otpError ? (
-                  <Text style={{ color: '#DC2626', marginTop: 10, textAlign: 'center', fontWeight: '700' }}>{otpError}</Text>
+                  <Text style={{ color: COLORS.errorDark, marginTop: responsive.spacing(10), textAlign: 'center', fontWeight: '700' }}>{otpError}</Text>
                 ) : otpVerified ? (
-                  <Text style={{ color: '#16A34A', marginTop: 10, textAlign: 'center', fontWeight: '800' }}>Verified! Redirecting…</Text>
+                  <Text style={{ color: COLORS.successDark, marginTop: responsive.spacing(10), textAlign: 'center', fontWeight: '800' }}>Verified! Redirecting…</Text>
                 ) : null}
               </View>
               {/* Resend */}
-              <View style={{ alignItems: 'center', marginTop: 6 }}>
-                <Text style={{ color: '#6B7280' }}>
+              <View style={{ alignItems: 'center', marginTop: responsive.spacing(6) }}>
+                <Text style={{ color: COLORS.text.tertiary }}>
                   Code not received?{' '}
-                  <Text onPress={handleResend} style={{ color: resendRemaining > 0 ? '#9CA3AF' : BRAND, fontWeight: '800', textDecorationLine: 'underline' }}>
+                  <Text onPress={handleResend} style={{ color: resendRemaining > 0 ? COLORS.text.disabled : BRAND, fontWeight: '800', textDecorationLine: 'underline' }}>
                     {resendRemaining > 0 ? `Resend in ${resendRemaining}s` : 'Resend'}
                   </Text>
                 </Text>

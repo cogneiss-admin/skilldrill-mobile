@@ -1,390 +1,379 @@
-/**
- * Subscription Screen
- *
- * Beaunttiful payme screen showing two options:
- * 1. One-time drill pack purchase
- * 2. Monthly subscription with recurring credits
- *
- * Features:
- * - Animated option cards
- * - Stripe payment integration
- * - Subscription credit support
- * - Beautiful gradient header
- * - Loading states
- */
-
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  StyleSheet,
-  StatusBar
-} from 'react-native';
+import React, { useState } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { MotiView } from 'moti';
 import { StripeProvider } from '@stripe/stripe-react-native';
 
-import Button from '../components/Button';
-import OptionCard from '../components/OptionCard';
-import { usePayment } from '../hooks/usePayment';
-import { useSubscription } from '../hooks/useSubscription';
-import { useAnimation } from '../hooks/useAnimation';
-import apiService from '../services/api';
-
 import {
-  BRAND,
-  BRAND_DARK,
   COLORS,
-  TYPOGRAPHY,
   SPACING,
   BORDER_RADIUS,
-  GRADIENTS
+  TYPOGRAPHY,
+  SHADOWS,
+  BRAND,
+  SCREEN_BACKGROUND
 } from './components/Brand';
-import { PricingPlan } from '../types/pricing';
+import SelectionCard from './components/SelectionCard';
+import PlanCard from './components/PlanCard';
+import SwipeButton from './components/SwipeButton';
+import SubscriberView from './components/SubscriberView';
+import { usePayment } from '../hooks/usePayment';
+import { useSubscription } from '../hooks/useSubscription';
+import { useToast } from '../hooks/useToast';
 
-type PaymentOption = 'drill-pack' | 'subscription';
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// Subscription Plans (Coming Soon - for future implementation)
+const SUBSCRIPTION_PLANS = [
+  { id: '12_months', duration: '12 Months', price: '$3.99/month', savings: 'Save 60%', badge: 'BEST VALUE' as const },
+  { id: '6_months', duration: '6 Months', price: '$5.99/month', savings: 'Save 40%', badge: 'POPULAR' as const },
+  { id: '3_months', duration: '3 Months', price: '$7.99/month', savings: 'Save 20%' },
+  { id: '1_month', duration: '1 Month', price: '$9.99/month' },
+];
 
 export default function SubscriptionScreen() {
+  // Get params - can come from activity screen (drill unlock) or profile (subscription mode)
   const params = useLocalSearchParams<{
+    recommendationId?: string;
     skillId?: string;
     assessmentId?: string;
-    recommendationId?: string;
     drillCount?: string;
+    price?: string;
+    currency?: string;
+    mode?: string; // 'subscription' when coming from profile
   }>();
 
+  // Check if this is subscription-only mode (from profile)
+  const isSubscriptionMode = params.mode === 'subscription';
+
+  // Hooks
   const { processPayment, processing } = usePayment();
   const { hasActiveSubscription, availableCredits, unlockWithCredits } = useSubscription();
-  const { fadeIn, fadeAnim } = useAnimation();
+  const { showError, showSuccess } = useToast();
 
-  const [selectedOption, setSelectedOption] = useState<PaymentOption>('drill-pack');
-  const [loadingPricing, setLoadingPricing] = useState(true);
-  const [pricingData, setPricingData] = useState<PricingPlan | null>(null);
+  // Parse params - only required when NOT in subscription mode
+  const drillCount = params.drillCount ? parseInt(params.drillCount, 10) : 0;
+  const drillPrice = params.price ? parseFloat(params.price) : 0;
+  const currency = params.currency;
 
-  const drillCount = params.drillCount ? parseInt(params.drillCount) : 15;
+  // Validate required data is present (only for drill unlock flow, not subscription mode)
+  const hasRequiredData = isSubscriptionMode || (params.recommendationId && params.skillId && params.price && params.drillCount && params.currency);
 
-  useEffect(() => {
-    fadeIn();
-    loadPricingData();
-  }, []);
+  // State
+  const [selectedOption, setSelectedOption] = useState<'subscription' | 'one-time'>(isSubscriptionMode ? 'subscription' : 'one-time');
+  const [selectedPlanId, setSelectedPlanId] = useState('6_months');
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const loadPricingData = async () => {
-    try {
-      setLoadingPricing(true);
-
-      try {
-        const res = await apiService.getPricingPlans();
-
-        if (res.success) {
-          setPricingData(res.data);
-        }
-      } catch (apiError: unknown) {
-        // If endpoint doesn't exist yet, use default pricing
-        const errorObj = apiError as { status?: number; message?: string } | undefined;
-        if (errorObj?.status === 404 || errorObj?.message?.includes('Route') || errorObj?.message?.includes('not found')) {
-          console.log('[Subscription] Using default pricing (endpoint not implemented yet)');
-          setPricingData({
-            drillPack: {
-              priceId: 'price_drill_pack_default',
-              price: '$4.99',
-              currency: 'USD'
-            },
-            subscription: {
-              priceId: 'price_subscription_default',
-              price: '$9.99',
-              currency: 'USD'
-            }
-          });
-        } else {
-          throw apiError;
-        }
-      }
-    } catch (error: unknown) {
-      console.error('Failed to load pricing:', error);
-      // Use fallback pricing
-      setPricingData({
-        drillPack: {
-          priceId: 'price_drill_pack_default',
-          price: '$4.99',
-          currency: 'USD'
-        },
-        subscription: {
-          priceId: 'price_subscription_default',
-          price: '$9.99',
-          currency: 'USD'
-        }
-      });
-    } finally {
-      setLoadingPricing(false);
-    }
+  // Format price for display
+  const formatPrice = (amount: number, curr: string) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: curr,
+      minimumFractionDigits: 2,
+    }).format(amount);
   };
 
-  const handlePayment = async () => {
-    if (!params.skillId) {
-      console.error('Missing skillId parameter');
+  const formattedDrillPrice = (!isSubscriptionMode && currency) ? formatPrice(drillPrice, currency) : '';
+
+  // Handle drill pack payment (real implementation)
+  const handleDrillPackPayment = async () => {
+    if (!params.recommendationId || !params.skillId) {
+      showError('Missing required information. Please try again.');
       return;
     }
 
     try {
-      // Check if user has subscription and enough credits
-      if (hasActiveSubscription && availableCredits > 0) {
-        // Use subscription credits
-        const assignmentId = await unlockWithCredits({
+      setIsProcessing(true);
+
+      await processPayment({
+        recommendationId: params.recommendationId,
+        metadata: {
           skillId: params.skillId,
           assessmentId: params.assessmentId,
-          recommendationId: params.recommendationId
-        });
-
-        // Navigate to drill practice
-        router.push({
-          pathname: '/drillsScenarios',
-          params: { assignmentId }
-        });
-        return;
-      }
-
-      // Process payment
-      // Use dynamic pricing (recommendationId) if available, otherwise fallback to fixed pricing (priceId)
-      if (params.recommendationId && selectedOption === 'drill-pack') {
-        // Dynamic pricing mode - use recommendationId
-        console.log('[Subscription] Using dynamic pricing with recommendationId:', params.recommendationId);
-
-        await processPayment({
           recommendationId: params.recommendationId,
-          metadata: {
-            skillId: params.skillId,
-            assessmentId: params.assessmentId,
-            recommendationId: params.recommendationId
-          },
-          onSuccess: (assignmentId) => {
-            // Navigate to drill practice
-            router.push({
-              pathname: '/drillsScenarios',
-              params: { assignmentId }
-            });
-          }
-        });
-      } else {
-        // Fixed pricing mode - use priceId
-        const priceId = selectedOption === 'drill-pack'
-          ? pricingData?.drillPack?.priceId
-          : pricingData?.subscription?.priceId;
-
-        if (!priceId) {
-          throw new Error('Price information not available');
+        },
+        onSuccess: (assignmentId) => {
+          showSuccess('Payment successful! Your drills are ready.');
+          router.push({
+            pathname: '/drillsScenarios',
+            params: { assignmentId }
+          });
+        },
+        onCancel: () => {
+          setIsProcessing(false);
         }
-
-        console.log('[Subscription] Using fixed pricing with priceId:', priceId);
-
-        await processPayment({
-          priceId,
-          metadata: {
-            skillId: params.skillId,
-            assessmentId: params.assessmentId,
-            recommendationId: params.recommendationId
-          },
-          onSuccess: (assignmentId) => {
-            // Navigate to drill practice
-            router.push({
-              pathname: '/drillsScenarios',
-              params: { assignmentId }
-            });
-          }
-        });
-      }
-    } catch (error: unknown) {
-      console.error('Payment failed:', error);
+      });
+    } catch (error: any) {
+      showError(error.message || 'Payment failed. Please try again.');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  if (loadingPricing) {
+  // Handle subscription credit usage (for subscribers)
+  const handleUseCredit = async () => {
+    if (!params.skillId) {
+      showError('Missing skill information.');
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      const assignmentId = await unlockWithCredits({
+        skillId: params.skillId,
+        assessmentId: params.assessmentId,
+        recommendationId: params.recommendationId,
+      });
+
+      router.push({
+        pathname: '/drillsScenarios',
+        params: { assignmentId }
+      });
+    } catch (error: any) {
+      showError(error.message || 'Failed to unlock drills.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Handle swipe success - only called when drill pack is selected (button disabled for subscription)
+  const handleSwipeSuccess = () => {
+    // Process drill pack payment
+    handleDrillPackPayment();
+  };
+
+  // If required data is missing, show error state
+  if (!hasRequiredData) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={BRAND} />
-          <Text style={styles.loadingText}>Loading pricing plans...</Text>
-        </View>
-      </SafeAreaView>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaView style={styles.container}>
+          <StatusBar barStyle="dark-content" />
+          <View style={styles.header}>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="chevron-back" size={SCREEN_WIDTH * 0.05} color={COLORS.text.primary} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Unlock Your Drills</Text>
+          </View>
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle-outline" size={SCREEN_WIDTH * 0.15} color={COLORS.text.tertiary} />
+            <Text style={styles.errorTitle}>Something went wrong</Text>
+            <Text style={styles.errorText}>
+              Unable to load pricing information. Please go back and try again.
+            </Text>
+            <TouchableOpacity style={styles.errorButton} onPress={() => router.back()}>
+              <Text style={styles.errorButtonText}>Go Back</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </GestureHandlerRootView>
     );
   }
 
-  const drillPackPrice = pricingData?.drillPack?.price || '$4.99';
-  const subscriptionPrice = pricingData?.subscription?.price || '$9.99';
-
   return (
     <StripeProvider publishableKey={process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || ''}>
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="light-content" />
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaView style={styles.container}>
+          <StatusBar barStyle="dark-content" />
 
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Header with Gradient */}
-          <LinearGradient
-            colors={GRADIENTS.primary}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.header}
-          >
+          {/* Header - match Profile screen layout */}
+          <View style={styles.header}>
             <TouchableOpacity
               onPress={() => router.back()}
-              style={styles.backButton}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+              <Ionicons name="chevron-back" size={SCREEN_WIDTH * 0.05} color={COLORS.text.primary} />
             </TouchableOpacity>
-
-            <MotiView
-              from={{ opacity: 0, translateY: -20 }}
-              animate={{ opacity: 1, translateY: 0 }}
-              transition={{ type: 'spring', delay: 100 }}
-            >
-              <Text style={styles.headerTitle}>Unlock Your Drills</Text>
-              <Text style={styles.headerSubtitle}>
-                Choose the plan that works best for you
-              </Text>
-            </MotiView>
-
-            {/* Drill Count Badge */}
-            <MotiView
-              from={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: 'spring', delay: 300 }}
-              style={styles.drillBadge}
-            >
-              <Ionicons name="fitness" size={20} color={BRAND} />
-              <Text style={styles.drillBadgeText}>{drillCount} Practice Drills</Text>
-            </MotiView>
-          </LinearGradient>
-
-          {/* Subscription Credit Notice */}
-          {hasActiveSubscription && availableCredits > 0 && (
-            <MotiView
-              from={{ opacity: 0, translateY: 10 }}
-              animate={{ opacity: 1, translateY: 0 }}
-              transition={{ delay: 400 }}
-              style={styles.creditNotice}
-            >
-              <View style={styles.creditNoticeContent}>
-                <Ionicons name="gift" size={24} color={COLORS.success} />
-                <View style={{ flex: 1, marginLeft: SPACING.md }}>
-                  <Text style={styles.creditNoticeTitle}>
-                    You have {availableCredits} credit{availableCredits !== 1 ? 's' : ''} available!
-                  </Text>
-                  <Text style={styles.creditNoticeText}>
-                    Use your subscription credits to unlock these drills for free
-                  </Text>
-                </View>
-              </View>
-            </MotiView>
-          )}
-
-          {/* Payment Options */}
-          <View style={styles.optionsContainer}>
-            {/* Drill Pack Option */}
-            <OptionCard
-              title="Drill Pack"
-              price={drillPackPrice}
-              period="one-time"
-              features={[
-                `${drillCount} AI-generated practice drills`,
-                'Instant access after payment',
-                'Milestone feedback system',
-                'Progress tracking & analytics'
-              ]}
-              isSelected={selectedOption === 'drill-pack'}
-              onPress={() => setSelectedOption('drill-pack')}
-              style={styles.optionCard}
-            />
-
-            {/* Monthly Subscription Option */}
-            <OptionCard
-              title="Monthly Subscription"
-              price={subscriptionPrice}
-              period="per month"
-              features={[
-                '10 drill credits every month',
-                'Unlock any skill drills',
-                'Cancel anytime',
-                'Priority support',
-                'Early access to new features'
-              ]}
-              badge="BEST VALUE"
-              isSelected={selectedOption === 'subscription'}
-              onPress={() => setSelectedOption('subscription')}
-              premium
-              style={styles.optionCard}
-            />
+            <Text style={styles.headerTitle}>
+              {isSubscriptionMode ? 'Subscription' : (hasActiveSubscription ? 'Unlock Drills' : 'Unlock Your Drills')}
+            </Text>
           </View>
 
-          {/* Benefits Section */}
-          <MotiView
-            from={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 600 }}
-            style={styles.benefitsSection}
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
           >
-            <Text style={styles.benefitsTitle}>What you'll get:</Text>
+            {/* Subscription Mode - Show only subscription card and coming soon */}
+            {isSubscriptionMode ? (
+              <>
+                {/* Subscription Card Only */}
+                <View style={styles.section}>
+                  <SelectionCard
+                    title="Unlock Unlimited Drills & More"
+                    subtitle="Starting at $3.99/month"
+                    features={[
+                      {
+                        title: 'Unlimited AI-powered drills',
+                        description: 'Practice as much as you want — no limits, no restrictions.'
+                      },
+                      {
+                        title: 'Faster learning progress + confidence boost',
+                        description: 'Master your communication 5× faster with continuous training.'
+                      },
+                      {
+                        title: 'All skills unlocked instantly',
+                        description: 'Access every soft-skill domain the moment you upgrade.'
+                      },
+                      {
+                        title: 'Save up to 70% over time',
+                        description: 'Subscription costs far less than buying multiple drill packs.'
+                      }
+                    ]}
+                    isSelected={true}
+                    onSelect={() => {}}
+                    badge="BEST VALUE"
+                  />
+                </View>
 
-            <View style={styles.benefitsList}>
-              {[
-                { icon: 'trending-up', text: 'AI-powered skill improvement' },
-                { icon: 'analytics', text: 'Detailed progress analytics' },
-                { icon: 'star', text: 'Personalized feedback at milestones' },
-                { icon: 'shield-checkmark', text: 'Secure payment via Stripe' }
-              ].map((benefit, index) => (
-                <MotiView
-                  key={index}
-                  from={{ opacity: 0, translateX: -20 }}
-                  animate={{ opacity: 1, translateX: 0 }}
-                  transition={{ delay: 700 + index * 100 }}
-                  style={styles.benefitItem}
-                >
-                  <View style={styles.benefitIcon}>
-                    <Ionicons name={benefit.icon as keyof typeof Ionicons.glyphMap} size={20} color={BRAND} />
+                {/* Coming Soon Notice */}
+                <View style={styles.comingSoonContainer}>
+                  <View style={styles.comingSoonCard}>
+                    <View style={styles.comingSoonIconContainer}>
+                      <Ionicons name="rocket-outline" size={SCREEN_WIDTH * 0.08} color={BRAND} />
+                    </View>
+                    <Text style={styles.comingSoonTitle}>Coming Soon!</Text>
+                    <Text style={styles.comingSoonText}>
+                      We're working hard to bring you unlimited subscription plans.
+                      Stay tuned for updates!
+                    </Text>
                   </View>
-                  <Text style={styles.benefitText}>{benefit.text}</Text>
-                </MotiView>
-              ))}
+
+                  {/* Preview of Subscription Plans (Disabled) */}
+                  <Text style={[styles.sectionTitle, { opacity: 0.5, marginTop: SPACING.margin.lg }]}>
+                    Upcoming Subscription Plans
+                  </Text>
+
+                  {SUBSCRIPTION_PLANS.map((plan) => (
+                    <View key={plan.id} style={{ opacity: 0.4 }}>
+                      <PlanCard
+                        duration={plan.duration}
+                        price={plan.price}
+                        savings={plan.savings}
+                        isSelected={false}
+                        onSelect={() => {}}
+                        badge={plan.badge}
+                      />
+                    </View>
+                  ))}
+                </View>
+              </>
+            ) : hasActiveSubscription && availableCredits > 0 ? (
+              <SubscriberView
+                credits={availableCredits}
+                drillCount={drillCount}
+                onUseCredit={handleUseCredit}
+              />
+            ) : (
+              <>
+                {/* Main Options - Drill Unlock Flow */}
+                <View style={styles.section}>
+                  {/* Drill Pack Option - Uses Real Price from Backend */}
+                  <SelectionCard
+                    title="Drill Pack (one-time)"
+                    subtitle={`${formattedDrillPrice} one-time payment for ${drillCount} drills.`}
+                    price={formattedDrillPrice}
+                    variant="one-time"
+                    isSelected={selectedOption === 'one-time'}
+                    onSelect={() => setSelectedOption('one-time')}
+                  />
+
+                  {/* Subscription Option - Coming Soon */}
+                  <SelectionCard
+                    title="Unlock Unlimited Drills & More"
+                    subtitle="Starting at $3.99/month"
+                    features={[
+                      {
+                        title: 'Unlimited AI-powered drills',
+                        description: 'Practice as much as you want — no limits, no restrictions.'
+                      },
+                      {
+                        title: 'Faster learning progress + confidence boost',
+                        description: 'Master your communication 5× faster with continuous training.'
+                      },
+                      {
+                        title: 'All skills unlocked instantly',
+                        description: 'Access every soft-skill domain the moment you upgrade.'
+                      },
+                      {
+                        title: 'Save up to 70% over time',
+                        description: 'Subscription costs far less than buying multiple drill packs.'
+                      }
+                    ]}
+                    isSelected={selectedOption === 'subscription'}
+                    onSelect={() => setSelectedOption('subscription')}
+                    badge="BEST VALUE"
+                  />
+                </View>
+
+                {/* Coming Soon Notice - Show when subscription is selected */}
+                {selectedOption === 'subscription' && (
+                  <View style={styles.comingSoonContainer}>
+                    <View style={styles.comingSoonCard}>
+                      <View style={styles.comingSoonIconContainer}>
+                        <Ionicons name="rocket-outline" size={SCREEN_WIDTH * 0.08} color={BRAND} />
+                      </View>
+                      <Text style={styles.comingSoonTitle}>Coming Soon!</Text>
+                      <Text style={styles.comingSoonText}>
+                        We're working hard to bring you unlimited subscription plans.
+                        For now, you can purchase drill packs to start practicing.
+                      </Text>
+                      <TouchableOpacity
+                        style={styles.switchToDrillPackButton}
+                        onPress={() => setSelectedOption('one-time')}
+                      >
+                        <Text style={styles.switchToDrillPackText}>
+                          Switch to Drill Pack ({formattedDrillPrice})
+                        </Text>
+                        <Ionicons name="arrow-forward" size={SCREEN_WIDTH * 0.04} color={BRAND} />
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Preview of Subscription Plans (Disabled) */}
+                    <Text style={[styles.sectionTitle, { opacity: 0.5, marginTop: SPACING.margin.lg }]}>
+                      Upcoming Subscription Plans
+                    </Text>
+
+                    {SUBSCRIPTION_PLANS.map((plan) => (
+                      <View key={plan.id} style={{ opacity: 0.4 }}>
+                        <PlanCard
+                          duration={plan.duration}
+                          price={plan.price}
+                          savings={plan.savings}
+                          isSelected={false}
+                          onSelect={() => {}}
+                          badge={plan.badge}
+                        />
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </>
+            )}
+          </ScrollView>
+
+          {/* Fixed Footer - Only show for non-subscription mode and non-subscriber */}
+          {!isSubscriptionMode && !(hasActiveSubscription && availableCredits > 0) && (
+            <View style={styles.footer}>
+              {/* SwipeButton - disabled when subscription is selected */}
+              <SwipeButton
+                onSwipeSuccess={handleSwipeSuccess}
+                loading={isProcessing || processing}
+                disabled={selectedOption === 'subscription'}
+              />
+
+              <View style={styles.securePayment}>
+                <Ionicons name="lock-closed-outline" size={SCREEN_WIDTH * 0.03} color={COLORS.text.tertiary} />
+                <Text style={styles.secureText}>Secure payment powered by Stripe</Text>
+              </View>
             </View>
-          </MotiView>
-
-          {/* Payment Button */}
-          <MotiView
-            from={{ opacity: 0, translateY: 20 }}
-            animate={{ opacity: 1, translateY: 0 }}
-            transition={{ delay: 900 }}
-            style={styles.paymentButtonContainer}
-          >
-            <Button
-              variant="gradient"
-              size="large"
-              onPress={handlePayment}
-              loading={processing}
-              disabled={processing}
-              icon="card"
-              fullWidth
-            >
-              {hasActiveSubscription && availableCredits > 0
-                ? 'Use Subscription Credit'
-                : selectedOption === 'drill-pack'
-                ? `Pay ${drillPackPrice}`
-                : `Subscribe for ${subscriptionPrice}/month`}
-            </Button>
-
-            <Text style={styles.securePaymentText}>
-              <Ionicons name="lock-closed" size={12} color={COLORS.text.tertiary} />
-              {' '}Secure payment powered by Stripe
-            </Text>
-          </MotiView>
-        </ScrollView>
-      </SafeAreaView>
+          )}
+        </SafeAreaView>
+      </GestureHandlerRootView>
     </StripeProvider>
   );
 }
@@ -392,7 +381,24 @@ export default function SubscriptionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background.primary
+    backgroundColor: SCREEN_BACKGROUND,
+  },
+  header: {
+    paddingVertical: SCREEN_WIDTH * 0.04,
+    paddingHorizontal: SCREEN_WIDTH * 0.06,
+    borderBottomWidth: 1.5,
+    borderBottomColor: COLORS.gray[300],
+    backgroundColor: COLORS.white,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: SCREEN_WIDTH * 0.048,
+    fontWeight: '700',
+    color: COLORS.text.primary,
+    marginRight: SCREEN_WIDTH * 0.05, // Offset for back button
   },
   loadingContainer: {
     flex: 1,
@@ -408,126 +414,132 @@ const styles = StyleSheet.create({
     flex: 1
   },
   scrollContent: {
-    paddingBottom: SPACING['3xl']
+    paddingBottom: SCREEN_WIDTH * 0.1,
+    paddingHorizontal: SCREEN_WIDTH * 0.06,
+    paddingTop: SCREEN_WIDTH * 0.05,
   },
-  header: {
-    paddingTop: SPACING['2xl'],
-    paddingBottom: SPACING['3xl'],
-    paddingHorizontal: SPACING.padding.lg,
-    position: 'relative'
+  section: {
+    marginBottom: SCREEN_WIDTH * 0.08,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.lg
-  },
-  headerTitle: {
-    ...TYPOGRAPHY.h1,
-    fontSize: 28,
-    color: COLORS.white,
-    fontWeight: '800',
-    marginBottom: SPACING.xs
-  },
-  headerSubtitle: {
-    ...TYPOGRAPHY.body,
-    color: COLORS.white,
-    opacity: 0.9
-  },
-  drillBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    paddingHorizontal: SPACING.padding.md,
-    paddingVertical: SPACING.padding.xs,
-    borderRadius: BORDER_RADIUS.full,
-    alignSelf: 'flex-start',
-    marginTop: SPACING.lg
-  },
-  drillBadgeText: {
-    ...TYPOGRAPHY.label,
-    color: BRAND,
+  sectionTitle: {
+    fontSize: SCREEN_WIDTH * 0.045,
     fontWeight: '700',
-    marginLeft: SPACING.xs
-  },
-  creditNotice: {
-    marginHorizontal: SPACING.padding.lg,
-    marginTop: -SPACING.lg,
-    marginBottom: SPACING.lg,
-    backgroundColor: COLORS.background.card,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 2,
-    borderColor: COLORS.success,
-    overflow: 'hidden'
-  },
-  creditNoticeContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: SPACING.padding.md
-  },
-  creditNoticeTitle: {
-    ...TYPOGRAPHY.subtitle,
-    color: COLORS.success,
-    marginBottom: SPACING.xs,
-    fontWeight: TYPOGRAPHY.subtitle.fontWeight as '500' | '600' | '700'
-  },
-  creditNoticeText: {
-    ...TYPOGRAPHY.caption,
-    color: COLORS.text.secondary
-  },
-  optionsContainer: {
-    paddingHorizontal: SPACING.padding.lg,
-    gap: SPACING.gap.lg
-  },
-  optionCard: {
-    marginBottom: SPACING.margin.md
-  },
-  benefitsSection: {
-    marginHorizontal: SPACING.padding.lg,
-    marginTop: SPACING.margin['2xl'],
-    padding: SPACING.padding.lg,
-    backgroundColor: COLORS.background.secondary,
-    borderRadius: BORDER_RADIUS.xl
-  },
-  benefitsTitle: {
-    fontSize: TYPOGRAPHY.h2.fontSize,
-    fontWeight: '600' as const,
     color: COLORS.text.primary,
-    marginBottom: SPACING.md,
-    letterSpacing: TYPOGRAPHY.h2.letterSpacing
+    marginBottom: SCREEN_WIDTH * 0.04,
+    marginTop: SCREEN_WIDTH * 0.025,
   },
-  benefitsList: {
-    gap: SPACING.gap.md
+  footer: {
+    paddingTop: SCREEN_WIDTH * 0.04,
+    paddingBottom: SCREEN_WIDTH * 0.04,
+    paddingHorizontal: SCREEN_WIDTH * 0.06,
+    backgroundColor: COLORS.white,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.gray[200],
   },
-  benefitItem: {
+  payButton: {
+    backgroundColor: BRAND,
+    borderRadius: SCREEN_WIDTH * 0.075,
+    height: SCREEN_WIDTH * 0.14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...SHADOWS.md,
+  },
+  payButtonText: {
+    fontSize: SCREEN_WIDTH * 0.045,
+    fontWeight: '700',
+    color: COLORS.white,
+  },
+  securePayment: {
     flexDirection: 'row',
-    alignItems: 'center'
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: SCREEN_WIDTH * 0.04,
+    gap: SCREEN_WIDTH * 0.01,
   },
-  benefitIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.background.primary,
+  secureText: {
+    fontSize: SCREEN_WIDTH * 0.03,
+    color: COLORS.text.tertiary,
+  },
+  // Coming Soon Styles
+  comingSoonContainer: {
+    marginTop: -SCREEN_WIDTH * 0.04,
+  },
+  comingSoonCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SCREEN_WIDTH * 0.06,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: BRAND,
+    borderStyle: 'dashed',
+    ...SHADOWS.sm,
+  },
+  comingSoonIconContainer: {
+    width: SCREEN_WIDTH * 0.16,
+    height: SCREEN_WIDTH * 0.16,
+    borderRadius: SCREEN_WIDTH * 0.08,
+    backgroundColor: `${BRAND}15`,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: SPACING.md
+    marginBottom: SCREEN_WIDTH * 0.04,
   },
-  benefitText: {
-    ...TYPOGRAPHY.body,
+  comingSoonTitle: {
+    fontSize: SCREEN_WIDTH * 0.05,
+    fontWeight: '700',
+    color: COLORS.text.primary,
+    marginBottom: SCREEN_WIDTH * 0.025,
+  },
+  comingSoonText: {
+    fontSize: SCREEN_WIDTH * 0.035,
     color: COLORS.text.secondary,
-    flex: 1
-  },
-  paymentButtonContainer: {
-    marginTop: SPACING.margin['2xl'],
-    paddingHorizontal: SPACING.padding.lg
-  },
-  securePaymentText: {
-    ...TYPOGRAPHY.caption,
-    color: COLORS.text.tertiary,
     textAlign: 'center',
-    marginTop: SPACING.md
-  }
+    lineHeight: SCREEN_WIDTH * 0.05,
+    marginBottom: SCREEN_WIDTH * 0.05,
+  },
+  switchToDrillPackButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: `${BRAND}10`,
+    paddingVertical: SCREEN_WIDTH * 0.03,
+    paddingHorizontal: SCREEN_WIDTH * 0.05,
+    borderRadius: BORDER_RADIUS.full,
+    gap: SCREEN_WIDTH * 0.02,
+  },
+  switchToDrillPackText: {
+    fontSize: SCREEN_WIDTH * 0.035,
+    fontWeight: '600',
+    color: BRAND,
+  },
+  // Error State Styles
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: SCREEN_WIDTH * 0.1,
+  },
+  errorTitle: {
+    fontSize: SCREEN_WIDTH * 0.05,
+    fontWeight: '700',
+    color: COLORS.text.primary,
+    marginTop: SCREEN_WIDTH * 0.04,
+    marginBottom: SCREEN_WIDTH * 0.02,
+  },
+  errorText: {
+    fontSize: SCREEN_WIDTH * 0.035,
+    color: COLORS.text.secondary,
+    textAlign: 'center',
+    lineHeight: SCREEN_WIDTH * 0.05,
+    marginBottom: SCREEN_WIDTH * 0.06,
+  },
+  errorButton: {
+    backgroundColor: BRAND,
+    paddingVertical: SCREEN_WIDTH * 0.035,
+    paddingHorizontal: SCREEN_WIDTH * 0.08,
+    borderRadius: SCREEN_WIDTH * 0.02,
+  },
+  errorButtonText: {
+    fontSize: SCREEN_WIDTH * 0.04,
+    fontWeight: '600',
+    color: COLORS.white,
+  },
 });

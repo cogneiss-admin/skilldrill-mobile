@@ -14,7 +14,7 @@ import { parseApiError, formatErrorMessage } from "../../utils/errorHandler";
 import { detectInputType, isValidEmail, isValidPhone, validationMessageFor } from "../components/validators";
 import { useSocialAuth } from "../../hooks/useSocialAuth";
 import { useResponsive } from "../../utils/responsive";
-import { BRAND, LOGO_SRC } from "../components/Brand";
+import { BRAND, LOGO_SRC, SCREEN_BACKGROUND, COLORS, BORDER_RADIUS, SPACING } from "../components/Brand";
 import { useCountries, getConvertedFlagUrl } from "../../hooks/useCountries";
 import CountryPickerModal from "../components/CountryPickerModal";
 const logoSrc = LOGO_SRC;
@@ -36,7 +36,7 @@ export default function LoginScreen() {
 
   // Detect if input is email or phone number (simple, user-friendly heuristic)
   const inputType = useMemo(() => detectInputType(emailOrPhone), [emailOrPhone]);
-  
+
   // Get international phone number if it's a phone input
   const internationalPhone = useMemo(() => {
     return emailOrPhone.trim();
@@ -60,7 +60,7 @@ export default function LoginScreen() {
       setValidationMessage("");
       return false;
     }
-    
+
     if (showPhoneInput) {
       // Phone mode - validate as phone
       const isValid = isValidPhone(emailOrPhone);
@@ -76,16 +76,16 @@ export default function LoginScreen() {
 
   const sendOtp = async () => {
     if (busy || !isValidInput) return;
-    
+
     try {
       setBusy(true);
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      
+
       console.log('🔍 Send OTP - Input:', emailOrPhone, 'Type:', inputType);
-      
+
       // Import auth service dynamically to avoid circular dependencies
       const { authService } = await import("../../services/authService");
-      
+
       let response;
       if (inputType === "email") {
         console.log('📧 Sending email login request...');
@@ -103,14 +103,14 @@ export default function LoginScreen() {
         response = await authService.loginWithPhone({ phoneNo });
         console.log('📱 Phone login response:', response);
       }
-      
+
       if (response.success) {
         console.log('✅ OTP sent successfully, navigating to OTP screen...');
         // Pass the identifier to the OTP screen
-        const params = inputType === "email" 
+        const params = inputType === "email"
           ? { email: emailOrPhone.trim() }
           : { phone: (emailOrPhone.trim().startsWith('+') ? emailOrPhone.trim() : `+${(selectedPhoneCountry?.phoneCode || '').replace(/\D/g, '')}${(emailOrPhone || '').replace(/\D/g, '')}`) };
-          
+
         console.log('🚀 Navigating to OTP with params:', params);
         try {
           await router.replace({ pathname: "/auth/otp", params });
@@ -149,13 +149,13 @@ export default function LoginScreen() {
       console.error('❌ Send OTP error:', error);
       const apiError = parseApiError(error);
       const message = formatErrorMessage(apiError);
-      
+
       // Show toast notification
       showError(message);
-      
+
       // Set validation message for banner
       setValidationMessage(message);
-      
+
       // Handle specific error codes for UI state
       if (apiError.code === 'USER_NOT_FOUND') {
         setShowSignupSuggestion(true);
@@ -170,9 +170,9 @@ export default function LoginScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: BRAND }}>
       <StatusBar barStyle="light-content" />
-      
+
       {/* Top half - Colorful section like Zomato */}
-      <View style={{ 
+      <View style={{
         minHeight: responsive.height(25), // 25% of screen height
         backgroundColor: "#E23744", // Zomato red color for reference, we'll use our brand
         paddingHorizontal: responsive.padding.lg,
@@ -218,7 +218,7 @@ export default function LoginScreen() {
             borderRadius: 15,
           }} />
         </View>
-        
+
         {/* Logo (larger) */}
         <Image
           source={logoSrc}
@@ -232,10 +232,10 @@ export default function LoginScreen() {
         />
       </View>
 
-      {/* Bottom half - White section with form (square top edges) */}
-      <View style={{ 
+      {/* Bottom half - Form section */}
+      <View style={{
         flex: 1,
-        backgroundColor: "#ffffff",
+        backgroundColor: SCREEN_BACKGROUND,
         borderTopLeftRadius: 0,
         borderTopRightRadius: 0,
         marginTop: responsive.spacing(-20),
@@ -252,245 +252,245 @@ export default function LoginScreen() {
           }}
           showsVerticalScrollIndicator={false}
         >
-        
 
 
-        {/* Login heading */}
-        <View style={{ width: "100%", alignItems: "center", marginBottom: responsive.spacing(8) }}>
-          <Text style={{
-            fontSize: responsive.typography.h2,
-            fontWeight: "700",
-            color: "#1a1a1a",
-            marginBottom: responsive.spacing(8),
-          }}>
-            Sign In
-          </Text>
-          <Text style={{
-            fontSize: responsive.typography.body1,
-            color: "#666666",
-            marginBottom: responsive.spacing(24),
-            textAlign: "center",
-          }}>
-            Log in or sign up to continue
-          </Text>
-        </View>
 
-        {/* Smart input field - email or phone */}
-        <View style={{ width: "100%", marginBottom: responsive.spacing(16) }}>
-          <View style={{ 
-            maxWidth: responsive.maxWidth.form,
-            alignSelf: 'center',
-            width: '100%'
-          }}>
-            {!showPhoneInput ? (
-              // Default email/phone input
-              <View>
-                <TextInput
-                  mode="outlined"
-                  placeholder="Enter email or phone number"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  multiline={false}
-                  textContentType="emailAddress"
-                  autoComplete="email"
-                  value={emailOrPhone}
-                  maxLength={50}
-                  onChangeText={(val) => {
-                    setEmailOrPhone(val);
-                    // Auto-switch to phone UI when first character indicates phone (digit or '+')
-                    if (!showPhoneInput && val && /^[+0-9]/.test(val[0] || '')) {
-                      setShowPhoneInput(true);
-                      setTimeout(() => {
-                        try { phoneInputRef.current?.focus?.(); } catch {}
-                      }, 0);
-                    }
-                  }}
-                  style={{ 
-                    backgroundColor: "#f8f9fa",
-                    height: responsive.input.height,
-                  }}
-                  textColor="#333333"
-                  placeholderTextColor="#999999"
-                  outlineColor="#e9ecef"
-                  activeOutlineColor={BRAND}
-                  contentStyle={{
-                    paddingVertical: 0,
-                    fontSize: responsive.input.fontSize,
-                    fontWeight: '700',
-                    textAlign: "left",
-                  }}
-                  theme={{
-                    colors: {
-                      onSurfaceVariant: "#666666",
-                    },
-                    roundness: 12,
-                  }}
-                  left={<TextInput.Icon icon="email-outline" size={responsive.size(20)} />}
-                />
-              </View>
-            ) : (
-              <View>
-                <View style={{ flexDirection: 'row', gap: 12 }}>
-                  <Pressable 
-                    onPress={() => setCountryPickerVisible(true)}
-                    style={{ width: 60 }}
-                  >
-                    <View style={{
-                      backgroundColor: '#f8f9fa',
-                      borderWidth: 1,
-                      borderColor: '#e9ecef',
-                      borderRadius: 12,
-                      height: responsive.input.height,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      paddingHorizontal: 8
-                    }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        {selectedPhoneCountry.flag ? (
-                          <Image 
-                            source={{ uri: getConvertedFlagUrl(selectedPhoneCountry.flag) }}
-                            style={{ width: 18, height: 12, marginRight: 6 }}
-                          />
-                        ) : (
-                          <View style={{ width: 20, height: 14, marginRight: 6, backgroundColor: '#e9ecef', borderRadius: 2 }} />
-                        )}
-                        <Ionicons name="chevron-down" size={12} color="#6B7280" />
-                      </View>
-                    </View>
-                  </Pressable>
+          {/* Login heading */}
+          <View style={{ width: "100%", alignItems: "center", marginBottom: responsive.spacing(8) }}>
+            <Text style={{
+              fontSize: responsive.typography.h2,
+              fontWeight: "700",
+              color: COLORS.text.primary,
+              marginBottom: responsive.spacing(8),
+            }}>
+              Sign In
+            </Text>
+            <Text style={{
+              fontSize: responsive.typography.body1,
+              color: COLORS.text.tertiary,
+              marginBottom: responsive.spacing(24),
+              textAlign: "center",
+            }}>
+              Log in or sign up to continue
+            </Text>
+          </View>
 
+          {/* Smart input field - email or phone */}
+          <View style={{ width: "100%", marginBottom: responsive.spacing(16) }}>
+            <View style={{
+              maxWidth: responsive.maxWidth.form,
+              alignSelf: 'center',
+              width: '100%'
+            }}>
+              {!showPhoneInput ? (
+                // Default email/phone input
+                <View>
                   <TextInput
-                    ref={phoneInputRef}
                     mode="outlined"
-                    placeholder="Enter Phone Number"
+                    placeholder="Enter email or phone number"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    multiline={false}
+                    textContentType="emailAddress"
+                    autoComplete="email"
                     value={emailOrPhone}
+                    maxLength={50}
                     onChangeText={(val) => {
                       setEmailOrPhone(val);
-                      // If cleared, return to email input UI
-                      if (!val) {
-                        setShowPhoneInput(false);
+                      // Auto-switch to phone UI when first character indicates phone (digit or '+')
+                      if (!showPhoneInput && val && /^[+0-9]/.test(val[0] || '')) {
+                        setShowPhoneInput(true);
+                        setTimeout(() => {
+                          try { phoneInputRef.current?.focus?.(); } catch { }
+                        }, 0);
                       }
                     }}
-                    keyboardType="phone-pad"
-                    maxLength={15}
-                    style={{ 
-                      backgroundColor: '#f8f9fa',
+                    style={{
+                      backgroundColor: COLORS.white,
                       height: responsive.input.height,
-                      flex: 1
                     }}
-                    textColor="#333333"
-                    placeholderTextColor="#999999"
-                    outlineColor="#e9ecef"
+                    textColor={COLORS.text.secondary}
+                    placeholderTextColor={COLORS.text.disabled}
+                    outlineColor={COLORS.border.light}
                     activeOutlineColor={BRAND}
                     contentStyle={{
                       paddingVertical: 0,
                       fontSize: responsive.input.fontSize,
                       fontWeight: '700',
-                      textAlignVertical: 'center'
+                      textAlign: "left",
                     }}
                     theme={{
-                      colors: { onSurfaceVariant: '#666666' },
-                      roundness: 12,
+                      colors: {
+                        onSurfaceVariant: COLORS.text.tertiary,
+                      },
+                      roundness: BORDER_RADIUS.lg,
                     }}
-                    left={<TextInput.Icon icon={() => (
-                      <Text style={{ color: '#111827', fontWeight: '700', fontSize: responsive.input.fontSize }}>
-                        {`${selectedPhoneCountry.phoneCode} `}
-                      </Text>
-                    )} />}
+                    left={<TextInput.Icon icon="email-outline" size={responsive.size(20)} />}
                   />
                 </View>
-              </View>
-            )}
+              ) : (
+                <View>
+                  <View style={{ flexDirection: 'row', gap: 12 }}>
+                    <Pressable
+                      onPress={() => setCountryPickerVisible(true)}
+                      style={{ width: 60 }}
+                    >
+                      <View style={{
+                        backgroundColor: COLORS.white,
+                        borderWidth: 1,
+                        borderColor: COLORS.border.light,
+                        borderRadius: BORDER_RADIUS.lg,
+                        height: responsive.input.height,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        paddingHorizontal: SPACING.xs
+                      }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          {selectedPhoneCountry.flag ? (
+                            <Image
+                              source={{ uri: getConvertedFlagUrl(selectedPhoneCountry.flag) }}
+                              style={{ width: 18, height: 12, marginRight: SPACING.xs }}
+                            />
+                          ) : (
+                            <View style={{ width: 20, height: 14, marginRight: SPACING.xs, backgroundColor: COLORS.border.light, borderRadius: BORDER_RADIUS.sm }} />
+                          )}
+                          <Ionicons name="chevron-down" size={12} color={COLORS.text.tertiary} />
+                        </View>
+                      </View>
+                    </Pressable>
+
+                    <TextInput
+                      ref={phoneInputRef}
+                      mode="outlined"
+                      placeholder="Enter Phone Number"
+                      value={emailOrPhone}
+                      onChangeText={(val) => {
+                        setEmailOrPhone(val);
+                        // If cleared, return to email input UI
+                        if (!val) {
+                          setShowPhoneInput(false);
+                        }
+                      }}
+                      keyboardType="phone-pad"
+                      maxLength={15}
+                      style={{
+                        backgroundColor: COLORS.white,
+                        height: responsive.input.height,
+                        flex: 1
+                      }}
+                      textColor={COLORS.text.secondary}
+                      placeholderTextColor={COLORS.text.disabled}
+                      outlineColor={COLORS.border.light}
+                      activeOutlineColor={BRAND}
+                      contentStyle={{
+                        paddingVertical: 0,
+                        fontSize: responsive.input.fontSize,
+                        fontWeight: '700',
+                        textAlignVertical: 'center'
+                      }}
+                      theme={{
+                        colors: { onSurfaceVariant: COLORS.text.tertiary },
+                        roundness: BORDER_RADIUS.lg,
+                      }}
+                      left={<TextInput.Icon icon={() => (
+                        <Text style={{ color: COLORS.gray[900], fontWeight: '700', fontSize: responsive.input.fontSize }}>
+                          {`${selectedPhoneCountry.phoneCode} `}
+                        </Text>
+                      )} />}
+                    />
+                  </View>
+                </View>
+              )}
+            </View>
           </View>
-        </View>
 
 
-        {/* Inline validation/auth message (simple red text, like signup) */}
-        {validationMessage ? (
-          <View style={{
-            maxWidth: responsive.maxWidth.form,
-            alignSelf: 'center',
-            marginTop: 2,
-            marginBottom: responsive.spacing(6),
-            width: '100%'
-          }}>
-            <Text style={{ color: '#DC2626', fontSize: 13, fontWeight: '700' }}>
-              * {validationMessage}
-            </Text>
-          </View>
-        ) : null}
-
-
-
-        <View style={{ 
-          width: "100%", 
-          alignItems: "center",
-          maxWidth: responsive.maxWidth.form,
-          alignSelf: 'center'
-        }}>
-          <Pressable
-            onPress={sendOtp}
-            disabled={busy || !isValidInput}
-            style={{
-              height: responsive.button.height,
-              borderRadius: responsive.button.borderRadius,
-              backgroundColor: BRAND,
-              alignItems: "center",
-              justifyContent: "center",
-              marginTop: responsive.spacing(20),
-              marginBottom: responsive.spacing(16),
-              width: '100%',
-              paddingHorizontal: responsive.button.paddingHorizontal,
-              opacity: isValidInput ? 1 : 0.5,
-              shadowColor: BRAND,
-              shadowOffset: {
-                width: 0,
-                height: 4,
-              },
-              shadowOpacity: isValidInput ? 0.3 : 0,
-              shadowRadius: 12,
-              elevation: isValidInput ? 8 : 0,
-            }}
-          >
-            <Text style={{
-              fontSize: responsive.button.fontSize,
-              fontWeight: "700",
-              color: "#ffffff",
-              letterSpacing: 0.5,
+          {/* Inline validation/auth message (simple red text, like signup) */}
+          {validationMessage ? (
+            <View style={{
+              maxWidth: responsive.maxWidth.form,
+              alignSelf: 'center',
+              marginTop: 2,
+              marginBottom: responsive.spacing(6),
+              width: '100%'
             }}>
-              {busy ? "Please wait..." : "Send OTP"}
-            </Text>
-          </Pressable>
-        </View>
+              <Text style={{ color: COLORS.errorDark, fontSize: responsive.typography.caption, fontWeight: '700' }}>
+                * {validationMessage}
+              </Text>
+            </View>
+          ) : null}
 
-        {/* Divider */}
-        <View style={{ 
-          alignItems: "center", 
-          flexDirection: "row", 
-          marginTop: responsive.spacing(20),
-          marginBottom: responsive.spacing(20), 
-          width: "100%",
-          maxWidth: responsive.maxWidth.form,
-          alignSelf: 'center'
-        }}>
-          <View style={{ flex: 1, height: 1, backgroundColor: "#e9ecef" }} />
-          <Text style={{ 
-            marginHorizontal: responsive.spacing(20), 
-            color: "#666666", 
-            fontSize: responsive.typography.body2,
-            fontWeight: "500",
+
+
+          <View style={{
+            width: "100%",
+            alignItems: "center",
+            maxWidth: responsive.maxWidth.form,
+            alignSelf: 'center'
           }}>
-            or
-          </Text>
-          <View style={{ flex: 1, height: 1, backgroundColor: "#e9ecef" }} />
-        </View>
+            <Pressable
+              onPress={sendOtp}
+              disabled={busy || !isValidInput}
+              style={{
+                height: responsive.button.height,
+                borderRadius: responsive.button.borderRadius,
+                backgroundColor: BRAND,
+                alignItems: "center",
+                justifyContent: "center",
+                marginTop: responsive.spacing(20),
+                marginBottom: responsive.spacing(16),
+                width: '100%',
+                paddingHorizontal: responsive.button.paddingHorizontal,
+                opacity: isValidInput ? 1 : 0.5,
+                shadowColor: BRAND,
+                shadowOffset: {
+                  width: 0,
+                  height: 4,
+                },
+                shadowOpacity: isValidInput ? 0.3 : 0,
+                shadowRadius: 12,
+                elevation: isValidInput ? 8 : 0,
+              }}
+            >
+              <Text style={{
+                fontSize: responsive.button.fontSize,
+                fontWeight: "700",
+                color: COLORS.white,
+                letterSpacing: 0.5,
+              }}>
+                {busy ? "Please wait..." : "Send OTP"}
+              </Text>
+            </Pressable>
+          </View>
 
-                  {/* OAuth buttons - Google and LinkedIn only */}
-          <View style={{ 
-            flexDirection: "row", 
-            justifyContent: "center", 
-            gap: responsive.spacing(20), 
+          {/* Divider */}
+          <View style={{
+            alignItems: "center",
+            flexDirection: "row",
+            marginTop: responsive.spacing(20),
+            marginBottom: responsive.spacing(20),
+            width: "100%",
+            maxWidth: responsive.maxWidth.form,
+            alignSelf: 'center'
+          }}>
+            <View style={{ flex: 1, height: 1, backgroundColor: COLORS.border.light }} />
+            <Text style={{
+              marginHorizontal: responsive.spacing(20),
+              color: COLORS.text.tertiary,
+              fontSize: responsive.typography.body2,
+              fontWeight: "500",
+            }}>
+              or
+            </Text>
+            <View style={{ flex: 1, height: 1, backgroundColor: COLORS.border.light }} />
+          </View>
+
+          {/* OAuth buttons - Google and LinkedIn only */}
+          <View style={{
+            flexDirection: "row",
+            justifyContent: "center",
+            gap: responsive.spacing(20),
             marginBottom: responsive.spacing(20),
             width: "100%",
             alignItems: "center",
@@ -504,14 +504,14 @@ export default function LoginScreen() {
                   {
                     width: responsive.size(56),
                     height: responsive.size(56),
-                    borderRadius: 9999,
+                    borderRadius: BORDER_RADIUS.full,
                     backgroundColor: "transparent",
                     borderWidth: 2,
-                    borderColor: "#d1d5db",
+                    borderColor: COLORS.border.medium,
                     alignItems: "center",
                     justifyContent: "center",
                     transform: [{ scale: pressed ? 0.95 : 1 }],
-                    shadowColor: "#000",
+                    shadowColor: COLORS.black,
                     shadowOffset: { width: 0, height: 3 },
                     shadowOpacity: 0.12,
                     shadowRadius: 10,
@@ -532,14 +532,14 @@ export default function LoginScreen() {
                   {
                     width: responsive.size(56),
                     height: responsive.size(56),
-                    borderRadius: 9999,
+                    borderRadius: BORDER_RADIUS.full,
                     backgroundColor: "transparent",
                     borderWidth: 2,
-                    borderColor: "#d1d5db",
+                    borderColor: COLORS.border.medium,
                     alignItems: "center",
                     justifyContent: "center",
                     transform: [{ scale: pressed ? 0.95 : 1 }],
-                    shadowColor: "#000",
+                    shadowColor: COLORS.black,
                     shadowOffset: { width: 0, height: 3 },
                     shadowOpacity: 0.12,
                     shadowRadius: 10,
@@ -557,13 +557,13 @@ export default function LoginScreen() {
 
 
         </ScrollView>
-        
+
         {/* Footer - Terms and signup link */}
         <View style={{
           paddingHorizontal: responsive.padding.lg,
           paddingBottom: responsive.padding.lg,
           paddingTop: responsive.padding.sm,
-          backgroundColor: "#ffffff",
+          backgroundColor: SCREEN_BACKGROUND,
           maxWidth: responsive.maxWidth.form,
           alignSelf: 'center',
           width: '100%'
@@ -571,43 +571,43 @@ export default function LoginScreen() {
           {/* Terms and privacy */}
           <Text style={{
             fontSize: responsive.typography.caption,
-            color: "#999999",
+            color: COLORS.text.disabled,
             textAlign: "center",
             lineHeight: responsive.fontSize(18),
             marginBottom: responsive.spacing(12),
           }}>
             By continuing, you agree to our{"\n"}
-            <Text style={{ color: "#666666", textDecorationLine: "underline" }}>Terms of Service</Text>
+            <Text style={{ color: COLORS.text.tertiary, textDecorationLine: "underline" }}>Terms of Service</Text>
             {" "}
-            <Text style={{ color: "#666666", textDecorationLine: "underline" }}>Privacy Policy</Text>
+            <Text style={{ color: COLORS.text.tertiary, textDecorationLine: "underline" }}>Privacy Policy</Text>
             {" "}
-            <Text style={{ color: "#666666", textDecorationLine: "underline" }}>Content Policy</Text>
+            <Text style={{ color: COLORS.text.tertiary, textDecorationLine: "underline" }}>Content Policy</Text>
           </Text>
 
           {/* Bottom signup link */}
-          <Pressable 
+          <Pressable
             onPress={() => {
               console.log('📝 Navigating to signup screen...');
               router.push("/auth/signup");
             }}
             style={({ pressed }) => [
-              { 
+              {
                 transform: [{ scale: pressed ? 0.98 : 1 }],
                 paddingVertical: responsive.padding.xs,
                 alignItems: "center",
               }
             ]}
-          > 
-            <Text style={{ 
-              color: "#666666", 
+          >
+            <Text style={{
+              color: COLORS.text.tertiary,
               textAlign: "center",
               fontSize: responsive.typography.body2,
               lineHeight: responsive.fontSize(20),
             }}>
               New to Skill Drill? {" "}
-              <Text style={{ 
+              <Text style={{
                 color: BRAND,
-                fontWeight: "600", 
+                fontWeight: "600",
               }}>
                 Sign up
               </Text>

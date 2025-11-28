@@ -13,10 +13,10 @@ import { apiService } from "../../services/api";
 import CareerSkeleton from "../components/CareerSkeleton";
 import ErrorBanner from "../../components/ErrorBanner";
 
-import { BRAND, LOGO_SRC } from '../components/Brand';
+import { BRAND, LOGO_SRC, SCREEN_BACKGROUND, COLORS, BORDER_RADIUS } from '../components/Brand';
 const APP_NAME = "Skill Drill";
 const logoSrc = LOGO_SRC;
-const { width } = Dimensions.get("window");
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 type CareerLevel = { id: string; name: string; description?: string; order: number };
 type RoleType = { id: string; name: string; description?: string; order: number };
@@ -205,28 +205,28 @@ export default function CareerRoleScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#FFFFFF" },
-  container: { flex: 1, paddingHorizontal: width * 0.06 },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: 'center', paddingVertical: 16, paddingHorizontal: width * 0.06, marginHorizontal: -(width * 0.06), borderBottomWidth: 1.5, borderBottomColor: "#D1D5DB" },
-  headerTitle: { fontSize: width * 0.048, fontWeight: "700", color: "#0F172A", textAlign: 'center' },
-  sectionBar: { height: 14, backgroundColor: '#F2F3F5', borderTopWidth: 1.5, borderTopColor: '#C5C9CF', borderBottomWidth: 1, borderBottomColor: '#E5E7EB', marginHorizontal: -(width * 0.06) },
-  body: { flex: 1, backgroundColor: '#F3F4F6', marginHorizontal: -(width * 0.06), paddingHorizontal: width * 0.06 },
+  safe: { flex: 1, backgroundColor: COLORS.white },
+  container: { flex: 1, paddingHorizontal: SCREEN_WIDTH * 0.06 },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: 'center', paddingVertical: 16, paddingHorizontal: SCREEN_WIDTH * 0.06, marginHorizontal: -(SCREEN_WIDTH * 0.06), borderBottomWidth: 1.5, borderBottomColor: COLORS.border.medium },
+  headerTitle: { fontSize: SCREEN_WIDTH * 0.048, fontWeight: "700", color: COLORS.gray[900], textAlign: 'center' },
+  sectionBar: { height: 14, backgroundColor: COLORS.gray[100], borderTopWidth: 1.5, borderTopColor: COLORS.gray[300], borderBottomWidth: 1, borderBottomColor: COLORS.border.light, marginHorizontal: -(SCREEN_WIDTH * 0.06) },
+  body: { flex: 1, backgroundColor: SCREEN_BACKGROUND, marginHorizontal: -(SCREEN_WIDTH * 0.06), paddingHorizontal: SCREEN_WIDTH * 0.06 },
   scrollContent: { paddingTop: 16, paddingBottom: 24 },
-  heading: { fontSize: width * 0.044, fontWeight: "700", color: "#1A1A1A", marginBottom: 2 },
-  subHeading: { fontSize: width * 0.034, color: "#555", marginBottom: 16 },
-  sectionTitle: { fontSize: width * 0.038, fontWeight: "600", color: "#0F172A", marginTop: 10, marginBottom: 8 },
-  optionContainer: { flexDirection: "row", alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 10, borderWidth: 1, borderColor: "#D1D5DB", paddingVertical: 10, paddingHorizontal: 12, marginBottom: 8, justifyContent: "space-between" },
-  optionSelected: { borderColor: "#3B82F6", backgroundColor: "#EFF6FF" },
+  heading: { fontSize: SCREEN_WIDTH * 0.044, fontWeight: "700", color: COLORS.text.primary, marginBottom: 2 },
+  subHeading: { fontSize: SCREEN_WIDTH * 0.034, color: COLORS.text.tertiary, marginBottom: 16 },
+  sectionTitle: { fontSize: SCREEN_WIDTH * 0.038, fontWeight: "600", color: COLORS.gray[900], marginTop: 10, marginBottom: 8 },
+  optionContainer: { flexDirection: "row", alignItems: "center", backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.border.medium, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 8, justifyContent: "space-between" },
+  optionSelected: { borderColor: BRAND, backgroundColor: "#EFF6FF" },
   optionTextContainer: { flex: 1, marginRight: 10 },
-  optionTitle: { fontSize: width * 0.04, fontWeight: "500", color: "#111827" },
-  optionSubtitle: { fontSize: width * 0.03, color: "#4B5563", marginTop: 2 },
-  radioOuter: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: "#6B7280", alignItems: "center", justifyContent: "center" },
-  radioOuterActive: { borderColor: "#2563EB" },
-  radioInner: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#2563EB" },
-  footer: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: width * 0.06, paddingVertical: 12, backgroundColor: '#FFFFFF', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#D1D5DB' },
-  continueButton: { backgroundColor: BRAND, borderRadius: 22, alignItems: "center", justifyContent: "center", paddingVertical: 12, marginHorizontal: 6 },
+  optionTitle: { fontSize: SCREEN_WIDTH * 0.04, fontWeight: "500", color: COLORS.gray[900] },
+  optionSubtitle: { fontSize: SCREEN_WIDTH * 0.03, color: COLORS.text.secondary, marginTop: 2 },
+  radioOuter: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: COLORS.text.tertiary, alignItems: "center", justifyContent: "center" },
+  radioOuterActive: { borderColor: BRAND },
+  radioInner: { width: 8, height: 8, borderRadius: 4, backgroundColor: BRAND },
+  footer: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: SCREEN_WIDTH * 0.06, paddingVertical: 12, backgroundColor: COLORS.white, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.border.medium },
+  continueButton: { backgroundColor: BRAND, borderRadius: BORDER_RADIUS['2xl'], alignItems: "center", justifyContent: "center", paddingVertical: 12, marginHorizontal: 6 },
   continueDisabled: { opacity: 0.6 },
-  continueText: { color: "#fff", fontSize: width * 0.038, fontWeight: "600" },
+  continueText: { color: COLORS.white, fontSize: SCREEN_WIDTH * 0.038, fontWeight: "600" },
 });
 
 

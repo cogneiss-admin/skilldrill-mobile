@@ -1213,6 +1213,26 @@ export default function ProfileScreen() {
                 </View>
               </TouchableOpacity>
             </View>
+
+            {/* Subscription Button */}
+            <View style={{ width: '100%', marginTop: 8, marginBottom: 8 }}>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => router.push({ pathname: '/subscriptionScreen', params: { mode: 'subscription' } })}
+                style={{
+                  backgroundColor: BRAND,
+                  borderRadius: 12,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingVertical: 14,
+                  flexDirection: 'row',
+                  gap: 8,
+                }}
+              >
+                <Ionicons name="diamond-outline" size={18} color="#FFFFFF" />
+                <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '700' }}>Subscription</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Logout Button */}
