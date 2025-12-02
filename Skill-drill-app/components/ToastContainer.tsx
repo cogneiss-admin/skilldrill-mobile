@@ -13,7 +13,7 @@ interface ToastContainerProps {
     onPress?: () => void;
     actionText?: string;
     showIcon?: boolean;
-    position?: 'top' | 'bottom';
+    position?: 'top' | 'center' | 'bottom';
   }[];
   onDismiss: (id: string) => void;
 }
@@ -22,7 +22,8 @@ export default function ToastContainer({ toasts, onDismiss }: ToastContainerProp
   const responsive = useResponsive();
 
   // Group toasts by position
-  const topToasts = toasts.filter(toast => toast.position !== 'bottom');
+  const topToasts = toasts.filter(toast => !toast.position || toast.position === 'top');
+  const centerToasts = toasts.filter(toast => toast.position === 'center');
   const bottomToasts = toasts.filter(toast => toast.position === 'bottom');
 
   return (
@@ -52,6 +53,25 @@ export default function ToastContainer({ toasts, onDismiss }: ToastContainerProp
               position="top"
             />
           </View>
+        ))}
+      </View>
+
+      {/* Center toasts */}
+      <View style={styles.centerContainer} pointerEvents="box-none">
+        {centerToasts.map((toast) => (
+          <ToastNotification
+            key={toast.id}
+            visible={true}
+            type={toast.type}
+            title={toast.title}
+            message={toast.message}
+            duration={toast.duration}
+            onDismiss={() => onDismiss(toast.id)}
+            onPress={toast.onPress}
+            actionText={toast.actionText}
+            showIcon={toast.showIcon}
+            position="center"
+          />
         ))}
       </View>
 
@@ -100,6 +120,15 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
+  },
+  centerContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   bottomContainer: {
     position: 'absolute',

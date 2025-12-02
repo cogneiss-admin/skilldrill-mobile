@@ -18,7 +18,7 @@ interface ToastNotificationProps {
   onPress?: () => void;
   actionText?: string;
   showIcon?: boolean;
-  position?: 'top' | 'bottom';
+  position?: 'top' | 'center' | 'bottom';
 }
 
 const TOAST_CONFIG = {
@@ -150,11 +150,12 @@ export default function ToastNotification({
     <Animated.View
       style={[
         styles.container,
+        position === 'center' && styles.centerContainer,
         {
           top: position === 'top' ? responsive.spacing(20) : undefined,
           bottom: position === 'bottom' ? responsive.spacing(20) : undefined,
           transform: [
-            { translateY: slideAnim },
+            { translateY: position === 'center' ? 0 : slideAnim },
             { scale: scaleAnim },
           ],
           opacity: opacityAnim,
@@ -176,6 +177,11 @@ export default function ToastNotification({
             shadowOpacity: 0.15,
             shadowRadius: 8,
             elevation: 8,
+            // For center position, set explicit width
+            ...(position === 'center' && {
+              width: screenWidth - (responsive.padding.lg * 2),
+              maxWidth: 400,
+            }),
           },
         ]}
         onPress={handlePress}
@@ -263,6 +269,12 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 1000,
+  },
+  centerContainer: {
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   toast: {
     borderWidth: 1,

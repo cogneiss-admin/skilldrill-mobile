@@ -13,6 +13,7 @@ import { store } from "../store";
 import { useAuth } from "../hooks/useAuth";
 import ToastContainer from "../components/ToastContainer";
 import { useToast } from "../hooks/useToast";
+import { ToastProvider } from "../contexts/ToastContext";
 import { BRAND, LOGO_SRC } from "./components/Brand";
 import SessionManager from "../utils/sessionManager";
 
@@ -315,4 +316,13 @@ const RootLayout = React.memo(() => {
 
 RootLayout.displayName = 'RootLayout';
 
-export default RootLayout;
+// Wrap with ToastProvider so all components share the same toast state
+function RootLayoutWithToast() {
+  return (
+    <ToastProvider>
+      <RootLayout />
+    </ToastProvider>
+  );
+}
+
+export default RootLayoutWithToast;
