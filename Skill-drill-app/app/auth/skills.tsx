@@ -71,9 +71,9 @@ export default function SkillsScreen() {
           return;
         }
 
-        // Don't redirect if user came from discover page
-        if (returnTo === 'discover') {
-          console.log('🔍 Came from discover page: Allowing user to explore skills');
+        // Don't redirect if user came from another page (discover, activity, etc.)
+        if (returnTo) {
+          console.log(`🔍 Came from ${returnTo} page: Allowing user to explore skills`);
           return;
         }
 
@@ -230,9 +230,11 @@ export default function SkillsScreen() {
 
           showToast('success', 'Skills Added!', `${response.data.addedSkills} skill(s) added to your assessment.`);
 
-          // Navigate back to discover if returnTo is set
+          // Navigate back to the page user came from
           if (returnTo === 'discover') {
             router.replace('/discover');
+          } else if (returnTo === 'activity') {
+            router.replace('/activity');
           } else {
             router.replace('/dashboard');
           }
@@ -314,9 +316,11 @@ export default function SkillsScreen() {
             }
           }
 
-          // Navigate back to discover if returnTo is set
+          // Navigate back to the page user came from
           if (returnTo === 'discover') {
             router.replace('/discover');
+          } else if (returnTo === 'activity') {
+            router.replace('/activity');
           } else {
             router.replace('/dashboard');
           }

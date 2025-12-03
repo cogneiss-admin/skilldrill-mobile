@@ -118,9 +118,9 @@ const getPricingData = (recommendation: RecommendationResponse | null): PricingD
     // Handle FIXED pricing mode
     if (pricing.pricingMode === 'FIXED') {
       return {
-        finalPrice: pricing.totalPrice || 0,
+        finalPrice: pricing.finalPrice || 0,
         recommendedDrills: drillCount,
-        validUntil: pricing.config?.expiresAt,
+        validUntil: pricing.expiresAt,
         calculation: {
           config: {
             pricingMode: 'FIXED',
@@ -133,27 +133,27 @@ const getPricingData = (recommendation: RecommendationResponse | null): PricingD
     // Handle DYNAMIC pricing mode
     if (pricing.pricingMode === 'DYNAMIC') {
       return {
-        finalPrice: pricing.pricing?.totalPrice || 0,
+        finalPrice: pricing.finalPrice || 0,
         recommendedDrills: drillCount,
-        validUntil: pricing.config?.expiresAt,
+        validUntil: pricing.expiresAt,
         calculation: {
           config: {
             pricingMode: 'DYNAMIC',
-            pricePerDrill: pricing.pricing?.finalCostPerDrill,
-            marginType: pricing.pricing?.marginType,
-            marginValue: pricing.pricing?.marginValue,
-            bufferPercent: pricing.config?.bufferPercent,
+            pricePerDrill: pricing.pricePerDrill,
+            marginType: pricing.calculation?.marginType,
+            marginValue: pricing.calculation?.marginValue,
+            bufferPercent: pricing.calculation?.bufferPercent,
           },
           tokenEstimation: {
-            total: pricing.tokens?.breakdown?.scoring?.raw,
+            total: pricing.tokens?.totalPerDrill,
             totalWithBuffer: pricing.tokens?.totalWithBuffer,
             buffer: pricing.tokens?.buffer,
           },
           costCalculation: {
-            baseCost: pricing.pricing?.baseCost,
-            margin: pricing.pricing?.marginApplied,
-            costPerDrill: pricing.pricing?.finalCostPerDrill,
-            totalPrice: pricing.pricing?.totalPrice,
+            baseCost: pricing.calculation?.baseCost,
+            margin: pricing.calculation?.marginApplied,
+            costPerDrill: pricing.pricePerDrill,
+            totalPrice: pricing.finalPrice,
           }
         }
       };

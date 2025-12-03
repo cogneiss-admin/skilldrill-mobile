@@ -164,6 +164,13 @@ export default function Discover() {
             index >= 2 && styles.categoryCardBottom,
           ]}
           activeOpacity={0.8}
+          onPress={() => router.push({
+            pathname: '/auth/skills',
+            params: {
+              category: category.name,
+              returnTo: 'discover'
+            }
+          })}
         >
           <View style={styles.categoryAvatar}>
             <Text style={styles.categoryInitials}>{getInitials(category.name)}</Text>

@@ -95,10 +95,11 @@ export default function SubscriptionScreen() {
           recommendationId: params.recommendationId,
         },
         onSuccess: (assignmentId) => {
-          showSuccess('Payment successful! Your drills are ready.');
+          showSuccess('Payment successful! Your drills are unlocked.');
+          // Redirect to Activity page (drills tab) - user will click "Start" to generate drills
           router.push({
-            pathname: '/drillsScenarios',
-            params: { assignmentId }
+            pathname: '/activity',
+            params: { tab: 'drills' }
           });
         },
         onCancel: () => {
@@ -127,9 +128,11 @@ export default function SubscriptionScreen() {
         recommendationId: params.recommendationId,
       });
 
+      showSuccess('Drills unlocked! Tap Start to begin practice.');
+      // Redirect to Activity page (drills tab) - user will click "Start" to generate drills
       router.push({
-        pathname: '/drillsScenarios',
-        params: { assignmentId }
+        pathname: '/activity',
+        params: { tab: 'drills' }
       });
     } catch (error: any) {
       showError(error.message || 'Failed to unlock drills.');

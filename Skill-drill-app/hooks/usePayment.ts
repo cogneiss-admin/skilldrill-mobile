@@ -125,25 +125,11 @@ export const usePayment = (): UsePaymentReturn => {
       }
 
       console.log('[Payment] ✅ Payment successful!');
-      showSuccess('Payment successful! Generating your drills...');
 
-      // Step 4: Poll for drill assignment
-      // Backend webhook will create the assignment
-      // Get skillId from metadata (legacy) or from checkout response (dynamic)
-      const skillId = params.metadata?.skillId || checkoutRes.data?.skillId;
-
-      if (!skillId) {
-        console.warn('[Payment] No skillId available for polling, skipping assignment check');
-        params.onSuccess('');
-        return;
-      }
-
-      const assignmentId = await pollForAssignment(skillId);
-
-      console.log('[Payment] ✅ Drill assignment created:', assignmentId);
-
-      // Step 5: Success callback
-      params.onSuccess(assignmentId);
+      // Success! The Stripe webhook will create the DrillAssignment in the background.
+      // We don't need to poll - just redirect to Activity page where user can start drills.
+      // The assignment will be there by the time user navigates (webhook is fast).
+      params.onSuccess('');
 
     } catch (error: unknown) {
       console.error('[Payment] Error:', error);

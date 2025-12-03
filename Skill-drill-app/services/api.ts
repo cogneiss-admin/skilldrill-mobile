@@ -656,6 +656,15 @@ class ApiService {
   }
 
   /**
+   * Generate drill items for an unlocked assignment
+   * Called when user clicks "Start Drills Practice" on an unlocked drill
+   */
+  public async generateDrillItems(assignmentId: string): Promise<ApiResponse> {
+    console.log('🎯 Generating drill items for assignment:', assignmentId);
+    return this.post(`/drills/assignments/${assignmentId}/generate`, {});
+  }
+
+  /**
    * Get user's recommendations (pending assessments + unpurchased drill packs)
    */
   public async getUserRecommendations(): Promise<ApiResponse> {

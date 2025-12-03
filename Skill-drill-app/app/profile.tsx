@@ -987,8 +987,12 @@ export default function ProfileScreen() {
       </View>
 
       {/* Body - same background as skills/careerRole */}
-      <View style={{ flex: 1, backgroundColor: '#F3F4F6', marginHorizontal: -(width * 0.06), paddingHorizontal: width * 0.06 }}>
-        <View style={{ paddingTop: 0, paddingBottom: 80 }}>
+      <View style={{ flex: 1, backgroundColor: '#F3F4F6', marginHorizontal: -(width * 0.06) }}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingTop: 0, paddingBottom: 100, paddingHorizontal: width * 0.06 }}
+          showsVerticalScrollIndicator={false}
+        >
 
           {/* Profile Card */}
           <View style={styles.card}>
@@ -1253,7 +1257,7 @@ export default function ProfileScreen() {
               <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '700' }}>Logout</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </ScrollView>
 
         {/* Sticky footer - same as continue button style */}
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: width * 0.06, paddingTop: 12, paddingBottom: 12, zIndex: 1000, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#D1D5DB' }}>
@@ -1362,7 +1366,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   label: { fontSize: 14, color: '#666666', marginBottom: 8, fontWeight: '500' },
   input: { backgroundColor: '#f8f9fa', height: 56 },
-  card: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: '#E5E7EB', marginTop: 22, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
+  card: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: '#E5E7EB', marginTop: 55, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
   avatarCircle: { width: 96, height: 96, borderRadius: 48, backgroundColor: '#374151', borderWidth: 2, borderColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4, overflow: 'hidden' },
   avatarInitial: { fontSize: 36, fontWeight: '800', color: '#FFFFFF' },
   selectInput: { backgroundColor: '#f8f9fa', height: 56, borderWidth: 1, borderColor: '#e9ecef', borderRadius: 12, paddingHorizontal: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },

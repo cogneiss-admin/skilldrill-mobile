@@ -52,28 +52,33 @@ export default function Activity() {
 
       if (userSkillsResponse.success && userSkillsResponse.data) {
         const mappedAssessments: ActivityCardProps['data'][] = userSkillsResponse.data.map((item: any) => {
-          // Determine UI status from backend data
-          let uiStatus: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
+          // Use backend status directly
+          // null = no session (Start Assessment)
+          // PENDING = session in progress (Resume Assessment)
+          // COMPLETED = session done (See Results)
+          const backendStatus = item.assessmentStatus;
 
-          if (item.assessmentStatus === 'COMPLETED') {
-            uiStatus = 'COMPLETED';
-          } else if (item.progress?.hasResponses) {
-            uiStatus = 'IN_PROGRESS';
+          // Map backend status to UI status
+          let status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
+          if (backendStatus === 'COMPLETED') {
+            status = 'COMPLETED';
+          } else if (backendStatus === 'PENDING') {
+            status = 'IN_PROGRESS';
           } else {
-            uiStatus = 'NOT_STARTED';
+            status = 'NOT_STARTED';
           }
 
           return {
             id: item.skill.id,
             skillName: item.skill.name,
-            status: uiStatus,
-            progress: uiStatus === 'IN_PROGRESS' ? {
+            status: status,
+            progress: backendStatus === 'PENDING' ? {
               current: item.progress.completed,
               total: item.progress.total,
               percentage: item.progress.percentage
             } : undefined,
             startedAt: item.startedAt,
-            assessmentId: item.assessmentId // For navigating to results
+            assessmentId: item.assessmentId
           };
         });
 
@@ -86,20 +91,33 @@ export default function Activity() {
       let allDrills: ActivityCardProps['data'][] = [];
 
       if (assignmentsResponse.success && assignmentsResponse.data?.assignments) {
-        const mappedAssignments: ActivityCardProps['data'][] = assignmentsResponse.data.assignments.map((assignment: any) => ({
-          id: assignment.id,
-          skillName: assignment.skillName,
-          // Fix status mapping - backend returns 'Completed', 'InProgress', 'Pending'
-          status: (assignment.status === 'Completed' || assignment.status === 'COMPLETED') ? 'Completed' : 'Active',
-          progress: {
-            current: assignment.completed,
-            total: assignment.total,
-            percentage: assignment.completionPercentage
-          },
-          score: assignment.averageScore ? {
-            average: assignment.averageScore
-          } : undefined
-        }));
+        const mappedAssignments: ActivityCardProps['data'][] = assignmentsResponse.data.assignments.map((assignment: any) => {
+          // Map backend status to UI status
+          // Backend: 'Unlocked', 'Pending', 'InProgress', 'Completed'
+          let uiStatus: 'Unlocked' | 'Active' | 'Completed';
+          if (assignment.status === 'Completed' || assignment.status === 'COMPLETED') {
+            uiStatus = 'Completed';
+          } else if (assignment.status === 'Unlocked') {
+            uiStatus = 'Unlocked'; // New status - purchased but drills not generated yet
+          } else {
+            uiStatus = 'Active'; // Pending or InProgress
+          }
+
+          return {
+            id: assignment.id,
+            skillName: assignment.skillName,
+            status: uiStatus,
+            backendStatus: assignment.status, // Keep original status for generation check
+            progress: {
+              current: assignment.completed,
+              total: assignment.total,
+              percentage: assignment.completionPercentage
+            },
+            score: assignment.averageScore ? {
+              average: assignment.averageScore
+            } : undefined
+          };
+        });
 
         allDrills = [...mappedAssignments];
       }
@@ -206,12 +224,22 @@ export default function Activity() {
   };
 
   // Drill handlers - similar to assessment but navigates to drillsScenarios
-  const handleStartDrill = async (assignmentId: string, skillName: string) => {
+  const handleStartDrill = async (assignmentId: string, skillName: string, backendStatus?: string) => {
     setLoadingSkillName(skillName);
     setIsResuming(false);
     setShowAiLoader(true);
 
     try {
+      // If drill is Unlocked, generate items first
+      if (backendStatus === 'Unlocked') {
+        console.log('🔄 Generating drill items for unlocked assignment:', assignmentId);
+        const generateResponse = await apiService.generateDrillItems(assignmentId);
+        if (!generateResponse.success) {
+          throw new Error(generateResponse.message || 'Failed to generate drills');
+        }
+        console.log('✅ Drill items generated:', generateResponse.data);
+      }
+
       // Navigate to drillsScenarios - useDrillProgress hook will handle session creation
       setShowAiLoader(false);
       router.push({
@@ -251,7 +279,8 @@ export default function Activity() {
     switch (action) {
       case 'start':
         if (isDrill) {
-          handleStartDrill(id, derivedSkillName);
+          // Pass backendStatus to check if we need to generate items first
+          handleStartDrill(id, derivedSkillName, (drill as any)?.backendStatus);
         } else {
           handleStartAssessment(id, derivedSkillName);
         }
@@ -384,25 +413,51 @@ export default function Activity() {
               {activeTab === 'assessments' ? (
                 <View style={styles.listContainer}>
                   {assessments.length > 0 ? (
-                    assessments.map((item, index) => (
-                      <ActivityCard
-                        key={`assessment-${index}`}
-                        type="assessment"
-                        data={item}
-                        onAction={handleAction}
-                      />
-                    ))
+                    <>
+                      {assessments.map((item, index) => (
+                        <ActivityCard
+                          key={`assessment-${index}`}
+                          type="assessment"
+                          data={item}
+                          onAction={handleAction}
+                        />
+                      ))}
+                      {/* Explore More Skills Button */}
+                      <TouchableOpacity
+                        style={styles.exploreMoreButton}
+                        activeOpacity={0.8}
+                        onPress={() => router.push({ pathname: '/auth/skills', params: { returnTo: 'activity' } })}
+                      >
+                        <Ionicons name="add-circle-outline" size={20} color={BRAND} />
+                        <Text style={styles.exploreMoreText}>Explore More Skills</Text>
+                      </TouchableOpacity>
+                    </>
                   ) : (
                     <View style={styles.emptyState}>
                       <Text style={styles.emptyStateText}>No active assessments found.</Text>
-                      <TouchableOpacity onPress={() => router.push('/discover')}>
-                        <Text style={styles.emptyStateLink}>Discover Skills</Text>
+                      <TouchableOpacity onPress={() => router.push({ pathname: '/auth/skills', params: { returnTo: 'activity' } })}>
+                        <Text style={styles.emptyStateLink}>Explore Skills</Text>
                       </TouchableOpacity>
                     </View>
                   )}
                 </View>
               ) : (
                 <View style={styles.listContainer}>
+                  {/* Unlocked Drills - Ready to Start */}
+                  {drills.some(d => d.status === 'Unlocked') && (
+                    <View style={styles.sectionHeader}>
+                      <Text style={styles.sectionTitle}>Ready to Start</Text>
+                    </View>
+                  )}
+                  {drills.filter(d => d.status === 'Unlocked').map((item, index) => (
+                    <ActivityCard
+                      key={`unlocked-${index}`}
+                      type="drill"
+                      data={item}
+                      onAction={handleAction}
+                    />
+                  ))}
+
                   {/* Active Drills */}
                   {drills.some(d => d.status === 'Active') && (
                     <View style={styles.sectionHeader}>
@@ -620,6 +675,25 @@ const styles = StyleSheet.create({
   emptyStateLink: {
     fontSize: SCREEN_WIDTH * 0.04,
     fontWeight: '700',
+    color: BRAND,
+  },
+  exploreMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: SCREEN_WIDTH * 0.03,
+    borderWidth: 1.5,
+    borderColor: BRAND,
+    borderStyle: 'dashed',
+    paddingVertical: SCREEN_WIDTH * 0.035,
+    paddingHorizontal: SCREEN_WIDTH * 0.04,
+    marginTop: SCREEN_WIDTH * 0.02,
+    gap: SCREEN_WIDTH * 0.02,
+  },
+  exploreMoreText: {
+    fontSize: SCREEN_WIDTH * 0.038,
+    fontWeight: '600',
     color: BRAND,
   },
   // AI Loader Styles

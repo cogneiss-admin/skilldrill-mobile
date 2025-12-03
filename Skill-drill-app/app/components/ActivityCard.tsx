@@ -10,8 +10,8 @@ export interface ActivityCardProps {
         skillId?: string; // For drill recommendations - needed for subscription screen
         skillName: string;
         // Assessment statuses: NOT_STARTED, IN_PROGRESS, COMPLETED
-        // Drill statuses: Active, Completed, NOT_STARTED (locked)
-        status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'Active' | 'Completed';
+        // Drill statuses: Unlocked, Active, Completed, NOT_STARTED (locked)
+        status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'Unlocked' | 'Active' | 'Completed';
         progress?: {
             current: number;
             total: number;
@@ -132,6 +132,8 @@ export default function ActivityCard({ type, data, onAction }: ActivityCardProps
     const renderDrillCard = () => {
         const isLocked = !data.progress && data.status === 'NOT_STARTED'; // Assuming no progress means locked/unpurchased
         const isCompleted = data.status === 'Completed';
+        const isUnlocked = data.status === 'Unlocked'; // Purchased but drills not generated yet
+        const isActive = data.status === 'Active'; // Drills generated, in progress
 
         if (isLocked) {
             return (
@@ -158,16 +160,33 @@ export default function ActivityCard({ type, data, onAction }: ActivityCardProps
             );
         }
 
+        // Determine button text and action based on status
+        let buttonText = 'Resume Practice';
+        let buttonAction: 'start' | 'resume' | 'view_results' | 'view_details' = 'resume';
+        if (isCompleted) {
+            buttonText = 'View Results';
+            buttonAction = 'view_details';
+        } else if (isUnlocked) {
+            buttonText = 'Start Practice';
+            buttonAction = 'start';
+        }
+
         return (
             <View style={styles.card}>
                 <View style={styles.content}>
                     <View style={styles.drillHeader}>
                         <Text style={styles.drillTitle}>{data.skillName}</Text>
-                        {/* Optional Settings Icon */}
+                        {/* Status indicator for unlocked drills */}
+                        {isUnlocked && (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}>
+                                <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                                <Text style={{ fontSize: 12, color: '#10B981', marginLeft: 4 }}>Ready</Text>
+                            </View>
+                        )}
                     </View>
 
-                    {/* Progress Bar */}
-                    {data.progress && (
+                    {/* Progress Bar - show for active drills with progress */}
+                    {data.progress && !isUnlocked && (
                         <View style={styles.progressSection}>
                             <View style={styles.progressBarBg}>
                                 <View style={[styles.progressBarFill, { width: `${data.progress.percentage}%` }]} />
@@ -176,6 +195,13 @@ export default function ActivityCard({ type, data, onAction }: ActivityCardProps
                                 {data.progress.current}/{data.progress.total} drills completed - {data.progress.percentage}%
                             </Text>
                         </View>
+                    )}
+
+                    {/* Info for unlocked drills */}
+                    {isUnlocked && data.progress && (
+                        <Text style={{ fontSize: 14, color: '#6B7280', marginBottom: 12 }}>
+                            {data.progress.total} personalized drills ready for you
+                        </Text>
                     )}
 
                     {/* Average Score (Only for Completed) */}
@@ -188,10 +214,10 @@ export default function ActivityCard({ type, data, onAction }: ActivityCardProps
                     {/* Action Button */}
                     <TouchableOpacity
                         style={isCompleted ? styles.secondaryButtonFull : styles.primaryButton}
-                        onPress={() => onAction(isCompleted ? 'view_details' : 'resume', data.id)}
+                        onPress={() => onAction(buttonAction, data.id)}
                     >
                         <Text style={isCompleted ? styles.secondaryButtonText : styles.primaryButtonText}>
-                            {isCompleted ? 'View Results' : 'Resume Practice'}
+                            {buttonText}
                         </Text>
                     </TouchableOpacity>
                 </View>
