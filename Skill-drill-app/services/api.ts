@@ -548,6 +548,14 @@ class ApiService {
     return this.get('/commerce/pricing');
   }
 
+  /**
+   * Get subscription plans for user's career level
+   */
+  public async getSubscriptionPlans(): Promise<ApiResponse> {
+    console.log('📋 Fetching subscription plans');
+    return this.get('/commerce/subscription-plans');
+  }
+
   // ===========================================
   // DRILL ASSIGNMENT METHODS
   // ===========================================

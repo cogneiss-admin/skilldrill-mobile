@@ -23,6 +23,7 @@ export interface CheckoutRequest {
   provider: string;
   priceId?: string;
   recommendationId?: string;
+  planId?: string; // For subscription checkout
   skillId?: string;
   assessmentId?: string;
   metadata?: Record<string, unknown>;

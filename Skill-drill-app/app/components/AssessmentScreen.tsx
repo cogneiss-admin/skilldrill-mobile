@@ -9,13 +9,15 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { View, Text, Alert, Modal, StyleSheet } from "react-native";
+import { View, Text, Alert, Modal, StyleSheet, ActivityIndicator, Dimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { BlurView } from 'expo-blur';
 import LottieView from 'lottie-react-native';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 import { useAssessmentSession } from "../../hooks/useAssessmentSession";
 import { useToast } from "../../hooks/useToast";
@@ -68,6 +70,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   const [isLoadingResults, setIsLoadingResults] = useState(false);
   const [completedSessionId, setCompletedSessionId] = useState<string | null>(null);
   const [showAiLoader, setShowAiLoader] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // ==================== RESULTS MODE STATE ====================
   const [parsedResults, setParsedResults] = useState<any>(null);
@@ -80,6 +83,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
       return;
     }
 
+    setIsSubmitting(true);
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
@@ -98,6 +102,8 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
       }
     } catch (error: any) {
       showToast('error', 'Submission Failed', error.message || 'Failed to submit response');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -122,12 +128,13 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   };
 
   const handleSeeResults = async () => {
+    // If we already have results cached, use them
     if (assessmentResults) {
       setShowCompletionDialog(false);
       if (onComplete) {
         onComplete(assessmentResults);
       } else {
-        router.push({
+        router.replace({
           pathname: "/assessmentResults",
           params: {
             results: JSON.stringify(assessmentResults),
@@ -143,42 +150,88 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
     setShowAiLoader(true);
     setIsLoadingResults(true);
 
-    try {
-      const targetSessionId = completedSessionId || currentSessionId;
-      const response = await apiService.getAdaptiveResults(targetSessionId);
+    const targetSessionId = completedSessionId || currentSessionId;
+    const maxRetries = 20; // Maximum number of polling attempts
+    const retryDelay = 2000; // 2 seconds between retries
+    let attempts = 0;
 
-      if (response.success) {
-        setAssessmentResults(response.data);
-        setShowAiLoader(false);
+    const pollForResults = async (): Promise<void> => {
+      try {
+        const response = await apiService.getAdaptiveResults(targetSessionId);
 
-        if (onComplete) {
-          onComplete(response.data);
-        } else {
-          router.push({
-            pathname: "/assessmentResults",
-            params: {
-              results: JSON.stringify({ ...response.data, assessmentId: targetSessionId, skillName }),
-              skillName: skillName,
-              assessmentId: targetSessionId,
+        if (response.success) {
+          // Check if results are ready
+          if (response.data.status === 'ready') {
+            // Results are ready!
+            const resultsData = {
+              finalScore: response.data.finalScore,
+              feedbackGood: response.data.feedbackGood,
+              feedbackImprove: response.data.feedbackImprove,
+              feedbackSummary: response.data.feedbackSummary
+            };
+            
+            setAssessmentResults(resultsData);
+            setShowAiLoader(false);
+            setIsLoadingResults(false);
+
+            if (onComplete) {
+              onComplete(resultsData);
+            } else {
+              router.replace({
+                pathname: "/assessmentResults",
+                params: {
+                  results: JSON.stringify({ ...resultsData, assessmentId: targetSessionId, skillName }),
+                  skillName: skillName,
+                  assessmentId: targetSessionId,
+                }
+              });
             }
-          });
+          } else if (response.data.status === 'processing') {
+            // Still processing - poll again
+            attempts++;
+            if (attempts >= maxRetries) {
+              // Max retries reached
+              setShowAiLoader(false);
+              setIsLoadingResults(false);
+              showToast('error', 'Timeout', 'Results are taking longer than expected. Please try again later.');
+            } else {
+              // Wait and retry
+              setTimeout(pollForResults, retryDelay);
+            }
+          } else {
+            // Unexpected response format
+            setShowAiLoader(false);
+            setIsLoadingResults(false);
+            showToast('error', 'Error', 'Unexpected response format');
+          }
+        } else {
+          // API error
+          setShowAiLoader(false);
+          setIsLoadingResults(false);
+          showToast('error', 'Error', response.message || 'Failed to load assessment results');
         }
-      } else {
-        setShowAiLoader(false);
-        showToast('error', 'Error', 'Failed to load assessment results');
+      } catch (error) {
+        // Network or other error
+        attempts++;
+        if (attempts >= maxRetries) {
+          setShowAiLoader(false);
+          setIsLoadingResults(false);
+          showToast('error', 'Error', 'Failed to load assessment results. Please try again later.');
+        } else {
+          // Retry on error
+          setTimeout(pollForResults, retryDelay);
+        }
       }
-    } catch (error) {
-      setShowAiLoader(false);
-      showToast('error', 'Error', 'Failed to load assessment results');
-    } finally {
-      setIsLoadingResults(false);
-    }
+    };
+
+    // Start polling
+    pollForResults();
   };
 
   const handleContinueNext = () => {
     setShowCompletionDialog(false);
     setCompletedSessionId(null);
-    router.push("/dashboard");
+    router.replace("/auth/skills?mode=assessment&assessment=true");
   };
 
   // ==================== RESULTS MODE LOGIC ====================
@@ -209,11 +262,23 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
       const response = await apiService.getAdaptiveResults(assessmentId);
 
       if (response.success) {
-        console.log('✅ Results fetched:', response.data);
-        setParsedResults({
-          ...response.data,
-          assessmentId: assessmentId
-        });
+        // Check if results are ready
+        if (response.data.status === 'ready') {
+          console.log('✅ Results fetched:', response.data);
+          setParsedResults({
+            finalScore: response.data.finalScore,
+            feedbackGood: response.data.feedbackGood,
+            feedbackImprove: response.data.feedbackImprove,
+            feedbackSummary: response.data.feedbackSummary,
+            assessmentId: assessmentId
+          });
+        } else if (response.data.status === 'processing') {
+          // Results still processing - show message
+          showToast('info', 'Processing', 'Results are still being generated. Please refresh in a moment.');
+        } else {
+          console.error('❌ Unexpected response format:', response.data);
+          showToast('error', 'Error', 'Unexpected response format');
+        }
       } else {
         console.error('❌ Failed to fetch results:', response.message);
         showToast('error', 'Error', 'Failed to load assessment results');
@@ -227,7 +292,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   };
 
   const handleBack = () => {
-    router.back();
+    router.replace('/activity?tab=assessments');
   };
 
   const handleRecommendedSteps = () => {
@@ -264,9 +329,9 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
           scenarioText={currentQuestion?.scenario}
           onSubmit={handleSubmitResponse}
           onExit={handleExit}
-          loading={isLoadingResults}
-          loadingMessage={isLoadingResults ? 'Finalizing your results...' : 'Processing...'}
-          loadingSubMessage={isLoadingResults ? 'Summarizing your performance' : ''}
+          loading={false}
+          loadingMessage="Processing..."
+          loadingSubMessage=""
           submitting={loading}
         />
 
@@ -275,7 +340,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
           skillName={skillName || "Assessment"}
           onSeeResults={handleSeeResults}
           onContinueNext={handleContinueNext}
-          isLoadingResults={isLoadingResults}
+          isLoadingResults={false}
         />
 
         {/* AI Loader Modal for Results Generation */}
@@ -300,6 +365,21 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
               </Text>
             </View>
           </BlurView>
+        </Modal>
+
+        {/* Simple Loader for Scoring/Processing */}
+        <Modal
+          visible={isSubmitting}
+          transparent
+          animationType="fade"
+          statusBarTranslucent
+        >
+          <View style={styles.blurContainer}>
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#FFFFFF" />
+              <Text style={[styles.loadingText, { color: '#FFFFFF', marginTop: SCREEN_WIDTH * 0.04 }]}>Processing your response...</Text>
+            </View>
+          </View>
         </Modal>
       </>
     );
@@ -364,6 +444,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
+  },
+  blurContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.8)',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SCREEN_WIDTH * 0.06,
+  },
+  loadingText: {
+    marginTop: SCREEN_WIDTH * 0.025,
+    fontSize: SCREEN_WIDTH * 0.04,
   },
 });
 

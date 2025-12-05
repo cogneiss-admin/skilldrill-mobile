@@ -29,6 +29,8 @@ interface PaymentParams {
   priceId?: string;
   // Dynamic mode: use recommendationId for token-based pricing
   recommendationId?: string;
+  // Subscription mode: use planId for subscription purchase
+  planId?: string;
   metadata?: {
     skillId: string;
     assessmentId?: string;
@@ -56,8 +58,8 @@ export const usePayment = (): UsePaymentReturn => {
 
     try {
       // Validate input parameters
-      if (!params.priceId && !params.recommendationId) {
-        throw new Error('Either priceId or recommendationId is required');
+      if (!params.priceId && !params.recommendationId && !params.planId) {
+        throw new Error('Either priceId, recommendationId, or planId is required');
       }
 
       // Step 1: Create checkout session on backend
@@ -68,8 +70,13 @@ export const usePayment = (): UsePaymentReturn => {
         provider: 'stripe',
       };
 
-      // Dynamic pricing mode (new)
-      if (params.recommendationId) {
+      // Subscription mode: use planId
+      if (params.planId) {
+        console.log('[Payment] Using subscription checkout with planId:', params.planId);
+        checkoutRequest.planId = params.planId;
+      }
+      // Dynamic pricing mode: use recommendationId
+      else if (params.recommendationId) {
         console.log('[Payment] Using dynamic pricing with recommendationId:', params.recommendationId);
         checkoutRequest.recommendationId = params.recommendationId;
       }

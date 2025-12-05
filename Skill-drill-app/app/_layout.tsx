@@ -140,12 +140,6 @@ const AuthMiddleware = React.memo(({ children }: { children: React.ReactNode }) 
       return;
     }
 
-    // Don't redirect if we're on the session-loading screen
-    const isSessionLoadingScreen = segments[0] === 'session-loading';
-    if (isSessionLoadingScreen) {
-      console.log('⏳ AuthMiddleware: On session-loading screen, not redirecting');
-      return;
-    }
 
     // Don't redirect if we're on the assessment-results screen
     const isAssessmentResultsScreen = segments[0] === 'assessment-results';

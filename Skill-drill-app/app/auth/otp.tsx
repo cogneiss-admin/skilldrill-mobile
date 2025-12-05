@@ -110,7 +110,7 @@ export default function OtpScreen() {
         
         if (userData?.onboardingStep === 'Completed') {
           setTimeout(() => {
-            router.replace("/session-loading");
+            router.replace("/dashboard");
           }, 700);
         } else {
           setTimeout(() => {

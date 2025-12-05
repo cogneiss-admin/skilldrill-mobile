@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { View, Text, ScrollView, TouchableOpacity } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "react-native";
 import * as Haptics from "expo-haptics";
@@ -11,6 +11,7 @@ import { useToast } from "../../hooks/useToast";
 import { Ionicons } from "@expo/vector-icons";
 import { useSkillsData } from "../../hooks/useSkillsData";
 import SkillsSkeleton from "../components/SkillsSkeleton";
+import { BlurView } from 'expo-blur';
 
 import { BRAND, SCREEN_BACKGROUND, COLORS, BORDER_RADIUS } from "../components/Brand";
 import { Dimensions } from 'react-native';
@@ -26,8 +27,6 @@ export default function SkillsScreen() {
   const isAddMoreSkillsMode = params.mode === 'add-more-skills';
   const returnTo = params.returnTo as string;
 
-  console.log('🎯 Skills Screen - Assessment Mode:', isAssessmentMode, 'Add-to-Assessment Mode:', isAddToAssessmentMode, 'Add More Skills Mode:', isAddMoreSkillsMode, 'Params:', params);
-  
   const router = useRouter();
   const { updateOnboardingStep } = useAuth();
   const { showToast } = useToast();
@@ -36,6 +35,8 @@ export default function SkillsScreen() {
   const [tiers, setTiers] = useState<Array<{ key: string; name: string; order?: number }>>([]);
   const [timelineEndY, setTimelineEndY] = useState<number | null>(null);
   const timelineContainerRef = useRef<View>(null);
+  const [showAssessmentMessage, setShowAssessmentMessage] = useState(false);
+  const [selectedSkillName, setSelectedSkillName] = useState<string>('');
 
   const {
     skillsData,
@@ -52,71 +53,38 @@ export default function SkillsScreen() {
     isAddToAssessmentMode,
   });
 
-  // Check if user already has skills and redirect to dashboard (but not in add-to-assessment mode)
   useEffect(() => {
     const checkExistingSkills = async () => {
       try {
-        console.log('🔍 Skills Screen: Checking if user already has skills...');
-        console.log('🔍 Add-to-assessment mode:', isAddToAssessmentMode);
-
-        // Don't redirect if we're in add-to-assessment mode
-        if (isAddToAssessmentMode) {
-          console.log('➕ Add-to-assessment mode: Allowing user to add more skills');
+        if (isAddToAssessmentMode || isAddMoreSkillsMode || returnTo) {
           return;
         }
 
-        // Don't redirect if we're in add-more-skills mode
-        if (isAddMoreSkillsMode) {
-          console.log('➕ Add-more-skills mode: Allowing user to add more skills');
-          return;
-        }
-
-        // Don't redirect if user came from another page (discover, activity, etc.)
-        if (returnTo) {
-          console.log(`🔍 Came from ${returnTo} page: Allowing user to explore skills`);
-          return;
-        }
-
-        // For assessment mode, if user already has skills, navigate to skill selection in assessment mode
-        // But if they're coming from dashboard after completing assessments, allow them to add new skills
         if (isAssessmentMode && !isFromCompleted) {
-          console.log('🎯 Assessment mode with existing skills: Continuing to skill selection...');
-          // Don't redirect - let user choose skills for assessment
           return;
         }
 
-        // If coming from completed assessment, allow adding new skills
         if (isFromCompleted) {
-          console.log('✅ Coming from completed assessment - allowing to add new skills');
           return;
         }
 
         const response = await apiService.get('/user/skills');
 
         if (response.success && response.data && response.data.length > 0) {
-          console.log('✅ Skills Screen: User already has skills, redirecting to dashboard');
           showToast('info', 'Skills Already Selected', 'You have already selected skills. Redirecting to dashboard.');
           router.replace('/dashboard');
           return;
         }
       } catch (error) {
-        console.log('ℹ️ Skills Screen: Error checking existing skills (user may not have any):', error.message);
+        // Error checking existing skills - user may not have any
       }
     };
 
     checkExistingSkills();
-  }, [router, isAddToAssessmentMode, isAddMoreSkillsMode, returnTo]);
+  }, [router, isAddToAssessmentMode, isAddMoreSkillsMode, returnTo, isAssessmentMode, isFromCompleted, showToast]);
 
-  useEffect(() => {
-    if (selected) {
-      console.log('🎯 Selected skills count:', selected.length);
-    }
-  }, [selected]);
-
-  // Check which skills already have assessments
   const checkSkillsWithAssessments = useCallback(async () => {
     try {
-      // Use unified results endpoint used elsewhere in the app
       const response = await apiService.get('/assessment/results');
       if (response.success && Array.isArray(response.data)) {
         const ids = new Set(
@@ -125,25 +93,21 @@ export default function SkillsScreen() {
             .filter((id) => typeof id === 'string' && id.length > 0)
         );
         setSkillsWithAssessments(ids);
-        console.log('📊 Skills with existing assessments:', Array.from(ids));
       } else {
         setSkillsWithAssessments(new Set());
       }
     } catch (error) {
-      console.log('ℹ️ Could not fetch assessments:', error.message);
+      // Could not fetch assessments
     }
   }, []);
 
-  // Check for skills with existing assessments
   useEffect(() => {
     checkSkillsWithAssessments();
   }, [checkSkillsWithAssessments]);
 
-  // Load tier list from backend public endpoint
   useEffect(() => {
     (async () => {
       try {
-        // Prefer alias to avoid collision with /skills/:skillId in some setups
         const resp = await apiService.get('/skill-tiers');
         if (resp?.success && Array.isArray(resp.data)) {
           interface TierData {
@@ -157,16 +121,14 @@ export default function SkillsScreen() {
             .filter((t) => t.key);
           parsed.sort((a, b) => a.order - b.order);
           setTiers(parsed);
-          try { console.log('📚 Tiers fetched:', parsed); } catch {}
         }
       } catch (e: unknown) {
-        try { console.error('❌ /skills/tiers error:', e?.response?.status, e?.response?.data || e?.message); } catch {}
+        // Error loading tiers
       }
     })();
   }, []);
 
   const handleToggleSkill = useCallback(async (skillId) => {
-    // Check if skill is locked (not eligible for user's career level)
     const skill = skillsData.find(s => s.id === skillId);
     if (skill) {
       const hasEligible = eligibleSet && eligibleSet.size > 0;
@@ -177,9 +139,10 @@ export default function SkillsScreen() {
         return;
       }
       
-      // Check if skill already has an assessment
-      if (skillsWithAssessments.has(skill.mongoId)) {
-        showToast('info', 'Assessment Exists', 'You already have an assessment for this skill. Please select a different skill.');
+      const hasAssessment = skillsWithAssessments.has(skill.mongoId) || skillsWithAssessments.has(skill.id);
+      if (hasAssessment) {
+        setSelectedSkillName(skill.name);
+        setShowAssessmentMessage(true);
         return;
       }
     }
@@ -187,8 +150,6 @@ export default function SkillsScreen() {
     try { await Haptics.selectionAsync(); } catch {}
     toggleSkill(skillId);
   }, [toggleSkill, skillsData, skillsWithAssessments, eligibleSet, showToast]);
-
-  // No traditional assessment CTA in this inlined layout
 
   const handleContinue = async () => {
     if (!canContinue || busy) return;
@@ -198,10 +159,6 @@ export default function SkillsScreen() {
     
     try {
       if (isAddToAssessmentMode) {
-        // For add-to-assessment mode, call the add skills API
-        console.log('➕ Add-to-Assessment Mode: Adding skills to existing session...');
-
-        // Map selected skills to backend skillIds
         const validSkillIds = selected
           .map(skillId => {
             const skill = skillsData.find(s => s.id === skillId);
@@ -209,28 +166,20 @@ export default function SkillsScreen() {
           })
           .filter(id => id && id.length > 10);
 
-        console.log('➕ Valid skill IDs to add:', validSkillIds);
-
         if (validSkillIds.length === 0) {
           showToast('error', 'No Valid Skills', 'Please select valid skills before continuing.');
           setBusy(false);
           return;
         }
 
-        // Add skills to existing session
         const response = await apiService.post('/assessment/session/add-skills', {
           skillIds: validSkillIds
         });
 
         if (response.success) {
-          console.log('✅ Skills added to session successfully');
-
-          // Clear persisted selection
-          AsyncStorage.removeItem('selectedSkills').catch(console.error);
-
+          AsyncStorage.removeItem('selectedSkills').catch(() => {});
           showToast('success', 'Skills Added!', `${response.data.addedSkills} skill(s) added to your assessment.`);
 
-          // Navigate back to the page user came from
           if (returnTo === 'discover') {
             router.replace('/discover');
           } else if (returnTo === 'activity') {
@@ -240,15 +189,9 @@ export default function SkillsScreen() {
           }
           return;
         } else {
-          console.error('❌ Failed to add skills to session:', response.message);
           showToast('error', 'Add Skills Error', response.message || 'Failed to add skills to assessment');
         }
       } else if (isAssessmentMode) {
-        // For assessment mode, we need to save skills to backend first
-        // because assessment creation requires skill IDs to exist
-        console.log('🎯 Assessment Mode: Saving skills before assessment...');
-
-        // Map selected skills to backend skillIds
         const validSkillIds = selected
           .map(skillId => {
             const skill = skillsData.find(s => s.id === skillId);
@@ -256,34 +199,28 @@ export default function SkillsScreen() {
           })
           .filter(id => id && id.length > 10);
 
-        console.log('🎯 Valid skill IDs for assessment:', validSkillIds);
-
         if (validSkillIds.length === 0) {
           showToast('error', 'No Valid Skills', 'Please select valid skills before continuing.');
           setBusy(false);
           return;
         }
 
-        // Save skills to backend (required for assessment)
         const response = await apiService.post('/user/skills', {
           skillIds: validSkillIds
         });
 
         if (response.success) {
-          console.log('✅ Skills saved, navigating to assessment...');
-          AsyncStorage.removeItem('selectedSkills').catch(console.error);
+          AsyncStorage.removeItem('selectedSkills').catch(() => {});
 
           router.replace({
             pathname: '/assessmentScenarios',
             params: { selectedSkills: JSON.stringify(validSkillIds) }
           });
-          return; // Exit early to prevent dashboard navigation
+          return;
         } else {
-          console.error('❌ Failed to save skills for assessment:', response.message);
           showToast('error', 'Save Error', response.message || 'Failed to save skills');
         }
       } else {
-        // Map selected skills to backend skillIds
         const validSkillIds = selected
           .map(skillId => {
             const skill = skillsData.find(s => s.id === skillId);
@@ -303,20 +240,16 @@ export default function SkillsScreen() {
         
         if (response.success) {
           showToast('success', 'Success', 'Skills saved successfully!');
+          AsyncStorage.removeItem('selectedSkills').catch(() => {});
 
-          // Clear persisted selection
-          AsyncStorage.removeItem('selectedSkills').catch(console.error);
-
-          // Only update onboarding step if NOT in assessment mode
           if (!isAssessmentMode) {
             try {
               await updateOnboardingStep('Completed');
             } catch (error) {
-              console.error('❌ Failed to update onboarding step:', error);
+              // Failed to update onboarding step
             }
           }
 
-          // Navigate back to the page user came from
           if (returnTo === 'discover') {
             router.replace('/discover');
           } else if (returnTo === 'activity') {
@@ -329,7 +262,6 @@ export default function SkillsScreen() {
         }
       }
     } catch (error) {
-      console.error('Save skills error:', error);
       showToast('error', 'Save Error', 'Failed to save skills. Please try again.');
     } finally {
       setBusy(false);
@@ -349,14 +281,12 @@ export default function SkillsScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.white }}>
       <StatusBar barStyle="dark-content" />
 
-      {/* Header with divider */}
       <View style={{ paddingVertical: SCREEN_WIDTH * 0.04, paddingHorizontal: SCREEN_WIDTH * 0.06, borderBottomWidth: 1.5, borderBottomColor: COLORS.border.medium, marginHorizontal: -(SCREEN_WIDTH * 0.06) }}>
         <Text style={{ textAlign: 'center', fontSize: SCREEN_WIDTH * 0.048, fontWeight: '700', color: COLORS.gray[900] }}>
               {isAddToAssessmentMode ? 'Add More Skills' : isAddMoreSkillsMode ? 'Add More Skills' : 'Select Your Skills'}
             </Text>
       </View>
 
-      {/* Body */}
       <View style={{ flex: 1, backgroundColor: SCREEN_BACKGROUND, marginHorizontal: -(SCREEN_WIDTH * 0.06), paddingHorizontal: SCREEN_WIDTH * 0.06 }}>
           <ScrollView contentContainerStyle={{ paddingBottom: 100, paddingHorizontal: SCREEN_WIDTH * 0.06, maxWidth: 560, width: '100%', alignSelf: 'center', paddingTop: 16 }} showsVerticalScrollIndicator={false}>
             <Text style={{ fontSize: 14, color: COLORS.text.secondary, marginBottom: 4 }}>Choose the skills you want to assess and improve</Text>
@@ -367,8 +297,6 @@ export default function SkillsScreen() {
                 : (selected.length > 0 ? `${selected.length} skill${selected.length !== 1 ? 's' : ''} selected` : 'Select at least one skill to continue')}
             </Text>
 
-            {/* Skills organized by tier with a single continuous vertical line */}
-            {(() => { try { console.log('🔎 Render keys:', { tiers: tiers.map(t=>t.key), skillsTierKeys: Object.keys(skillsByTier) }); } catch {} return null; })()}
             <View ref={timelineContainerRef} style={{ position: 'relative' }}>
               {timelineEndY != null ? (
                 <View style={{ position: 'absolute', left: 16, top: 14, height: Math.max(0, timelineEndY - 14), width: 2.5, backgroundColor: COLORS.black, zIndex: 10 }} />
@@ -384,37 +312,23 @@ export default function SkillsScreen() {
                   onLayout={isLastTier ? (e) => {
                     const { y, height } = e.nativeEvent.layout;
                     if (!tierSkills || tierSkills.length === 0) {
-                      // Empty tier: end at the tier header connector center
-                      // Header has marginBottom: 12, so connector is roughly at y + 10-12px (center of ~20px header)
                       setTimelineEndY(y + 11);
                     } else {
-                      // Tier with skills: end at the last skill indicator center
-                      // Last skill row has marginBottom: 12, and indicator is vertically centered in the row
-                      // Row height: ~12px padding top + ~20px text + ~4px subtitle + ~12px padding bottom = ~48px
-                      // Indicator center is at row center = row bottom - 24px
-                      // But we need to account for the marginBottom: 12 on the last row
-                      // So: container height - marginBottom (12) - half row height (24)
-                      const lastRowHeight = 48; // estimated row height
+                      const lastRowHeight = 48;
                       setTimelineEndY(y + height - 12 - (lastRowHeight / 2));
                     }
                   } : undefined}
                 >
-                  {/* Tier header with connector */}
                   <View
                     style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}
                   >
-                    {/* Spacer to align connector start with vertical line center (17.25px) */}
                     <View style={{ width: 17.25 }} />
-                    {/* Horizontal connector starting from vertical line center */}
                     <View style={{ width: 18, height: 2.5, backgroundColor: COLORS.black, marginRight: 8, zIndex: 10 }} />
                     <Text style={{ fontSize: 18, fontWeight: '700', color: COLORS.gray[900] }}>{tierName}</Text>
                   </View>
 
-                  {/* Skills list (empty allowed) */}
                   <View>
                     {(tierSkills || []).map((skill, idx: number) => {
-                      // Determine if skill is locked based on eligibleSet
-                      // Only lock if eligibleSet is populated (user has career level) and skill is not in the set
                       const hasEligible = eligibleSet && eligibleSet.size > 0;
                       const skillIdStr = String(skill.id || '');
                       const mongoIdStr = String(skill.mongoId || '');
@@ -423,35 +337,24 @@ export default function SkillsScreen() {
                                               eligibleSet?.has(skillIdStr) || 
                                               eligibleSet?.has(mongoIdStr);
                       const locked = hasEligible ? !isInEligibleSet : false;
+                      const hasAssessment = skillsWithAssessments.has(skill.mongoId) || skillsWithAssessments.has(skill.id);
+                      const isDisabled = locked || hasAssessment;
                       const isSelected = selected.includes(skill.id);
                       const isLastSkill = idx === (tierSkills.length - 1);
                       
-                      // Debug logging for first skill only (to avoid spam)
-                      if (idx === 0 && tierIdx === 0) {
-                        try {
-                          console.log('🔒 Skill locking check:', {
-                            skillName: skill.name,
-                            skillId: skill.id,
-                            mongoId: skill.mongoId,
-                            hasEligible,
-                            eligibleSetSize: eligibleSet?.size || 0,
-                            isInEligibleSet,
-                            locked
-                          });
-                        } catch {}
-                      }
                       return (
                         <View 
                           key={skill.id} 
                           style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, position: 'relative' }}
                         >
-                          {/* Timeline indicator - absolutely positioned to center on vertical line */}
-                          {/* Vertical line: left: 16, width: 2.5, center at 17.25px from timeline container edge */}
-                          {/* Circle: 20px wide, needs center at 17.25px, so left edge at 17.25 - 10 = 7.25px */}
                           <View style={{ position: 'absolute', left: 7.25, width: 20, height: 20, alignItems: 'center', justifyContent: 'center', zIndex: 20 }}>
                             {locked ? (
                               <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: COLORS.black, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.white }}>
                                 <Ionicons name="lock-closed" size={12} color={COLORS.black} />
+                              </View>
+                            ) : hasAssessment ? (
+                              <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#10B981', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.white }}>
+                                <Ionicons name="checkmark-circle" size={12} color="#10B981" />
                               </View>
                             ) : (
                               <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: COLORS.black, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.white }}>
@@ -459,30 +362,47 @@ export default function SkillsScreen() {
                               </View>
                             )}
                           </View>
-                          {/* Spacer to maintain proper spacing for skill card */}
                           <View style={{ width: 32 }} />
 
-                          {/* Skill row */}
-                          <View
+                          <TouchableOpacity
+                            activeOpacity={isDisabled ? 0.6 : 0.7}
+                            onPress={() => {
+                              if (isDisabled) {
+                                if (hasAssessment) {
+                                  setSelectedSkillName(skill.name);
+                                  setShowAssessmentMessage(true);
+                                }
+                              } else {
+                                handleToggleSkill(skill.id);
+                              }
+                            }}
                             style={{
                               flex: 1,
-                              backgroundColor: locked ? COLORS.gray[50] : (isSelected ? '#E6F2FF' : COLORS.white),
+                              backgroundColor: isDisabled ? COLORS.gray[50] : (isSelected ? '#E6F2FF' : COLORS.white),
                               borderRadius: BORDER_RADIUS.lg,
                               paddingVertical: 12,
                               paddingHorizontal: 14,
                               borderWidth: 1,
-                              borderColor: locked ? COLORS.border.light : (isSelected ? BRAND : COLORS.border.light)
+                              borderColor: isDisabled ? COLORS.border.light : (isSelected ? BRAND : COLORS.border.light),
+                              opacity: isDisabled ? 0.6 : 1
                             }}
-                            onStartShouldSetResponder={() => !locked}
-                            onResponderRelease={() => { if (!locked) handleToggleSkill(skill.id); }}
                           >
-                            <Text style={{ fontSize: 16, fontWeight: '700', color: locked ? COLORS.text.disabled : COLORS.gray[900] }} numberOfLines={1}>
-                              {skill.name}
-                            </Text>
-                            <Text style={{ marginTop: 4, fontSize: 12, color: locked ? COLORS.text.disabled : COLORS.text.tertiary }} numberOfLines={1}>
-                              {skill?.category || ''}
-                            </Text>
-                          </View>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 16, fontWeight: '700', color: isDisabled ? COLORS.text.disabled : COLORS.gray[900] }} numberOfLines={1}>
+                                  {skill.name}
+                                </Text>
+                                <Text style={{ marginTop: 4, fontSize: 12, color: isDisabled ? COLORS.text.disabled : COLORS.text.tertiary }} numberOfLines={1}>
+                                  {skill?.category || ''}
+                                </Text>
+                              </View>
+                              {hasAssessment && (
+                                <View style={{ marginLeft: 8, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#D1FAE5', borderRadius: 12 }}>
+                                  <Text style={{ fontSize: 11, fontWeight: '600', color: '#059669' }}>Completed</Text>
+                                </View>
+                              )}
+                            </View>
+                          </TouchableOpacity>
                         </View>
                       );
                     })}
@@ -492,7 +412,6 @@ export default function SkillsScreen() {
             })}
             </View>
 
-            {/* Error Display */}
         {error && (
             <View style={{
               backgroundColor: "#FEF2F2",
@@ -514,7 +433,6 @@ export default function SkillsScreen() {
 
           </ScrollView>
 
-          {/* Sticky footer CTA */}
           <View style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: SCREEN_WIDTH * 0.06, paddingTop: 12, paddingBottom: 12, zIndex: 1000, backgroundColor: COLORS.white, borderTopWidth: 1, borderTopColor: COLORS.border.medium }}>
             <TouchableOpacity
               onPress={handleContinue}
@@ -526,6 +444,79 @@ export default function SkillsScreen() {
             </TouchableOpacity>
         </View>
       </View>
+
+      <Modal
+        visible={showAssessmentMessage}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setShowAssessmentMessage(false)}
+      >
+        <BlurView intensity={100} tint="dark" style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{
+            backgroundColor: COLORS.white,
+            borderRadius: BORDER_RADIUS.xl,
+            padding: SCREEN_WIDTH * 0.06,
+            marginHorizontal: SCREEN_WIDTH * 0.06,
+            maxWidth: 400,
+            width: '100%',
+            alignItems: 'center'
+          }}>
+            <View style={{
+              width: 64,
+              height: 64,
+              borderRadius: 32,
+              backgroundColor: '#D1FAE5',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 16
+            }}>
+              <Ionicons name="checkmark-circle" size={32} color="#10B981" />
+            </View>
+            
+            <Text style={{
+              fontSize: 20,
+              fontWeight: '700',
+              color: COLORS.gray[900],
+              textAlign: 'center',
+              marginBottom: 8
+            }}>
+              Assessment Already Completed
+            </Text>
+            
+            <Text style={{
+              fontSize: 15,
+              color: COLORS.text.secondary,
+              textAlign: 'center',
+              marginBottom: 24,
+              lineHeight: 22
+            }}>
+              You've already completed an assessment for <Text style={{ fontWeight: '600', color: COLORS.gray[900] }}>{selectedSkillName}</Text>. Please select a different skill to assess.
+            </Text>
+            
+            <TouchableOpacity
+              onPress={() => setShowAssessmentMessage(false)}
+              style={{
+                backgroundColor: BRAND,
+                paddingVertical: 12,
+                paddingHorizontal: 32,
+                borderRadius: BORDER_RADIUS.md,
+                width: '100%',
+                alignItems: 'center'
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={{
+                fontSize: 16,
+                fontWeight: '600',
+                color: COLORS.white
+              }}>
+                Got it
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </BlurView>
+      </Modal>
     </SafeAreaView>
   );
 }

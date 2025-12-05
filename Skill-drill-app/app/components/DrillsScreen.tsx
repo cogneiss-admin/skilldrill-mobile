@@ -14,10 +14,14 @@ import {
   Text,
   ActivityIndicator,
   StyleSheet,
+  Modal,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 import { useDrillProgress } from '../../hooks/useDrillProgress';
 import { useAnimation } from '../../hooks/useAnimation';
@@ -173,6 +177,21 @@ const DrillsScreen: React.FC<DrillsScreenProps> = ({
             onAction={dismissMilestone}
           />
         )}
+
+        {/* Simple Loader for Scoring/Processing */}
+        <Modal
+          visible={submitting}
+          transparent
+          animationType="fade"
+          statusBarTranslucent
+        >
+          <View style={styles.blurContainer}>
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#FFFFFF" />
+              <Text style={[styles.loadingText, { color: '#FFFFFF', marginTop: SCREEN_WIDTH * 0.04 }]}>Processing your response...</Text>
+            </View>
+          </View>
+        </Modal>
       </>
     );
   }
@@ -227,6 +246,22 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.body,
     color: COLORS.text.secondary,
     textAlign: 'center',
+  },
+  blurContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.8)',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SCREEN_WIDTH * 0.06,
+  },
+  loadingText: {
+    marginTop: SCREEN_WIDTH * 0.025,
+    fontSize: SCREEN_WIDTH * 0.04,
   },
 });
 
