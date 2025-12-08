@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Dimensions, ActivityIndicator, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -69,7 +69,7 @@ export default function SubscriptionScreen() {
 
   // Hooks
   const { processPayment, processing } = usePayment();
-  const { hasActiveSubscription, availableCredits, unlockWithCredits } = useSubscription();
+  const { hasActiveSubscription, availableCredits, unlockWithCredits, loading: subscriptionLoading, creditValue } = useSubscription();
   const { plans: subscriptionPlans, hasPlans, loading: plansLoading } = useSubscriptionPlans();
   const { showError, showSuccess } = useToast();
 
@@ -81,6 +81,15 @@ export default function SubscriptionScreen() {
   const drillPrice = params.price ? parseFloat(params.price) : 0;
   const currency = params.currency;
 
+  // Calculate credits needed based on drill pack price and credit value
+  // Must be calculated AFTER drillPrice and creditValue are defined
+  const creditsNeeded = useMemo(() => {
+    if (creditValue > 0 && drillPrice > 0) {
+      return Math.ceil(drillPrice / creditValue);
+    }
+    return 0;
+  }, [drillPrice, creditValue]);
+
   // Validate required data is present (only for drill unlock flow, not subscription mode)
   const hasRequiredData = isSubscriptionMode || (params.recommendationId && params.skillId && params.price && params.drillCount && params.currency);
 
@@ -88,9 +97,64 @@ export default function SubscriptionScreen() {
   const [selectedOption, setSelectedOption] = useState<'subscription' | 'one-time'>(isSubscriptionMode ? 'subscription' : 'one-time');
   const [selectedPlanId, setSelectedPlanId] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showOutOfCreditsModal, setShowOutOfCreditsModal] = useState(false);
+
+  // Check for out of credits state and trigger modal after delay
+  useEffect(() => {
+    if (!isSubscriptionMode && hasActiveSubscription && !subscriptionLoading && creditsNeeded > 0) {
+      if (availableCredits < creditsNeeded) {
+        const timer = setTimeout(() => {
+          setShowOutOfCreditsModal(true);
+        }, 3000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [isSubscriptionMode, hasActiveSubscription, subscriptionLoading, availableCredits, creditsNeeded]);
+
+  const handleRenewMonthly = async () => {
+    // Find a monthly plan (durationMonths === 1)
+    const monthlyPlan = subscriptionPlans.find(p => p.durationMonths === 1);
+
+    if (monthlyPlan) {
+      setShowOutOfCreditsModal(false);
+      try {
+        setIsProcessing(true);
+        await processPayment({
+          planId: monthlyPlan.planId,
+          onSuccess: () => {
+            showSuccess('Plan renewed successfully! Credits refreshed.');
+            // Refresh logic if needed, or let the screen update naturally
+            router.replace({
+              pathname: '/subscriptionScreen',
+              params: params
+            });
+          },
+          onCancel: () => {
+            setIsProcessing(false);
+          }
+        });
+      } catch (error: any) {
+        showError(error.message || 'Renewal failed. Please try again.');
+        setIsProcessing(false);
+      }
+    } else {
+      // Fallback if no monthly plan found - redirect to plans list
+      setShowOutOfCreditsModal(false);
+      handleUpgradePlan();
+    }
+  };
+
+  const handleUpgradePlan = () => {
+    setShowOutOfCreditsModal(false);
+    // Switch to subscription mode to show plans
+    router.push({
+      pathname: '/subscriptionScreen',
+      params: { ...params, mode: 'subscription' }
+    });
+  };
 
   // Set default selected plan when plans load
-  React.useEffect(() => {
+  useEffect(() => {
     if (hasPlans && subscriptionPlans.length > 0 && !selectedPlanId) {
       setSelectedPlanId(subscriptionPlans[0].planId);
     }
@@ -150,15 +214,21 @@ export default function SubscriptionScreen() {
       return;
     }
 
+    if (!drillPrice || drillPrice <= 0) {
+      showError('Drill pack price is required.');
+      return;
+    }
+
     try {
       setIsProcessing(true);
       const assignmentId = await unlockWithCredits({
         skillId: params.skillId,
         assessmentId: params.assessmentId,
         recommendationId: params.recommendationId,
+        drillPackPrice: drillPrice,
       });
 
-      showSuccess('Drills unlocked! Tap Start to begin practice.');
+      showSuccess('Payment successful! Your drills are unlocked.');
       // Redirect to Activity page (drills tab) - user will click "Start" to generate drills
       router.push({
         pathname: '/activity',
@@ -267,250 +337,255 @@ export default function SubscriptionScreen() {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            {/* Subscription Mode - Show subscription plans or coming soon */}
-            {isSubscriptionMode ? (
-              <>
-                {/* Subscription Card Only */}
-                <View style={styles.section}>
-                  <SelectionCard
-                    title="Unlock Unlimited Drills & More"
-                    subtitle={hasPlans && formattedPlans[0] ? `Starting at ${formattedPlans[0].price}` : "Starting at $3.99/month"}
-                    features={[
-                      {
-                        title: 'Unlimited AI-powered drills',
-                        description: 'Practice as much as you want — no limits, no restrictions.'
-                      },
-                      {
-                        title: 'Faster learning progress + confidence boost',
-                        description: 'Master your communication 5× faster with continuous training.'
-                      },
-                      {
-                        title: 'All skills unlocked instantly',
-                        description: 'Access every soft-skill domain the moment you upgrade.'
-                      },
-                      {
-                        title: 'Save up to 70% over time',
-                        description: 'Subscription costs far less than buying multiple drill packs.'
-                      }
-                    ]}
-                    isSelected={true}
-                    onSelect={() => { }}
-                    badge="BEST VALUE"
-                  />
-                </View>
-
-                {/* Conditional Rendering: Show dynamic plans if available, otherwise Coming Soon */}
-                {hasPlans ? (
-                  <View style={styles.plansContainer}>
-                    <Text style={styles.sectionTitle}>Choose Your Plan</Text>
-                    {formattedPlans.map((plan, index) => (
-                      <PlanCard
-                        key={plan.id}
-                        duration={plan.duration}
-                        price={plan.price}
-                        savings={plan.savings}
-                        isSelected={selectedPlanId === plan.id}
-                        onSelect={() => setSelectedPlanId(plan.id)}
-                        badge={plan.badge}
-                      />
-                    ))}
-                  </View>
-                ) : (
-                  <View style={styles.comingSoonContainer}>
-                    <View style={styles.comingSoonCard}>
-                      <View style={styles.comingSoonIconContainer}>
-                        <Ionicons name="rocket-outline" size={SCREEN_WIDTH * 0.08} color={BRAND} />
-                      </View>
-                      <Text style={styles.comingSoonTitle}>Coming Soon!</Text>
-                      <Text style={styles.comingSoonText}>
-                        We're working hard to bring you unlimited subscription plans.
-                        Stay tuned for updates!
-                      </Text>
-                    </View>
-
-                    {/* Preview of Subscription Plans (Disabled) */}
-                    <Text style={[styles.sectionTitle, { opacity: 0.5, marginTop: SPACING.margin.lg }]}>
-                      Upcoming Subscription Plans
-                    </Text>
-
-                    {FALLBACK_SUBSCRIPTION_PLANS.map((plan) => (
-                      <View key={plan.id} style={{ opacity: 0.4 }}>
-                        <PlanCard
-                          duration={plan.duration}
-                          price={plan.price}
-                          savings={plan.savings}
-                          isSelected={false}
-                          onSelect={() => { }}
-                          badge={plan.badge}
-                        />
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </>
-            ) : hasActiveSubscription && availableCredits > 0 ? (
-              <View style={styles.subscriberContainer}>
-                {/* Header Section */}
-                <View style={styles.unlockHeader}>
-                  <Text style={styles.unlockTitle}>Unlock {params.skillId ? 'Communication' : 'Skill'} Drills!</Text>
-                  <Text style={styles.unlockSubtitle}>
-                    {drillCount} Personalized Drills for {params.skillId ? 'Communication' : 'this skill'}
-                  </Text>
-                </View>
-
-                {/* Balance Card */}
-                <View style={styles.balanceCard}>
-                  <Text style={styles.balanceLabel}>Your Current Credits</Text>
-                  <View style={styles.balanceRow}>
-                    <Text style={styles.balanceValue}>{availableCredits}</Text>
-                    <Ionicons name="ellipse" size={SCREEN_WIDTH * 0.04} color={COLORS.success} />
-                  </View>
-                </View>
-
-                {/* Unlock Details Card */}
-                <View style={styles.detailsCard}>
-                  <View style={styles.costRow}>
-                    <Text style={styles.costLabel}>Cost for these drills</Text>
-                    <Text style={styles.costValue}>1 Credit</Text>
-                  </View>
-
-                  <View style={styles.divider} />
-
-                  <Text style={styles.checklistTitle}>What You'll Unlock Today:</Text>
-
-                  <View style={styles.checklistItem}>
-                    <Ionicons name="checkbox" size={SCREEN_WIDTH * 0.06} color={COLORS.success} />
-                    <Text style={styles.checklistText}>{drillCount} Personalized Drills for Communication</Text>
-                  </View>
-                  <View style={styles.checklistItem}>
-                    <Ionicons name="checkbox" size={SCREEN_WIDTH * 0.06} color={COLORS.success} />
-                    <Text style={styles.checklistText}>Milestone Tracking</Text>
-                  </View>
-                  <View style={styles.checklistItem}>
-                    <Ionicons name="checkbox" size={SCREEN_WIDTH * 0.06} color={COLORS.success} />
-                    <Text style={styles.checklistText}>Advanced Feedback</Text>
-                  </View>
-                </View>
-
-                {/* Footer / Action */}
-                <View style={styles.actionContainer}>
-                  <Text style={styles.remainingText}>
-                    After this unlock, you'll have {availableCredits - 1} credits remaining.
-                  </Text>
-
-                  <TouchableOpacity
-                    style={styles.claimButton}
-                    onPress={handleUseCredit}
-                    disabled={isProcessing}
-                  >
-                    {isProcessing ? (
-                      <Text style={styles.claimButtonText}>Processing...</Text>
-                    ) : (
-                      <Text style={styles.claimButtonText}>Claim Your Drills Now!</Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
+            {/* Show loading state while checking subscription */}
+            {subscriptionLoading && !isSubscriptionMode ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={BRAND} />
+                <Text style={styles.loadingText}>Checking subscription status...</Text>
               </View>
             ) : (
               <>
-                {/* Main Options - Drill Unlock Flow */}
-                <View style={styles.section}>
-                  {/* Drill Pack Option - Uses Real Price from Backend */}
-                  <SelectionCard
-                    title="Drill Pack (one-time)"
-                    subtitle={`${formattedDrillPrice} one-time payment for ${drillCount} drills.`}
-                    price={formattedDrillPrice}
-                    variant="one-time"
-                    isSelected={selectedOption === 'one-time'}
-                    onSelect={() => setSelectedOption('one-time')}
-                  />
-
-                  {/* Subscription Option - Coming Soon */}
-                  <SelectionCard
-                    title="Unlock Unlimited Drills & More"
-                    subtitle="Starting at $3.99/month"
-                    features={[
-                      {
-                        title: 'Unlimited AI-powered drills',
-                        description: 'Practice as much as you want — no limits, no restrictions.'
-                      },
-                      {
-                        title: 'Faster learning progress + confidence boost',
-                        description: 'Master your communication 5× faster with continuous training.'
-                      },
-                      {
-                        title: 'All skills unlocked instantly',
-                        description: 'Access every soft-skill domain the moment you upgrade.'
-                      },
-                      {
-                        title: 'Save up to 70% over time',
-                        description: 'Subscription costs far less than buying multiple drill packs.'
-                      }
-                    ]}
-                    isSelected={selectedOption === 'subscription'}
-                    onSelect={() => setSelectedOption('subscription')}
-                    badge="BEST VALUE"
-                  />
-                </View>
-
-                {/* Show plans or Coming Soon when subscription is selected */}
-                {selectedOption === 'subscription' && (
-                  hasPlans ? (
-                    <View style={styles.plansContainer}>
-                      <Text style={styles.sectionTitle}>Choose Your Plan</Text>
-                      {formattedPlans.map((plan, index) => (
-                        <PlanCard
-                          key={plan.id}
-                          duration={plan.duration}
-                          price={plan.price}
-                          savings={plan.savings}
-                          isSelected={selectedPlanId === plan.id}
-                          onSelect={() => setSelectedPlanId(plan.id)}
-                          badge={plan.badge}
-                        />
-                      ))}
+                {/* Subscription Mode - Show subscription plans or coming soon */}
+                {isSubscriptionMode ? (
+                  <>
+                    {/* Subscription Card Only */}
+                    <View style={styles.section}>
+                      <SelectionCard
+                        title="Unlock Unlimited Drills & More"
+                        subtitle={hasPlans && formattedPlans[0] ? `Starting at ${formattedPlans[0].price}` : "Starting at $3.99/month"}
+                        features={[
+                          {
+                            title: 'Unlimited AI-powered drills',
+                            description: 'Practice as much as you want — no limits, no restrictions.'
+                          },
+                          {
+                            title: 'Faster learning progress + confidence boost',
+                            description: 'Master your communication 5× faster with continuous training.'
+                          },
+                          {
+                            title: 'All skills unlocked instantly',
+                            description: 'Access every soft-skill domain the moment you upgrade.'
+                          },
+                          {
+                            title: 'Save up to 70% over time',
+                            description: 'Subscription costs far less than buying multiple drill packs.'
+                          }
+                        ]}
+                        isSelected={true}
+                        onSelect={() => { }}
+                        badge="BEST VALUE"
+                      />
                     </View>
-                  ) : (
-                    <View style={styles.comingSoonContainer}>
-                      <View style={styles.comingSoonCard}>
-                        <View style={styles.comingSoonIconContainer}>
-                          <Ionicons name="rocket-outline" size={SCREEN_WIDTH * 0.08} color={BRAND} />
-                        </View>
-                        <Text style={styles.comingSoonTitle}>Coming Soon!</Text>
-                        <Text style={styles.comingSoonText}>
-                          We're working hard to bring you unlimited subscription plans.
-                          For now, you can purchase drill packs to start practicing.
-                        </Text>
-                        <TouchableOpacity
-                          style={styles.switchToDrillPackButton}
-                          onPress={() => setSelectedOption('one-time')}
-                        >
-                          <Text style={styles.switchToDrillPackText}>
-                            Switch to Drill Pack ({formattedDrillPrice})
-                          </Text>
-                          <Ionicons name="arrow-forward" size={SCREEN_WIDTH * 0.04} color={BRAND} />
-                        </TouchableOpacity>
-                      </View>
 
-                      {/* Preview of Subscription Plans (Disabled) */}
-                      <Text style={[styles.sectionTitle, { opacity: 0.5, marginTop: SPACING.margin.lg }]}>
-                        Upcoming Subscription Plans
-                      </Text>
-
-                      {FALLBACK_SUBSCRIPTION_PLANS.map((plan) => (
-                        <View key={plan.id} style={{ opacity: 0.4 }}>
+                    {/* Conditional Rendering: Show dynamic plans if available, otherwise Coming Soon */}
+                    {hasPlans ? (
+                      <View style={styles.plansContainer}>
+                        <Text style={styles.sectionTitle}>Choose Your Plan</Text>
+                        {formattedPlans.map((plan, index) => (
                           <PlanCard
+                            key={plan.id}
                             duration={plan.duration}
                             price={plan.price}
                             savings={plan.savings}
-                            isSelected={false}
-                            onSelect={() => { }}
+                            isSelected={selectedPlanId === plan.id}
+                            onSelect={() => setSelectedPlanId(plan.id)}
                             badge={plan.badge}
                           />
+                        ))}
+                      </View>
+                    ) : (
+                      <View style={styles.comingSoonContainer}>
+                        <View style={styles.comingSoonCard}>
+                          <View style={styles.comingSoonIconContainer}>
+                            <Ionicons name="rocket-outline" size={SCREEN_WIDTH * 0.08} color={BRAND} />
+                          </View>
+                          <Text style={styles.comingSoonTitle}>Coming Soon!</Text>
+                          <Text style={styles.comingSoonText}>
+                            We're working hard to bring you unlimited subscription plans.
+                            Stay tuned for updates!
+                          </Text>
                         </View>
-                      ))}
+
+                        {/* Preview of Subscription Plans (Disabled) */}
+                        <Text style={[styles.sectionTitle, { opacity: 0.5, marginTop: SPACING.margin.lg }]}>
+                          Upcoming Subscription Plans
+                        </Text>
+
+                        {FALLBACK_SUBSCRIPTION_PLANS.map((plan) => (
+                          <View key={plan.id} style={{ opacity: 0.4 }}>
+                            <PlanCard
+                              duration={plan.duration}
+                              price={plan.price}
+                              savings={plan.savings}
+                              isSelected={false}
+                              onSelect={() => { }}
+                              badge={plan.badge}
+                            />
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                  </>
+                ) : hasActiveSubscription ? (
+                  <View style={styles.subscriberContainer}>
+                    {/* Header Section */}
+                    <View style={styles.unlockHeader}>
+                      <Text style={styles.unlockTitle}>Unlock {params.skillId ? 'Communication' : 'Skill'} Drills!</Text>
+                      <Text style={styles.unlockSubtitle}>
+                        {drillCount} Personalized Drills for {params.skillId ? 'Communication' : 'this skill'}
+                      </Text>
                     </View>
-                  )
+
+                    {/* Balance Card */}
+                    <View style={styles.balanceCard}>
+                      <Text style={styles.balanceLabel}>Your Current Credits</Text>
+                      <View style={styles.balanceRow}>
+                        <Text style={styles.balanceValue}>{availableCredits}</Text>
+                        <Ionicons name="ellipse" size={SCREEN_WIDTH * 0.04} color={COLORS.success} />
+                      </View>
+                    </View>
+
+                    {/* Unlock Details Card */}
+                    <View style={styles.detailsCard}>
+                      <View style={styles.costRow}>
+                        <Text style={styles.costLabel}>Drill Pack Price</Text>
+                        <Text style={styles.costValue}>{formattedDrillPrice}</Text>
+                      </View>
+                      <View style={styles.costRow}>
+                        <Text style={styles.costLabel}>Credits Required</Text>
+                        <Text style={[styles.costValue, { color: BRAND, fontWeight: '800' }]}>
+                          {subscriptionLoading
+                            ? 'Calculating...'
+                            : creditsNeeded > 0
+                              ? `${creditsNeeded} ${creditsNeeded === 1 ? 'Credit' : 'Credits'}`
+                              : drillPrice === 0
+                                ? 'Drill pack price missing'
+                                : 'Unable to calculate'}
+                        </Text>
+                      </View>
+
+                      <View style={styles.divider} />
+
+                      <Text style={styles.checklistTitle}>What You'll Unlock Today:</Text>
+
+                      <View style={styles.checklistItem}>
+                        <Ionicons name="checkbox" size={SCREEN_WIDTH * 0.06} color={COLORS.success} />
+                        <Text style={styles.checklistText}>{drillCount} Personalized Drills for Communication</Text>
+                      </View>
+                      <View style={styles.checklistItem}>
+                        <Ionicons name="checkbox" size={SCREEN_WIDTH * 0.06} color={COLORS.success} />
+                        <Text style={styles.checklistText}>Milestone Tracking</Text>
+                      </View>
+                      <View style={styles.checklistItem}>
+                        <Ionicons name="checkbox" size={SCREEN_WIDTH * 0.06} color={COLORS.success} />
+                        <Text style={styles.checklistText}>Advanced Feedback</Text>
+                      </View>
+                    </View>
+
+
+                  </View>
+                ) : (
+                  <>
+                    {/* Main Options - Drill Unlock Flow */}
+                    <View style={styles.section}>
+                      {/* Drill Pack Option - Uses Real Price from Backend */}
+                      <SelectionCard
+                        title="Drill Pack (one-time)"
+                        subtitle={`${formattedDrillPrice} one-time payment for ${drillCount} drills.`}
+                        price={formattedDrillPrice}
+                        variant="one-time"
+                        isSelected={selectedOption === 'one-time'}
+                        onSelect={() => setSelectedOption('one-time')}
+                      />
+
+                      {/* Subscription Option - Coming Soon */}
+                      <SelectionCard
+                        title="Unlock Unlimited Drills & More"
+                        subtitle="Starting at $3.99/month"
+                        features={[
+                          {
+                            title: 'Unlimited AI-powered drills',
+                            description: 'Practice as much as you want — no limits, no restrictions.'
+                          },
+                          {
+                            title: 'Faster learning progress + confidence boost',
+                            description: 'Master your communication 5× faster with continuous training.'
+                          },
+                          {
+                            title: 'All skills unlocked instantly',
+                            description: 'Access every soft-skill domain the moment you upgrade.'
+                          },
+                          {
+                            title: 'Save up to 70% over time',
+                            description: 'Subscription costs far less than buying multiple drill packs.'
+                          }
+                        ]}
+                        isSelected={selectedOption === 'subscription'}
+                        onSelect={() => setSelectedOption('subscription')}
+                        badge="BEST VALUE"
+                      />
+                    </View>
+
+                    {/* Show plans or Coming Soon when subscription is selected */}
+                    {selectedOption === 'subscription' && (
+                      hasPlans ? (
+                        <View style={styles.plansContainer}>
+                          <Text style={styles.sectionTitle}>Choose Your Plan</Text>
+                          {formattedPlans.map((plan, index) => (
+                            <PlanCard
+                              key={plan.id}
+                              duration={plan.duration}
+                              price={plan.price}
+                              savings={plan.savings}
+                              isSelected={selectedPlanId === plan.id}
+                              onSelect={() => setSelectedPlanId(plan.id)}
+                              badge={plan.badge}
+                            />
+                          ))}
+                        </View>
+                      ) : (
+                        <View style={styles.comingSoonContainer}>
+                          <View style={styles.comingSoonCard}>
+                            <View style={styles.comingSoonIconContainer}>
+                              <Ionicons name="rocket-outline" size={SCREEN_WIDTH * 0.08} color={BRAND} />
+                            </View>
+                            <Text style={styles.comingSoonTitle}>Coming Soon!</Text>
+                            <Text style={styles.comingSoonText}>
+                              We're working hard to bring you unlimited subscription plans.
+                              For now, you can purchase drill packs to start practicing.
+                            </Text>
+                            <TouchableOpacity
+                              style={styles.switchToDrillPackButton}
+                              onPress={() => setSelectedOption('one-time')}
+                            >
+                              <Text style={styles.switchToDrillPackText}>
+                                Switch to Drill Pack ({formattedDrillPrice})
+                              </Text>
+                              <Ionicons name="arrow-forward" size={SCREEN_WIDTH * 0.04} color={BRAND} />
+                            </TouchableOpacity>
+                          </View>
+
+                          {/* Preview of Subscription Plans (Disabled) */}
+                          <Text style={[styles.sectionTitle, { opacity: 0.5, marginTop: SPACING.margin.lg }]}>
+                            Upcoming Subscription Plans
+                          </Text>
+
+                          {FALLBACK_SUBSCRIPTION_PLANS.map((plan) => (
+                            <View key={plan.id} style={{ opacity: 0.4 }}>
+                              <PlanCard
+                                duration={plan.duration}
+                                price={plan.price}
+                                savings={plan.savings}
+                                isSelected={false}
+                                onSelect={() => { }}
+                                badge={plan.badge}
+                              />
+                            </View>
+                          ))}
+                        </View>
+                      )
+                    )}
+                  </>
                 )}
               </>
             )}
@@ -518,7 +593,7 @@ export default function SubscriptionScreen() {
 
           {/* Fixed Footer - Show for purchase flows */}
           {/* For drill unlock flow - show when not a subscriber */}
-          {!isSubscriptionMode && !(hasActiveSubscription && availableCredits > 0) && (
+          {!isSubscriptionMode && !hasActiveSubscription && (
             <View style={styles.footer}>
               {/* SwipeButton - enabled for drill pack OR subscription with plans */}
               <SwipeButton
@@ -549,6 +624,93 @@ export default function SubscriptionScreen() {
               </View>
             </View>
           )}
+
+          {/* For subscribers unlocking drills - show claim button in footer */}
+          {!isSubscriptionMode && hasActiveSubscription && (
+            <View style={[styles.footer, { gap: 16 }]}>
+              {availableCredits >= creditsNeeded && creditsNeeded > 0 ? (
+                <>
+                  <Text style={styles.remainingText}>
+                    After this unlock, you'll have {availableCredits - creditsNeeded} credits remaining.
+                  </Text>
+
+                  <TouchableOpacity
+                    style={styles.claimButton}
+                    onPress={handleUseCredit}
+                    disabled={isProcessing}
+                  >
+                    {isProcessing ? (
+                      <Text style={styles.claimButtonText}>Processing...</Text>
+                    ) : (
+                      <Text style={styles.claimButtonText}>Unlock Your Drills Now</Text>
+                    )}
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.remainingText}>
+                    {creditsNeeded > 0
+                      ? `You need ${creditsNeeded} credits, but only have ${availableCredits}. Please purchase more credits or upgrade your subscription.`
+                      : drillPrice === 0
+                        ? 'Drill pack price not available. Please try again.'
+                        : 'Unable to calculate credits. Please contact support.'}
+                  </Text>
+
+                  <TouchableOpacity
+                    style={[styles.claimButton, { backgroundColor: COLORS.gray[400], opacity: 0.6 }]}
+                    disabled={true}
+                  >
+                    <Text style={styles.claimButtonText}>
+                      {creditsNeeded === 0 ? 'Unable to Calculate' : 'Insufficient Credits'}
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          )}
+
+          {/* Out of Credits Modal */}
+          <Modal
+            visible={showOutOfCreditsModal}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => setShowOutOfCreditsModal(false)} // Android back button
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <View style={styles.modalIconContainer}>
+                  <Ionicons name="alert-circle" size={48} color="#F59E0B" />
+                </View>
+
+                <Text style={styles.modalTitle}>Out of Credits</Text>
+
+                <Text style={styles.modalText}>
+                  You used all your drills for this term. Choose to renew the same plan or upgrade for more credits.
+                </Text>
+
+                {/* Mocking refresh date for now as requested */}
+                <Text style={styles.modalSubText}>
+                  Next credits refresh on: 15 July 2024
+                </Text>
+
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={styles.renewButton}
+                    onPress={handleRenewMonthly}
+                  >
+                    <Text style={styles.renewButtonText}>Renew Monthly</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.upgradeButton}
+                    onPress={handleUpgradePlan}
+                  >
+                    <Text style={styles.upgradeButtonText}>Upgrade Plan</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
         </SafeAreaView>
       </GestureHandlerRootView>
     </StripeProvider>
@@ -829,5 +991,74 @@ const styles = StyleSheet.create({
     fontSize: SCREEN_WIDTH * 0.045,
     fontWeight: '700',
     color: COLORS.white,
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: SCREEN_WIDTH * 0.08,
+  },
+  modalContent: {
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SCREEN_WIDTH * 0.06,
+    alignItems: 'center',
+    width: '100%',
+    ...SHADOWS.lg,
+  },
+  modalIconContainer: {
+    marginBottom: SCREEN_WIDTH * 0.04,
+    backgroundColor: '#FEF3C7', // Light yellow
+    padding: SCREEN_WIDTH * 0.03,
+    borderRadius: SCREEN_WIDTH * 0.1,
+  },
+  modalTitle: {
+    fontSize: SCREEN_WIDTH * 0.05,
+    fontWeight: '700',
+    color: '#D97706', // Dark yellow/orange
+    marginBottom: SCREEN_WIDTH * 0.03,
+  },
+  modalText: {
+    fontSize: SCREEN_WIDTH * 0.038,
+    color: COLORS.text.secondary,
+    textAlign: 'center',
+    lineHeight: SCREEN_WIDTH * 0.055,
+    marginBottom: SCREEN_WIDTH * 0.02,
+  },
+  modalSubText: {
+    fontSize: SCREEN_WIDTH * 0.032,
+    color: COLORS.text.tertiary,
+    textAlign: 'center',
+    marginBottom: SCREEN_WIDTH * 0.06,
+  },
+  modalActions: {
+    width: '100%',
+    gap: SCREEN_WIDTH * 0.03,
+  },
+  renewButton: {
+    backgroundColor: '#1D4ED8', // Blue
+    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: SCREEN_WIDTH * 0.035,
+    alignItems: 'center',
+  },
+  renewButtonText: {
+    fontSize: SCREEN_WIDTH * 0.04,
+    fontWeight: '600',
+    color: COLORS.white,
+  },
+  upgradeButton: {
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: SCREEN_WIDTH * 0.035,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#1D4ED8', // Blue
+  },
+  upgradeButtonText: {
+    fontSize: SCREEN_WIDTH * 0.04,
+    fontWeight: '600',
+    color: '#1D4ED8', // Blue
   },
 });

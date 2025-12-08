@@ -37,6 +37,7 @@ interface Subscription {
   credits: number; // Available drill credits
   usedCredits: number;
   totalCredits: number;
+  creditValue: number; // Dollar value per credit (e.g., 1 credit = $5.00)
   provider: string; // 'stripe' | 'razorpay'
   providerSubscriptionId: string;
   createdAt: string;
@@ -47,6 +48,7 @@ interface UnlockParams {
   skillId: string;
   assessmentId?: string;
   recommendationId?: string;
+  drillPackPrice?: number; // Price of the drill pack for credit calculation
 }
 
 interface UseSubscriptionReturn {
@@ -55,6 +57,7 @@ interface UseSubscriptionReturn {
   subscription: Subscription | null;
   hasActiveSubscription: boolean;
   availableCredits: number;
+  creditValue: number; // Dollar value per credit
   canUnlockDrills: (drillCount: number) => boolean;
   unlockWithCredits: (params: UnlockParams) => Promise<string>; // Returns assignmentId
   refresh: () => Promise<void>;
@@ -134,19 +137,33 @@ export const useSubscription = (): UseSubscriptionReturn => {
 
   /**
    * Unlock drills using subscription credits
+   * Calculates credits needed based on drill pack price and credit value
    */
   const unlockWithCredits = async (params: UnlockParams): Promise<string> => {
     if (!subscription || subscription.status !== 'ACTIVE') {
       throw new Error('No active subscription found');
     }
 
-    if (subscription.credits <= 0) {
-      throw new Error('Insufficient credits. Please purchase more drills or upgrade your plan.');
+    if (!subscription.creditValue || subscription.creditValue <= 0) {
+      throw new Error('Credit value not configured. Please contact support.');
+    }
+
+    // Calculate credits needed if drill pack price is provided
+    let creditsNeeded = 1; // Default fallback
+    if (params.drillPackPrice && params.drillPackPrice > 0) {
+      creditsNeeded = Math.ceil(params.drillPackPrice / subscription.creditValue);
+    }
+
+    if (subscription.credits < creditsNeeded) {
+      throw new Error(`Insufficient credits. Need ${creditsNeeded} credits, but only have ${subscription.credits}. Please purchase more credits or upgrade your plan.`);
     }
 
     try {
       console.log('[Subscription] Unlocking drills with credits:', {
         skillId: params.skillId,
+        drillPackPrice: params.drillPackPrice,
+        creditValue: subscription.creditValue,
+        creditsNeeded: creditsNeeded,
         availableCredits: subscription.credits
       });
 
@@ -154,7 +171,8 @@ export const useSubscription = (): UseSubscriptionReturn => {
       const res = await apiService.createDrillAssignment({
         skillId: params.skillId,
         source: 'Subscription',
-        recommendationId: params.recommendationId
+        recommendationId: params.recommendationId,
+        drillPackPrice: params.drillPackPrice
       });
 
       if (!res.success) {
@@ -165,11 +183,11 @@ export const useSubscription = (): UseSubscriptionReturn => {
 
       console.log('[Subscription] ✅ Drills unlocked with credits:', assignmentId);
 
-      // Update local subscription state (reduce credits)
+      // Update local subscription state (reduce credits by calculated amount)
       setSubscription({
         ...subscription,
-        credits: subscription.credits - 1, // Assuming 1 credit per drill pack
-        usedCredits: subscription.usedCredits + 1
+        credits: subscription.credits - creditsNeeded,
+        usedCredits: subscription.usedCredits + creditsNeeded
       });
 
       showSuccess('Drills unlocked successfully!');
@@ -200,6 +218,7 @@ export const useSubscription = (): UseSubscriptionReturn => {
     subscription,
     hasActiveSubscription,
     availableCredits,
+    creditValue: subscription?.creditValue || 0,
     canUnlockDrills,
     unlockWithCredits,
     refresh

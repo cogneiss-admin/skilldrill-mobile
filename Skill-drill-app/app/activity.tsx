@@ -344,6 +344,9 @@ export default function Activity() {
           showError('Unable to load pricing information. Please try again.');
           return;
         }
+        
+        // Always navigate to subscription screen - it will handle conditional rendering
+        // based on subscription status (shows credits view for subscribers, purchase view for non-subscribers)
         router.push({
           pathname: '/subscriptionScreen',
           params: {

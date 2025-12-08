@@ -519,15 +519,7 @@ class ApiService {
   /**
    * Create checkout session for payment
    */
-  public async createCheckout(params: {
-    priceId: string;
-    provider: string;
-    metadata: {
-      skillId: string;
-      assessmentId?: string;
-      recommendationId?: string;
-    };
-  }): Promise<ApiResponse> {
+  public async createCheckout(params: import('../types/pricing').CheckoutRequest): Promise<ApiResponse> {
     console.log('💳 Creating checkout session:', params);
     return this.post('/commerce/checkout', params);
   }
@@ -591,6 +583,7 @@ class ApiService {
     skillId: string;
     source: string;
     recommendationId?: string;
+    drillPackPrice?: number;
   }): Promise<ApiResponse> {
     console.log('✨ Creating drill assignment:', params);
     return this.post('/drills/assign', params);
