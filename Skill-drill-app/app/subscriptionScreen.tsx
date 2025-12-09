@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StripeProvider } from '@stripe/stripe-react-native';
+import apiService from '../services/api';
 
 import {
   COLORS,
@@ -26,7 +27,6 @@ import { useToast } from '../hooks/useToast';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// Fallback Subscription Plans (Coming Soon - shown when no plans in backend)
 const FALLBACK_SUBSCRIPTION_PLANS = [
   { id: '12_months', duration: '12 Months', price: '$3.99/month', savings: 'Save 60%', badge: 'BEST VALUE' as const },
   { id: '6_months', duration: '6 Months', price: '$5.99/month', savings: 'Save 40%', badge: 'POPULAR' as const },
@@ -34,9 +34,7 @@ const FALLBACK_SUBSCRIPTION_PLANS = [
   { id: '1_month', duration: '1 Month', price: '$9.99/month' },
 ];
 
-// Helper to format plan for display
 const formatPlanForDisplay = (plan: SubscriptionPlan, index: number) => {
-  // Calculate savings compared to 1-month plan (assuming first plan is longest duration)
   const savingsPercent = plan.durationMonths > 1
     ? Math.round((1 - (plan.monthlyPrice / (plan.price / plan.durationMonths))) * 100) || 0
     : 0;
@@ -53,7 +51,6 @@ const formatPlanForDisplay = (plan: SubscriptionPlan, index: number) => {
 };
 
 export default function SubscriptionScreen() {
-  // Get params - can come from activity screen (drill unlock) or profile (subscription mode)
   const params = useLocalSearchParams<{
     recommendationId?: string;
     skillId?: string;
@@ -61,28 +58,35 @@ export default function SubscriptionScreen() {
     drillCount?: string;
     price?: string;
     currency?: string;
-    mode?: string; // 'subscription' when coming from profile
+    mode?: string;
   }>();
 
-  // Check if this is subscription-only mode (from profile)
   const isSubscriptionMode = params.mode === 'subscription';
 
-  // Hooks
   const { processPayment, processing } = usePayment();
-  const { hasActiveSubscription, availableCredits, unlockWithCredits, loading: subscriptionLoading, creditValue } = useSubscription();
+  const { subscription, hasActiveSubscription, availableCredits, unlockWithCredits, loading: subscriptionLoading, creditValue, refresh } = useSubscription();
   const { plans: subscriptionPlans, hasPlans, loading: plansLoading } = useSubscriptionPlans();
   const { showError, showSuccess } = useToast();
 
-  // Format backend plans for display
   const formattedPlans = subscriptionPlans.map(formatPlanForDisplay);
 
-  // Parse params - only required when NOT in subscription mode
+  const subscriptionPlanMatch = useMemo(() => {
+    const planId = (subscription as any)?.planId || (subscription as any)?.metadata?.planId;
+    if (!planId) return null;
+    return subscriptionPlans.find((p) => p.planId === planId) || null;
+  }, [subscription, subscriptionPlans]);
+
+  const subscriptionPriceDisplay = useMemo(() => {
+    if ((subscription as any)?.planPrice) return (subscription as any).planPrice;
+    if (subscriptionPlanMatch?.priceFormatted) return subscriptionPlanMatch.priceFormatted;
+    if (subscriptionPlanMatch?.monthlyPriceFormatted) return subscriptionPlanMatch.monthlyPriceFormatted;
+    return '';
+  }, [subscription, subscriptionPlanMatch]);
+
   const drillCount = params.drillCount ? parseInt(params.drillCount, 10) : 0;
   const drillPrice = params.price ? parseFloat(params.price) : 0;
   const currency = params.currency;
 
-  // Calculate credits needed based on drill pack price and credit value
-  // Must be calculated AFTER drillPrice and creditValue are defined
   const creditsNeeded = useMemo(() => {
     if (creditValue > 0 && drillPrice > 0) {
       return Math.ceil(drillPrice / creditValue);
@@ -90,16 +94,17 @@ export default function SubscriptionScreen() {
     return 0;
   }, [drillPrice, creditValue]);
 
-  // Validate required data is present (only for drill unlock flow, not subscription mode)
   const hasRequiredData = isSubscriptionMode || (params.recommendationId && params.skillId && params.price && params.drillCount && params.currency);
 
-  // State
   const [selectedOption, setSelectedOption] = useState<'subscription' | 'one-time'>(isSubscriptionMode ? 'subscription' : 'one-time');
   const [selectedPlanId, setSelectedPlanId] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showOutOfCreditsModal, setShowOutOfCreditsModal] = useState(false);
+  const [changePlanMode, setChangePlanMode] = useState(false);
+  const [actionLoading, setActionLoading] = useState<'change' | 'cancel' | null>(null);
+  const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
-  // Check for out of credits state and trigger modal after delay
   useEffect(() => {
     if (!isSubscriptionMode && hasActiveSubscription && !subscriptionLoading && creditsNeeded > 0) {
       if (availableCredits < creditsNeeded) {
@@ -112,7 +117,6 @@ export default function SubscriptionScreen() {
   }, [isSubscriptionMode, hasActiveSubscription, subscriptionLoading, availableCredits, creditsNeeded]);
 
   const handleRenewMonthly = async () => {
-    // Find a monthly plan (durationMonths === 1)
     const monthlyPlan = subscriptionPlans.find(p => p.durationMonths === 1);
 
     if (monthlyPlan) {
@@ -123,7 +127,6 @@ export default function SubscriptionScreen() {
           planId: monthlyPlan.planId,
           onSuccess: () => {
             showSuccess('Plan renewed successfully! Credits refreshed.');
-            // Refresh logic if needed, or let the screen update naturally
             router.replace({
               pathname: '/subscriptionScreen',
               params: params
@@ -138,7 +141,6 @@ export default function SubscriptionScreen() {
         setIsProcessing(false);
       }
     } else {
-      // Fallback if no monthly plan found - redirect to plans list
       setShowOutOfCreditsModal(false);
       handleUpgradePlan();
     }
@@ -146,21 +148,67 @@ export default function SubscriptionScreen() {
 
   const handleUpgradePlan = () => {
     setShowOutOfCreditsModal(false);
-    // Switch to subscription mode to show plans
     router.push({
       pathname: '/subscriptionScreen',
       params: { ...params, mode: 'subscription' }
     });
   };
 
-  // Set default selected plan when plans load
+  const handleChangePlanPress = () => {
+    if (hasPlans && subscriptionPlans.length > 0) {
+      const planId = subscriptionPlanMatch?.planId || subscriptionPlans[0].planId;
+      setSelectedPlanId(planId);
+    }
+    setChangePlanMode(true);
+    setActionMessage(null);
+  };
+
+  const handleExitChangePlan = () => {
+    setChangePlanMode(false);
+    setActionMessage(null);
+  };
+
+  const handleCancelPress = () => {
+    setActionMessage(null);
+    setShowCancelConfirm(true);
+  };
+
+  const handleCancelSubscription = async () => {
+    setActionMessage(null);
+    setActionLoading('cancel');
+    try {
+      const res = await apiService.cancelSubscription({ cancelAtPeriodEnd: true });
+      if (!res.success) {
+        throw new Error(res.message || 'Unable to cancel subscription.');
+      }
+      await refresh();
+      setChangePlanMode(false);
+      setActionMessage({ type: 'success', text: 'Subscription cancellation scheduled. Your plan remains active until the period ends.' });
+    } catch (error: any) {
+      setActionMessage({ type: 'error', text: 'We couldn’t cancel your subscription right now. Please try again in a moment or contact support.' });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleViewPaymentHistory = async () => {
+    router.push('/paymentHistory');
+  };
+
   useEffect(() => {
     if (hasPlans && subscriptionPlans.length > 0 && !selectedPlanId) {
-      setSelectedPlanId(subscriptionPlans[0].planId);
+      const planId = subscriptionPlanMatch?.planId || subscriptionPlans[0].planId;
+      setSelectedPlanId(planId);
     }
-  }, [hasPlans, subscriptionPlans, selectedPlanId]);
+  }, [hasPlans, subscriptionPlans, selectedPlanId, subscriptionPlanMatch]);
 
-  // Format price for display
+  const formatDateString = (dateString?: string | null) => {
+    if (!dateString) return '—';
+    const parsed = new Date(dateString);
+    if (Number.isNaN(parsed.getTime())) return '—';
+    return parsed.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  };
+
   const formatPrice = (amount: number, curr: string) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -171,7 +219,6 @@ export default function SubscriptionScreen() {
 
   const formattedDrillPrice = (!isSubscriptionMode && currency) ? formatPrice(drillPrice, currency) : '';
 
-  // Handle drill pack payment (real implementation)
   const handleDrillPackPayment = async () => {
     if (!params.recommendationId || !params.skillId) {
       showError('Missing required information. Please try again.');
@@ -190,7 +237,6 @@ export default function SubscriptionScreen() {
         },
         onSuccess: (assignmentId) => {
           showSuccess('Payment successful! Your drills are unlocked.');
-          // Redirect to Activity page (drills tab) - user will click "Start" to generate drills
           router.push({
             pathname: '/activity',
             params: { tab: 'drills' }
@@ -207,7 +253,6 @@ export default function SubscriptionScreen() {
     }
   };
 
-  // Handle subscription credit usage (for subscribers)
   const handleUseCredit = async () => {
     if (!params.skillId) {
       showError('Missing skill information.');
@@ -229,7 +274,6 @@ export default function SubscriptionScreen() {
       });
 
       showSuccess('Payment successful! Your drills are unlocked.');
-      // Redirect to Activity page (drills tab) - user will click "Start" to generate drills
       router.push({
         pathname: '/activity',
         params: { tab: 'drills' }
@@ -241,7 +285,6 @@ export default function SubscriptionScreen() {
     }
   };
 
-  // Handle subscription purchase
   const handleSubscriptionPayment = async () => {
     if (!selectedPlanId) {
       showError('Please select a subscription plan.');
@@ -255,7 +298,6 @@ export default function SubscriptionScreen() {
         planId: selectedPlanId,
         onSuccess: () => {
           showSuccess('Subscription activated! You now have drill credits.');
-          // Refresh the current screen to show the subscriber view
           router.replace({
             pathname: '/subscriptionScreen',
             params: params
@@ -272,18 +314,14 @@ export default function SubscriptionScreen() {
     }
   };
 
-  // Handle swipe success - called for both drill pack and subscription
   const handleSwipeSuccess = () => {
     if (selectedOption === 'subscription' && hasPlans) {
-      // Process subscription payment
       handleSubscriptionPayment();
     } else {
-      // Process drill pack payment
       handleDrillPackPayment();
     }
   };
 
-  // If required data is missing, show error state
   if (!hasRequiredData) {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
@@ -319,7 +357,6 @@ export default function SubscriptionScreen() {
         <SafeAreaView style={styles.container}>
           <StatusBar barStyle="dark-content" />
 
-          {/* Header - match Profile screen layout */}
           <View style={styles.header}>
             <TouchableOpacity
               onPress={() => router.back()}
@@ -328,7 +365,7 @@ export default function SubscriptionScreen() {
               <Ionicons name="chevron-back" size={SCREEN_WIDTH * 0.05} color={COLORS.text.primary} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>
-              {isSubscriptionMode ? 'Subscription' : (hasActiveSubscription ? 'Unlock Drills' : 'Unlock Your Drills')}
+              {isSubscriptionMode ? 'My Subscription' : (hasActiveSubscription ? 'Unlock Drills' : 'Unlock Your Drills')}
             </Text>
           </View>
 
@@ -337,7 +374,6 @@ export default function SubscriptionScreen() {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            {/* Show loading state while checking subscription */}
             {subscriptionLoading && !isSubscriptionMode ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={BRAND} />
@@ -345,90 +381,213 @@ export default function SubscriptionScreen() {
               </View>
             ) : (
               <>
-                {/* Subscription Mode - Show subscription plans or coming soon */}
                 {isSubscriptionMode ? (
-                  <>
-                    {/* Subscription Card Only */}
-                    <View style={styles.section}>
-                      <SelectionCard
-                        title="Unlock Unlimited Drills & More"
-                        subtitle={hasPlans && formattedPlans[0] ? `Starting at ${formattedPlans[0].price}` : "Starting at $3.99/month"}
-                        features={[
-                          {
-                            title: 'Unlimited AI-powered drills',
-                            description: 'Practice as much as you want — no limits, no restrictions.'
-                          },
-                          {
-                            title: 'Faster learning progress + confidence boost',
-                            description: 'Master your communication 5× faster with continuous training.'
-                          },
-                          {
-                            title: 'All skills unlocked instantly',
-                            description: 'Access every soft-skill domain the moment you upgrade.'
-                          },
-                          {
-                            title: 'Save up to 70% over time',
-                            description: 'Subscription costs far less than buying multiple drill packs.'
-                          }
-                        ]}
-                        isSelected={true}
-                        onSelect={() => { }}
-                        badge="BEST VALUE"
-                      />
-                    </View>
-
-                    {/* Conditional Rendering: Show dynamic plans if available, otherwise Coming Soon */}
-                    {hasPlans ? (
-                      <View style={styles.plansContainer}>
-                        <Text style={styles.sectionTitle}>Choose Your Plan</Text>
-                        {formattedPlans.map((plan, index) => (
-                          <PlanCard
-                            key={plan.id}
-                            duration={plan.duration}
-                            price={plan.price}
-                            savings={plan.savings}
-                            isSelected={selectedPlanId === plan.id}
-                            onSelect={() => setSelectedPlanId(plan.id)}
-                            badge={plan.badge}
-                          />
-                        ))}
-                      </View>
+                  hasActiveSubscription ? (
+                    changePlanMode ? (
+                      <>
+                        <View style={styles.plansContainer}>
+                          <Text style={styles.sectionTitle}>Choose Your Plan</Text>
+                          {hasPlans ? (
+                            formattedPlans.map((plan) => (
+                              <PlanCard
+                                key={plan.id}
+                                duration={plan.duration}
+                                price={plan.price}
+                                savings={plan.savings}
+                                isSelected={selectedPlanId === plan.id}
+                                onSelect={() => setSelectedPlanId(plan.id)}
+                                badge={plan.badge}
+                              />
+                            ))
+                          ) : (
+                            <View style={styles.comingSoonContainer}>
+                              <View style={styles.comingSoonCard}>
+                                <View style={styles.comingSoonIconContainer}>
+                                  <Ionicons name="rocket-outline" size={SCREEN_WIDTH * 0.08} color={BRAND} />
+                                </View>
+                                <Text style={styles.comingSoonTitle}>Plans unavailable</Text>
+                                <Text style={styles.comingSoonText}>
+                                  We couldn't find subscription plans right now. Please try again later.
+                                </Text>
+                              </View>
+                            </View>
+                          )}
+                        </View>
+                        <TouchableOpacity style={styles.neutralButton} onPress={handleExitChangePlan}>
+                          <Text style={styles.neutralButtonText}>Back to current plan</Text>
+                        </TouchableOpacity>
+                      </>
                     ) : (
-                      <View style={styles.comingSoonContainer}>
-                        <View style={styles.comingSoonCard}>
-                          <View style={styles.comingSoonIconContainer}>
-                            <Ionicons name="rocket-outline" size={SCREEN_WIDTH * 0.08} color={BRAND} />
+                      <>
+
+                        <View style={styles.planOverviewCard}>
+                          <View style={styles.subscriptionHeader}>
+                            <View style={{ flex: 1, paddingRight: SCREEN_WIDTH * 0.02 }}>
+                              <Text style={styles.subscriptionTitle}>
+                                {subscription?.plan
+                                  ? (subscription.plan.toLowerCase().includes('monthly') ? 'Monthly Pro Plan' : subscription.plan.charAt(0) + subscription.plan.slice(1).toLowerCase() + ' Plan')
+                                  : 'Current Plan'}
+                              </Text>
+                              <Text style={styles.subscriptionPrice}>
+                                {subscriptionPriceDisplay || 'Price unavailable'}
+                              </Text>
+                            </View>
+                            <View
+                              style={[
+                                styles.statusBadge,
+                                subscription?.status === 'ACTIVE' ? styles.statusActive : styles.statusInactive
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.statusBadgeText,
+                                  subscription?.status === 'ACTIVE' ? styles.statusActiveText : styles.statusInactiveText
+                                ]}
+                              >
+                                {subscription?.status === 'ACTIVE' ? 'Active' : (subscription?.status || 'Inactive')}
+                              </Text>
+                            </View>
                           </View>
-                          <Text style={styles.comingSoonTitle}>Coming Soon!</Text>
-                          <Text style={styles.comingSoonText}>
-                            We're working hard to bring you unlimited subscription plans.
-                            Stay tuned for updates!
+
+                          <View style={styles.divider} />
+
+                          <View style={styles.subscriptionRow}>
+                            <Text style={styles.subscriptionRenewLabel}>Renews on {formatDateString(subscription?.endDate)}</Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.creditCard}>
+                          <Text style={styles.creditTitle}>Credit Balance</Text>
+                          <View style={styles.creditRow}>
+                            <Text style={styles.creditLabel}>Total Monthly Credits</Text>
+                            <Text style={styles.creditValue}>{subscription?.totalCredits ?? 0}</Text>
+                          </View>
+                          <View style={styles.creditRow}>
+                            <Text style={styles.creditLabel}>Credits Available</Text>
+                            <Text style={[styles.creditValue, styles.creditValueAvailable]}>{subscription?.credits ?? 0}</Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.subscriptionActions}>
+                          <TouchableOpacity
+                            style={styles.primaryActionButton}
+                            onPress={handleChangePlanPress}
+                            disabled={actionLoading === 'change'}
+                          >
+                            <Text style={styles.primaryActionText}>Change Plan</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={styles.secondaryActionButton}
+                            onPress={handleViewPaymentHistory}
+                          >
+                            <Text style={styles.secondaryActionText}>View Payment History</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={styles.cancelActionButton}
+                            onPress={handleCancelPress}
+                            disabled={actionLoading === 'cancel'}
+                          >
+                            <Text style={styles.cancelActionText}>Cancel Subscription</Text>
+                          </TouchableOpacity>
+                          <Text style={styles.cancelHelperText}>
+                            Please proceed with caution. This action is final and cannot be undone.
                           </Text>
                         </View>
 
-                        {/* Preview of Subscription Plans (Disabled) */}
-                        <Text style={[styles.sectionTitle, { opacity: 0.5, marginTop: SPACING.margin.lg }]}>
-                          Upcoming Subscription Plans
-                        </Text>
+                        {actionMessage && (
+                          <Text
+                            style={[
+                              styles.actionMessage,
+                              actionMessage.type === 'success' ? styles.actionMessageSuccess : styles.actionMessageError
+                            ]}
+                          >
+                            {actionMessage.text}
+                          </Text>
+                        )}
+                      </>
+                    )
+                  ) : (
+                    <>
+                      <View style={styles.section}>
+                        <SelectionCard
+                          title="Unlock Unlimited Drills & More"
+                          subtitle={hasPlans && formattedPlans[0] ? `Starting at ${formattedPlans[0].price}` : "Starting at $3.99/month"}
+                          features={[
+                            {
+                              title: 'Unlimited AI-powered drills',
+                              description: 'Practice as much as you want — no limits, no restrictions.'
+                            },
+                            {
+                              title: 'Faster learning progress + confidence boost',
+                              description: 'Master your communication 5× faster with continuous training.'
+                            },
+                            {
+                              title: 'All skills unlocked instantly',
+                              description: 'Access every soft-skill domain the moment you upgrade.'
+                            },
+                            {
+                              title: 'Save up to 70% over time',
+                              description: 'Subscription costs far less than buying multiple drill packs.'
+                            }
+                          ]}
+                          isSelected={true}
+                          onSelect={() => { }}
+                          badge="BEST VALUE"
+                        />
+                      </View>
 
-                        {FALLBACK_SUBSCRIPTION_PLANS.map((plan) => (
-                          <View key={plan.id} style={{ opacity: 0.4 }}>
+                      {hasPlans ? (
+                        <View style={styles.plansContainer}>
+                          <Text style={styles.sectionTitle}>Choose Your Plan</Text>
+                          {formattedPlans.map((plan) => (
                             <PlanCard
+                              key={plan.id}
                               duration={plan.duration}
                               price={plan.price}
                               savings={plan.savings}
-                              isSelected={false}
-                              onSelect={() => { }}
+                              isSelected={selectedPlanId === plan.id}
+                              onSelect={() => setSelectedPlanId(plan.id)}
                               badge={plan.badge}
                             />
+                          ))}
+                        </View>
+                      ) : (
+                        <View style={styles.comingSoonContainer}>
+                          <View style={styles.comingSoonCard}>
+                            <View style={styles.comingSoonIconContainer}>
+                              <Ionicons name="rocket-outline" size={SCREEN_WIDTH * 0.08} color={BRAND} />
+                            </View>
+                            <Text style={styles.comingSoonTitle}>Coming Soon!</Text>
+                            <Text style={styles.comingSoonText}>
+                              We're working hard to bring you unlimited subscription plans.
+                              Stay tuned for updates!
+                            </Text>
                           </View>
-                        ))}
-                      </View>
-                    )}
-                  </>
+
+                          <Text style={[styles.sectionTitle, { opacity: 0.5, marginTop: SPACING.margin.lg }]}>
+                            Upcoming Subscription Plans
+                          </Text>
+
+                          {FALLBACK_SUBSCRIPTION_PLANS.map((plan) => (
+                            <View key={plan.id} style={{ opacity: 0.4 }}>
+                              <PlanCard
+                                duration={plan.duration}
+                                price={plan.price}
+                                savings={plan.savings}
+                                isSelected={false}
+                                onSelect={() => { }}
+                                badge={plan.badge}
+                              />
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </>
+                  )
                 ) : hasActiveSubscription ? (
                   <View style={styles.subscriberContainer}>
-                    {/* Header Section */}
                     <View style={styles.unlockHeader}>
                       <Text style={styles.unlockTitle}>Unlock {params.skillId ? 'Communication' : 'Skill'} Drills!</Text>
                       <Text style={styles.unlockSubtitle}>
@@ -436,7 +595,6 @@ export default function SubscriptionScreen() {
                       </Text>
                     </View>
 
-                    {/* Balance Card */}
                     <View style={styles.balanceCard}>
                       <Text style={styles.balanceLabel}>Your Current Credits</Text>
                       <View style={styles.balanceRow}>
@@ -445,7 +603,6 @@ export default function SubscriptionScreen() {
                       </View>
                     </View>
 
-                    {/* Unlock Details Card */}
                     <View style={styles.detailsCard}>
                       <View style={styles.costRow}>
                         <Text style={styles.costLabel}>Drill Pack Price</Text>
@@ -591,11 +748,8 @@ export default function SubscriptionScreen() {
             )}
           </ScrollView>
 
-          {/* Fixed Footer - Show for purchase flows */}
-          {/* For drill unlock flow - show when not a subscriber */}
           {!isSubscriptionMode && !hasActiveSubscription && (
             <View style={styles.footer}>
-              {/* SwipeButton - enabled for drill pack OR subscription with plans */}
               <SwipeButton
                 onSwipeSuccess={handleSwipeSuccess}
                 loading={isProcessing || processing}
@@ -609,8 +763,7 @@ export default function SubscriptionScreen() {
             </View>
           )}
 
-          {/* For subscription mode - show purchase button when plans available */}
-          {isSubscriptionMode && hasPlans && (
+          {isSubscriptionMode && hasPlans && (!hasActiveSubscription || changePlanMode) && (
             <View style={styles.footer}>
               <SwipeButton
                 onSwipeSuccess={handleSubscriptionPayment}
@@ -625,7 +778,6 @@ export default function SubscriptionScreen() {
             </View>
           )}
 
-          {/* For subscribers unlocking drills - show claim button in footer */}
           {!isSubscriptionMode && hasActiveSubscription && (
             <View style={[styles.footer, { gap: 16 }]}>
               {availableCredits >= creditsNeeded && creditsNeeded > 0 ? (
@@ -669,12 +821,11 @@ export default function SubscriptionScreen() {
             </View>
           )}
 
-          {/* Out of Credits Modal */}
           <Modal
             visible={showOutOfCreditsModal}
             transparent={true}
             animationType="fade"
-            onRequestClose={() => setShowOutOfCreditsModal(false)} // Android back button
+            onRequestClose={() => setShowOutOfCreditsModal(false)}
           >
             <View style={styles.modalOverlay}>
               <View style={styles.modalContent}>
@@ -688,7 +839,6 @@ export default function SubscriptionScreen() {
                   You used all your drills for this term. Choose to renew the same plan or upgrade for more credits.
                 </Text>
 
-                {/* Mocking refresh date for now as requested */}
                 <Text style={styles.modalSubText}>
                   Next credits refresh on: 15 July 2024
                 </Text>
@@ -706,6 +856,43 @@ export default function SubscriptionScreen() {
                     onPress={handleUpgradePlan}
                   >
                     <Text style={styles.upgradeButtonText}>Upgrade Plan</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+
+          <Modal
+            visible={showCancelConfirm}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => setShowCancelConfirm(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>Cancel subscription?</Text>
+                <Text style={styles.modalText}>
+                  This action is final and cannot be undone. You will lose access to your remaining credits immediately.
+                </Text>
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={styles.dangerButton}
+                    onPress={() => {
+                      setShowCancelConfirm(false);
+                      handleCancelSubscription();
+                    }}
+                    disabled={actionLoading === 'cancel'}
+                  >
+                    <Text style={styles.dangerButtonText}>
+                      {actionLoading === 'cancel' ? 'Cancelling...' : 'Confirm Cancel'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.neutralButton}
+                    onPress={() => setShowCancelConfirm(false)}
+                    disabled={actionLoading === 'cancel'}
+                  >
+                    <Text style={styles.neutralButtonText}>Keep Subscription</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -737,7 +924,7 @@ const styles = StyleSheet.create({
     fontSize: SCREEN_WIDTH * 0.048,
     fontWeight: '700',
     color: COLORS.text.primary,
-    marginRight: SCREEN_WIDTH * 0.05, // Offset for back button
+    marginRight: SCREEN_WIDTH * 0.05,
   },
   loadingContainer: {
     flex: 1,
@@ -802,7 +989,6 @@ const styles = StyleSheet.create({
     fontSize: SCREEN_WIDTH * 0.03,
     color: COLORS.text.tertiary,
   },
-  // Coming Soon Styles
   comingSoonContainer: {
     marginTop: -SCREEN_WIDTH * 0.04,
   },
@@ -852,7 +1038,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: BRAND,
   },
-  // Error State Styles
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -884,7 +1069,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.white,
   },
-  // Subscriber Unlock Styles
   subscriberContainer: {
     marginTop: SCREEN_WIDTH * 0.02,
     gap: SCREEN_WIDTH * 0.05,
@@ -906,7 +1090,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   balanceCard: {
-    backgroundColor: '#F0FDF4', // Light green bg
+    backgroundColor: '#F0FDF4',
     borderRadius: BORDER_RADIUS.xl,
     padding: SCREEN_WIDTH * 0.06,
     alignItems: 'center',
@@ -926,7 +1110,7 @@ const styles = StyleSheet.create({
   balanceValue: {
     fontSize: SCREEN_WIDTH * 0.12,
     fontWeight: '800',
-    color: '#166534', // Dark green
+    color: '#166534',
   },
   detailsCard: {
     backgroundColor: COLORS.white,
@@ -981,7 +1165,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   claimButton: {
-    backgroundColor: '#22C55E', // Bright Green
+    backgroundColor: '#22C55E',
     borderRadius: BORDER_RADIUS.full,
     paddingVertical: SCREEN_WIDTH * 0.04,
     alignItems: 'center',
@@ -992,7 +1176,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.white,
   },
-  // Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -1010,14 +1193,14 @@ const styles = StyleSheet.create({
   },
   modalIconContainer: {
     marginBottom: SCREEN_WIDTH * 0.04,
-    backgroundColor: '#FEF3C7', // Light yellow
+    backgroundColor: '#FEF3C7',
     padding: SCREEN_WIDTH * 0.03,
     borderRadius: SCREEN_WIDTH * 0.1,
   },
   modalTitle: {
     fontSize: SCREEN_WIDTH * 0.05,
     fontWeight: '700',
-    color: '#D97706', // Dark yellow/orange
+    color: '#D97706',
     marginBottom: SCREEN_WIDTH * 0.03,
   },
   modalText: {
@@ -1038,7 +1221,7 @@ const styles = StyleSheet.create({
     gap: SCREEN_WIDTH * 0.03,
   },
   renewButton: {
-    backgroundColor: '#1D4ED8', // Blue
+    backgroundColor: '#1D4ED8',
     borderRadius: BORDER_RADIUS.md,
     paddingVertical: SCREEN_WIDTH * 0.035,
     alignItems: 'center',
@@ -1054,11 +1237,178 @@ const styles = StyleSheet.create({
     paddingVertical: SCREEN_WIDTH * 0.035,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#1D4ED8', // Blue
+    borderColor: '#1D4ED8',
   },
   upgradeButtonText: {
     fontSize: SCREEN_WIDTH * 0.04,
     fontWeight: '600',
-    color: '#1D4ED8', // Blue
+    color: '#1D4ED8',
+  },
+  planOverviewCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: SCREEN_WIDTH * 0.045,
+    padding: SCREEN_WIDTH * 0.055,
+    marginBottom: SCREEN_WIDTH * 0.04,
+    ...SHADOWS.sm,
+  },
+  subscriptionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SCREEN_WIDTH * 0.04,
+  },
+  subscriptionTitle: {
+    fontSize: SCREEN_WIDTH * 0.06,
+    fontWeight: '800',
+    color: COLORS.text.primary,
+  },
+  subscriptionPrice: {
+    fontSize: SCREEN_WIDTH * 0.04,
+    fontWeight: '700',
+    color: COLORS.text.primary,
+    marginTop: SCREEN_WIDTH * 0.01,
+  },
+  statusBadge: {
+    paddingHorizontal: SCREEN_WIDTH * 0.04,
+    paddingVertical: SCREEN_WIDTH * 0.018,
+    borderRadius: BORDER_RADIUS.full,
+  },
+  statusActive: {
+    backgroundColor: '#CFF5D9',
+  },
+  statusInactive: {
+    backgroundColor: COLORS.gray[200],
+  },
+  statusBadgeText: {
+    fontSize: SCREEN_WIDTH * 0.034,
+    fontWeight: '800',
+  },
+  statusActiveText: {
+    color: '#12A150',
+  },
+  statusInactiveText: {
+    color: COLORS.text.secondary,
+  },
+  creditCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: SCREEN_WIDTH * 0.04,
+    padding: SCREEN_WIDTH * 0.045,
+    ...SHADOWS.sm,
+  },
+  creditTitle: {
+    fontSize: SCREEN_WIDTH * 0.048,
+    fontWeight: '800',
+    color: COLORS.text.primary,
+    marginBottom: SCREEN_WIDTH * 0.04,
+  },
+  creditRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SCREEN_WIDTH * 0.03,
+  },
+  creditLabel: {
+    fontSize: SCREEN_WIDTH * 0.04,
+    color: '#5B79A6',
+  },
+  creditValue: {
+    fontSize: SCREEN_WIDTH * 0.05,
+    fontWeight: '800',
+    color: COLORS.text.primary,
+  },
+  creditValueAvailable: {
+    color: '#22A05B',
+  },
+  subscriptionRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    marginTop: SCREEN_WIDTH * 0.02,
+    marginBottom: 0,
+  },
+  subscriptionRenewLabel: {
+    fontSize: SCREEN_WIDTH * 0.038,
+    color: '#5B79A6',
+    fontWeight: '500',
+  },
+  subscriptionActions: {
+    marginTop: SCREEN_WIDTH * 0.02,
+    gap: SCREEN_WIDTH * 0.04,
+  },
+  primaryActionButton: {
+    backgroundColor: '#0E64CE',
+    paddingVertical: SCREEN_WIDTH * 0.04,
+    borderRadius: BORDER_RADIUS.full,
+    alignItems: 'center',
+  },
+  primaryActionText: {
+    fontSize: SCREEN_WIDTH * 0.04,
+    fontWeight: '700',
+    color: COLORS.white,
+  },
+  secondaryActionButton: {
+    backgroundColor: '#F3F7FC',
+    paddingVertical: SCREEN_WIDTH * 0.04,
+    borderRadius: BORDER_RADIUS.full,
+    alignItems: 'center',
+  },
+  secondaryActionText: {
+    fontSize: SCREEN_WIDTH * 0.04,
+    fontWeight: '700',
+    color: COLORS.text.primary,
+  },
+  cancelActionButton: {
+    backgroundColor: 'transparent',
+    paddingVertical: SCREEN_WIDTH * 0.04,
+    borderRadius: BORDER_RADIUS.full,
+    alignItems: 'center',
+    marginTop: SCREEN_WIDTH * 0.02,
+  },
+  cancelHelperText: {
+    fontSize: SCREEN_WIDTH * 0.03,
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: -SCREEN_WIDTH * 0.02,
+    marginBottom: SCREEN_WIDTH * 0.04,
+    paddingHorizontal: SCREEN_WIDTH * 0.04,
+    lineHeight: SCREEN_WIDTH * 0.045,
+  },
+  cancelActionText: {
+    fontSize: SCREEN_WIDTH * 0.044,
+    fontWeight: '800',
+    color: '#D63B30',
+  },
+  actionMessage: {
+    marginTop: SCREEN_WIDTH * 0.03,
+    fontSize: SCREEN_WIDTH * 0.035,
+    textAlign: 'center',
+  },
+  actionMessageSuccess: {
+    color: COLORS.success,
+  },
+  actionMessageError: {
+    color: '#B91C1C',
+  },
+  dangerButton: {
+    backgroundColor: '#DC2626',
+    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: SCREEN_WIDTH * 0.035,
+    alignItems: 'center',
+  },
+  dangerButtonText: {
+    fontSize: SCREEN_WIDTH * 0.04,
+    fontWeight: '700',
+    color: COLORS.white,
+  },
+  neutralButton: {
+    backgroundColor: COLORS.gray[100],
+    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: SCREEN_WIDTH * 0.035,
+    alignItems: 'center',
+  },
+  neutralButtonText: {
+    fontSize: SCREEN_WIDTH * 0.04,
+    fontWeight: '700',
+    color: COLORS.text.primary,
   },
 });

@@ -350,16 +350,16 @@ class ApiService {
 
     if (isAxiosError(error) && error.response) {
       const { status, data } = error.response;
-      
+
       // Handle 401 Unauthorized errors
       if (status === 401) {
         // Don't handle session expiration for auth-related endpoints or during logout
         const url = error.config?.url;
         const isAuthEndpoint =
-          url.includes('/login') ||
-          url.includes('/signup') ||
-          url.includes('/otp') ||
-          url.includes('/multi-auth/logout');
+          url?.includes('/login') ||
+          url?.includes('/signup') ||
+          url?.includes('/otp') ||
+          url?.includes('/multi-auth/logout');
 
         // Don't trigger session expiration if user is logging out
         if (SessionManager.isCurrentlyLoggingOut()) {
@@ -374,11 +374,11 @@ class ApiService {
           SessionManager.handleUnauthorized();
         }
       }
-      
+
       // Handle specific error codes
       const errorData = typeof data === 'object' && data !== null ? data as { message?: string; code?: string } : {};
       let message = errorData.message;
-      
+
       switch (errorData.code) {
         case 'RATE_LIMIT_EXCEEDED':
           message = 'Too many requests. Please wait a moment and try again.';
@@ -546,6 +546,27 @@ class ApiService {
   public async getSubscriptionPlans(): Promise<ApiResponse> {
     console.log('📋 Fetching subscription plans');
     return this.get('/commerce/subscription-plans');
+  }
+
+  /**
+   * Change user's subscription plan
+   */
+  public async changeSubscription(planId: string): Promise<ApiResponse> {
+    return this.post('/commerce/subscription/change', { planId });
+  }
+
+  /**
+   * Cancel user's subscription (default: cancel at period end)
+   */
+  public async cancelSubscription(params?: { cancelAtPeriodEnd?: boolean }): Promise<ApiResponse> {
+    return this.post('/commerce/subscription/cancel', params || {});
+  }
+
+  /**
+   * Get payment history
+   */
+  public async getPaymentHistory(): Promise<ApiResponse> {
+    return this.get('/commerce/payment-history');
   }
 
   // ===========================================

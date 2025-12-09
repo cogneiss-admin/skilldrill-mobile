@@ -209,6 +209,13 @@ const AuthMiddleware = React.memo(({ children }: { children: React.ReactNode }) 
       return;
     }
 
+    // Don't redirect if we're on the payment history screen
+    const isPaymentHistoryScreen = segments[0] === 'paymentHistory';
+    if (isPaymentHistoryScreen) {
+      console.log('💳 AuthMiddleware: On payment history screen, not redirecting');
+      return;
+    }
+
     if (isAuthenticated) {
       const onboardingComplete = isOnboardingComplete();
       const nextStep = getOnboardingNextStep();
