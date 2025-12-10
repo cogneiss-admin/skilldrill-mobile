@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Dimensions, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Dimensions, ActivityIndicator, Modal, TextInput, ViewStyle, TextStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import apiService from '../services/api';
@@ -20,6 +20,7 @@ import SelectionCard from './components/SelectionCard';
 import PlanCard from './components/PlanCard';
 import SwipeButton from './components/SwipeButton';
 import SubscriberView from './components/SubscriberView';
+import PromoCodeView from './components/PromoCodeView';
 import { usePayment } from '../hooks/usePayment';
 import { useSubscription } from '../hooks/useSubscription';
 import { useSubscriptionPlans, SubscriptionPlan } from '../hooks/useSubscriptionPlans';
@@ -27,6 +28,615 @@ import { useToast } from '../hooks/useToast';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: SCREEN_BACKGROUND,
+  } as ViewStyle,
+  header: {
+    paddingVertical: SCREEN_WIDTH * 0.04,
+    paddingHorizontal: SCREEN_WIDTH * 0.06,
+    borderBottomWidth: 1.5,
+    borderBottomColor: COLORS.gray[300],
+    backgroundColor: COLORS.white,
+    flexDirection: 'row',
+    alignItems: 'center',
+  } as ViewStyle,
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: SCREEN_WIDTH * 0.048,
+    fontWeight: '700',
+    color: COLORS.text.primary,
+    marginRight: SCREEN_WIDTH * 0.05,
+  } as TextStyle,
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
+  } as ViewStyle,
+  loadingText: {
+    ...TYPOGRAPHY.body,
+    marginTop: SPACING.md,
+    color: COLORS.text.tertiary
+  } as TextStyle,
+  scrollView: {
+    flex: 1
+  } as ViewStyle,
+  scrollContent: {
+    paddingBottom: SCREEN_WIDTH * 0.1,
+    paddingHorizontal: SCREEN_WIDTH * 0.06,
+    paddingTop: SCREEN_WIDTH * 0.05,
+  } as ViewStyle,
+  section: {
+    marginBottom: SCREEN_WIDTH * 0.02, // Reduced from 0.08 to bring promo code closer
+  } as ViewStyle,
+  sectionTitle: {
+    fontSize: SCREEN_WIDTH * 0.045,
+    fontWeight: '700',
+    color: COLORS.text.primary,
+    marginBottom: SCREEN_WIDTH * 0.04,
+    marginTop: SCREEN_WIDTH * 0.025,
+  } as TextStyle,
+  plansContainer: {
+    marginTop: -SCREEN_WIDTH * 0.04,
+  } as ViewStyle,
+  footer: {
+    paddingTop: SCREEN_WIDTH * 0.04,
+    paddingBottom: SCREEN_WIDTH * 0.04,
+    paddingHorizontal: SCREEN_WIDTH * 0.06,
+    backgroundColor: COLORS.white,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.gray[200],
+  } as ViewStyle,
+  payButton: {
+    backgroundColor: BRAND,
+    borderRadius: SCREEN_WIDTH * 0.075,
+    height: SCREEN_WIDTH * 0.14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...SHADOWS.md,
+  } as ViewStyle,
+  payButtonText: {
+    fontSize: SCREEN_WIDTH * 0.045,
+    fontWeight: '700',
+    color: COLORS.white,
+  } as TextStyle,
+  securePayment: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: SCREEN_WIDTH * 0.04,
+    gap: SCREEN_WIDTH * 0.01,
+  } as ViewStyle,
+  secureText: {
+    fontSize: SCREEN_WIDTH * 0.03,
+    color: COLORS.text.tertiary,
+  } as TextStyle,
+  comingSoonContainer: {
+    marginTop: -SCREEN_WIDTH * 0.04,
+  } as ViewStyle,
+  comingSoonCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SCREEN_WIDTH * 0.06,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: BRAND,
+    borderStyle: 'dashed',
+    ...SHADOWS.sm,
+  } as ViewStyle,
+  comingSoonIconContainer: {
+    width: SCREEN_WIDTH * 0.16,
+    height: SCREEN_WIDTH * 0.16,
+    borderRadius: SCREEN_WIDTH * 0.08,
+    backgroundColor: `${BRAND}15`,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SCREEN_WIDTH * 0.04,
+  } as ViewStyle,
+  comingSoonTitle: {
+    fontSize: SCREEN_WIDTH * 0.05,
+    fontWeight: '700',
+    color: COLORS.text.primary,
+    marginBottom: SCREEN_WIDTH * 0.025,
+  } as TextStyle,
+  comingSoonText: {
+    fontSize: SCREEN_WIDTH * 0.035,
+    color: COLORS.text.secondary,
+    textAlign: 'center',
+    lineHeight: SCREEN_WIDTH * 0.05,
+    marginBottom: SCREEN_WIDTH * 0.05,
+  } as TextStyle,
+  switchToDrillPackButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: `${BRAND}10`,
+    paddingVertical: SCREEN_WIDTH * 0.03,
+    paddingHorizontal: SCREEN_WIDTH * 0.05,
+    borderRadius: BORDER_RADIUS.full,
+    gap: SCREEN_WIDTH * 0.02,
+  } as ViewStyle,
+  switchToDrillPackText: {
+    fontSize: SCREEN_WIDTH * 0.035,
+    fontWeight: '600',
+    color: BRAND,
+  } as TextStyle,
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: SCREEN_WIDTH * 0.1,
+  } as ViewStyle,
+  errorTitle: {
+    fontSize: SCREEN_WIDTH * 0.05,
+    fontWeight: '700',
+    color: COLORS.text.primary,
+    marginTop: SCREEN_WIDTH * 0.04,
+    marginBottom: SCREEN_WIDTH * 0.02,
+  } as TextStyle,
+  errorText: {
+    fontSize: SCREEN_WIDTH * 0.035,
+    color: COLORS.text.secondary,
+    textAlign: 'center',
+    lineHeight: SCREEN_WIDTH * 0.05,
+    marginBottom: SCREEN_WIDTH * 0.06,
+  } as TextStyle,
+  errorButton: {
+    backgroundColor: BRAND,
+    paddingVertical: SCREEN_WIDTH * 0.035,
+    paddingHorizontal: SCREEN_WIDTH * 0.08,
+    borderRadius: SCREEN_WIDTH * 0.02,
+  } as ViewStyle,
+  errorButtonText: {
+    fontSize: SCREEN_WIDTH * 0.04,
+    fontWeight: '600',
+    color: COLORS.white,
+  } as TextStyle,
+  subscriberContainer: {
+    marginTop: SCREEN_WIDTH * 0.02,
+    gap: SCREEN_WIDTH * 0.05,
+  } as ViewStyle,
+  unlockHeader: {
+    alignItems: 'center',
+    marginBottom: SCREEN_WIDTH * 0.02,
+  } as ViewStyle,
+  unlockTitle: {
+    fontSize: SCREEN_WIDTH * 0.06,
+    fontWeight: '800',
+    color: COLORS.text.primary,
+    textAlign: 'center',
+    marginBottom: SCREEN_WIDTH * 0.02,
+  } as TextStyle,
+  unlockSubtitle: {
+    fontSize: SCREEN_WIDTH * 0.035,
+    color: COLORS.text.secondary,
+    textAlign: 'center',
+  } as TextStyle,
+  balanceCard: {
+    backgroundColor: '#F0FDF4',
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SCREEN_WIDTH * 0.06,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
+  } as ViewStyle,
+  balanceLabel: {
+    fontSize: SCREEN_WIDTH * 0.035,
+    color: COLORS.text.secondary,
+    marginBottom: SCREEN_WIDTH * 0.01,
+  } as TextStyle,
+  balanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SCREEN_WIDTH * 0.02,
+  } as ViewStyle,
+  balanceValue: {
+    fontSize: SCREEN_WIDTH * 0.12,
+    fontWeight: '800',
+    color: '#166534',
+  } as TextStyle,
+  detailsCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SCREEN_WIDTH * 0.06,
+    ...SHADOWS.sm,
+  } as ViewStyle,
+  costRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SCREEN_WIDTH * 0.04,
+  } as ViewStyle,
+  costLabel: {
+    fontSize: SCREEN_WIDTH * 0.04,
+    color: COLORS.text.secondary,
+  } as TextStyle,
+  costValue: {
+    fontSize: SCREEN_WIDTH * 0.04,
+    fontWeight: '700',
+    color: COLORS.text.primary,
+  } as TextStyle,
+  divider: {
+    height: 1,
+    backgroundColor: COLORS.gray[200],
+    marginBottom: SCREEN_WIDTH * 0.04,
+  } as ViewStyle,
+  checklistTitle: {
+    fontSize: SCREEN_WIDTH * 0.035,
+    color: COLORS.text.secondary,
+    marginBottom: SCREEN_WIDTH * 0.03,
+  } as TextStyle,
+  checklistItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SCREEN_WIDTH * 0.03,
+    marginBottom: SCREEN_WIDTH * 0.03,
+  } as ViewStyle,
+  checklistText: {
+    fontSize: SCREEN_WIDTH * 0.04,
+    fontWeight: '600',
+    color: COLORS.text.primary,
+    flex: 1,
+  } as TextStyle,
+  actionContainer: {
+    marginTop: SCREEN_WIDTH * 0.02,
+    gap: SCREEN_WIDTH * 0.04,
+  } as ViewStyle,
+  remainingText: {
+    fontSize: SCREEN_WIDTH * 0.03,
+    color: COLORS.text.tertiary,
+    textAlign: 'center',
+  } as TextStyle,
+  claimButton: {
+    backgroundColor: '#22C55E',
+    borderRadius: BORDER_RADIUS.full,
+    paddingVertical: SCREEN_WIDTH * 0.04,
+    alignItems: 'center',
+    ...SHADOWS.md,
+  } as ViewStyle,
+  claimButtonText: {
+    fontSize: SCREEN_WIDTH * 0.045,
+    fontWeight: '700',
+    color: COLORS.white,
+  } as TextStyle,
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: SCREEN_WIDTH * 0.08,
+  } as ViewStyle,
+  modalContent: {
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SCREEN_WIDTH * 0.06,
+    alignItems: 'center',
+    width: '100%',
+    ...SHADOWS.lg,
+  } as ViewStyle,
+  modalIconContainer: {
+    marginBottom: SCREEN_WIDTH * 0.04,
+    backgroundColor: '#FEF3C7',
+    padding: SCREEN_WIDTH * 0.03,
+    borderRadius: SCREEN_WIDTH * 0.1,
+  } as ViewStyle,
+  modalTitle: {
+    fontSize: SCREEN_WIDTH * 0.05,
+    fontWeight: '700',
+    color: '#D97706',
+    marginBottom: SCREEN_WIDTH * 0.03,
+  } as TextStyle,
+  modalText: {
+    fontSize: SCREEN_WIDTH * 0.038,
+    color: COLORS.text.secondary,
+    textAlign: 'center',
+    lineHeight: SCREEN_WIDTH * 0.055,
+    marginBottom: SCREEN_WIDTH * 0.02,
+  } as TextStyle,
+  modalSubText: {
+    fontSize: SCREEN_WIDTH * 0.032,
+    color: COLORS.text.tertiary,
+    textAlign: 'center',
+    marginBottom: SCREEN_WIDTH * 0.06,
+  } as TextStyle,
+  modalActions: {
+    width: '100%',
+    gap: SCREEN_WIDTH * 0.03,
+  } as ViewStyle,
+  renewButton: {
+    backgroundColor: '#1D4ED8',
+    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: SCREEN_WIDTH * 0.035,
+    alignItems: 'center',
+  } as ViewStyle,
+  renewButtonText: {
+    fontSize: SCREEN_WIDTH * 0.04,
+    fontWeight: '600',
+    color: COLORS.white,
+  } as TextStyle,
+  upgradeButton: {
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: SCREEN_WIDTH * 0.035,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#1D4ED8',
+  } as ViewStyle,
+  upgradeButtonText: {
+    fontSize: SCREEN_WIDTH * 0.04,
+    fontWeight: '600',
+    color: '#1D4ED8',
+  } as TextStyle,
+  planOverviewCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: SCREEN_WIDTH * 0.045,
+    padding: SCREEN_WIDTH * 0.055,
+    marginBottom: SCREEN_WIDTH * 0.04,
+    ...SHADOWS.sm,
+  } as ViewStyle,
+  subscriptionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SCREEN_WIDTH * 0.04,
+  } as ViewStyle,
+  subscriptionTitle: {
+    fontSize: SCREEN_WIDTH * 0.06,
+    fontWeight: '800',
+    color: COLORS.text.primary,
+  } as TextStyle,
+  subscriptionPrice: {
+    fontSize: SCREEN_WIDTH * 0.04,
+    fontWeight: '700',
+    color: COLORS.text.primary,
+    marginTop: SCREEN_WIDTH * 0.01,
+  } as TextStyle,
+  statusBadge: {
+    paddingHorizontal: SCREEN_WIDTH * 0.04,
+    paddingVertical: SCREEN_WIDTH * 0.018,
+    borderRadius: BORDER_RADIUS.full,
+  } as ViewStyle,
+  statusActive: {
+    backgroundColor: '#CFF5D9',
+  } as ViewStyle,
+  statusInactive: {
+    backgroundColor: COLORS.gray[200],
+  } as ViewStyle,
+  statusBadgeText: {
+    fontSize: SCREEN_WIDTH * 0.034,
+    fontWeight: '800',
+  } as TextStyle,
+  statusActiveText: {
+    color: '#12A150',
+  } as TextStyle,
+  statusInactiveText: {
+    color: COLORS.text.secondary,
+  } as TextStyle,
+  creditCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: SCREEN_WIDTH * 0.04,
+    padding: SCREEN_WIDTH * 0.045,
+    ...SHADOWS.sm,
+  } as ViewStyle,
+  creditTitle: {
+    fontSize: SCREEN_WIDTH * 0.048,
+    fontWeight: '800',
+    color: COLORS.text.primary,
+    marginBottom: SCREEN_WIDTH * 0.04,
+  } as TextStyle,
+  creditRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SCREEN_WIDTH * 0.03,
+  } as ViewStyle,
+  creditLabel: {
+    fontSize: SCREEN_WIDTH * 0.04,
+    color: '#5B79A6',
+  } as TextStyle,
+  creditValue: {
+    fontSize: SCREEN_WIDTH * 0.05,
+    fontWeight: '800',
+    color: COLORS.text.primary,
+  } as TextStyle,
+  creditValueAvailable: {
+    color: '#22A05B',
+  } as TextStyle,
+  subscriptionRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    marginTop: SCREEN_WIDTH * 0.02,
+    marginBottom: 0,
+  } as ViewStyle,
+  subscriptionRenewLabel: {
+    fontSize: SCREEN_WIDTH * 0.038,
+    color: '#5B79A6',
+    fontWeight: '500',
+  } as TextStyle,
+  subscriptionActions: {
+    marginTop: SCREEN_WIDTH * 0.02,
+    gap: SCREEN_WIDTH * 0.04,
+  } as ViewStyle,
+  primaryActionButton: {
+    backgroundColor: '#0E64CE',
+    paddingVertical: SCREEN_WIDTH * 0.04,
+    borderRadius: BORDER_RADIUS.full,
+    alignItems: 'center',
+  } as ViewStyle,
+  primaryActionText: {
+    fontSize: SCREEN_WIDTH * 0.04,
+    fontWeight: '700',
+    color: COLORS.white,
+  } as TextStyle,
+  secondaryActionButton: {
+    backgroundColor: '#F3F7FC',
+    paddingVertical: SCREEN_WIDTH * 0.04,
+    borderRadius: BORDER_RADIUS.full,
+    alignItems: 'center',
+  } as ViewStyle,
+  secondaryActionText: {
+    fontSize: SCREEN_WIDTH * 0.04,
+    fontWeight: '700',
+    color: COLORS.text.primary,
+  } as TextStyle,
+  cancelActionButton: {
+    backgroundColor: 'transparent',
+    paddingVertical: SCREEN_WIDTH * 0.04,
+    borderRadius: BORDER_RADIUS.full,
+    alignItems: 'center',
+    marginTop: SCREEN_WIDTH * 0.02,
+  } as ViewStyle,
+  cancelHelperText: {
+    fontSize: SCREEN_WIDTH * 0.03,
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: -SCREEN_WIDTH * 0.02,
+    marginBottom: SCREEN_WIDTH * 0.04,
+    paddingHorizontal: SCREEN_WIDTH * 0.04,
+    lineHeight: SCREEN_WIDTH * 0.045,
+  } as TextStyle,
+  cancelActionText: {
+    fontSize: SCREEN_WIDTH * 0.044,
+    fontWeight: '800',
+    color: '#D63B30',
+  } as TextStyle,
+  actionMessage: {
+    marginTop: SCREEN_WIDTH * 0.03,
+    fontSize: SCREEN_WIDTH * 0.035,
+    textAlign: 'center',
+  } as TextStyle,
+  actionMessageSuccess: {
+    color: COLORS.success,
+  } as TextStyle,
+  actionMessageError: {
+    color: '#B91C1C',
+  } as TextStyle,
+  dangerButton: {
+    backgroundColor: '#DC2626',
+    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: SCREEN_WIDTH * 0.035,
+    alignItems: 'center',
+  } as ViewStyle,
+  dangerButtonText: {
+    fontSize: SCREEN_WIDTH * 0.04,
+    fontWeight: '700',
+    color: COLORS.white,
+  } as TextStyle,
+  neutralButton: {
+    backgroundColor: COLORS.gray[100],
+    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: SCREEN_WIDTH * 0.035,
+    alignItems: 'center',
+  } as ViewStyle,
+  neutralButtonText: {
+    fontSize: SCREEN_WIDTH * 0.04,
+    fontWeight: '700',
+    color: COLORS.text.primary,
+  } as TextStyle,
+  promoCodeContainer: {
+    alignSelf: 'flex-end',
+    marginTop: 0, // Removed top margin
+    marginRight: SPACING.margin.lg,
+    marginBottom: SPACING.margin.md,
+  } as ViewStyle,
+  promoCodeText: {
+    ...TYPOGRAPHY.bodySmall,
+    color: BRAND,
+    textDecorationLine: 'underline',
+  } as TextStyle,
+  modalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  } as ViewStyle,
+  promoInput: {
+    width: '100%',
+    backgroundColor: COLORS.background.secondary,
+    borderRadius: BORDER_RADIUS.md,
+    paddingHorizontal: SPACING.padding.md,
+    paddingVertical: SPACING.padding.md,
+    fontSize: SCREEN_WIDTH * 0.04,
+    color: COLORS.text.primary,
+    borderWidth: 1,
+    borderColor: COLORS.border.light,
+    marginBottom: SPACING.margin.md,
+  } as TextStyle,
+  promoMessage: {
+    fontSize: SCREEN_WIDTH * 0.035,
+    fontWeight: '500',
+    marginBottom: SPACING.margin.md,
+    textAlign: 'center',
+  } as TextStyle,
+  promoSuccess: {
+    color: COLORS.success,
+  } as TextStyle,
+  promoError: {
+    color: COLORS.error,
+  } as TextStyle,
+  applyButton: {
+    width: '100%',
+    backgroundColor: BRAND,
+    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: SPACING.padding.md,
+    alignItems: 'center',
+    marginBottom: SPACING.margin.md,
+  } as ViewStyle,
+  applyButtonText: {
+    ...TYPOGRAPHY.buttonMedium,
+    color: COLORS.white,
+  } as TextStyle,
+  promoMessageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.gap.sm,
+    padding: SPACING.padding.sm,
+    borderRadius: BORDER_RADIUS.sm,
+    marginBottom: SPACING.margin.md,
+  } as ViewStyle,
+  promoSuccessContainer: {
+    backgroundColor: '#ECFDF3',
+  } as ViewStyle,
+  promoErrorContainer: {
+    backgroundColor: '#FEF2F2',
+  } as ViewStyle,
+  orderSummary: {
+    width: '100%',
+    marginTop: SPACING.margin.md,
+    padding: SPACING.padding.md,
+    borderRadius: BORDER_RADIUS.md,
+    backgroundColor: COLORS.background.secondary,
+    borderWidth: 1,
+    borderColor: COLORS.border.light,
+  } as ViewStyle,
+  orderSummaryTitle: {
+    fontSize: SCREEN_WIDTH * 0.04,
+    fontWeight: '700',
+    marginBottom: SPACING.margin.sm,
+    color: COLORS.text.primary,
+  } as TextStyle,
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: SPACING.margin.xs,
+  } as ViewStyle,
+  summaryLabel: {
+    fontSize: SCREEN_WIDTH * 0.038,
+    color: COLORS.text.secondary,
+  } as TextStyle,
+  summaryValue: {
+    fontSize: SCREEN_WIDTH * 0.038,
+    color: COLORS.text.primary,
+  } as TextStyle,
+  summaryDivider: {
+    height: 1,
+    backgroundColor: COLORS.border.light,
+    marginVertical: SPACING.margin.sm,
+  } as ViewStyle,
+});
 const FALLBACK_SUBSCRIPTION_PLANS = [
   { id: '12_months', duration: '12 Months', price: '$3.99/month', savings: 'Save 60%', badge: 'BEST VALUE' as const },
   { id: '6_months', duration: '6 Months', price: '$5.99/month', savings: 'Save 40%', badge: 'POPULAR' as const },
@@ -45,8 +655,6 @@ const formatPlanForDisplay = (plan: SubscriptionPlan, index: number) => {
     price: `${plan.monthlyPriceFormatted}/month`,
     totalPrice: plan.priceFormatted,
     savings: savingsPercent > 0 ? `Save ${savingsPercent}%` : undefined,
-    badge: index === 0 ? 'BEST VALUE' as const : index === 1 ? 'POPULAR' as const : undefined,
-    credits: plan.credits,
   };
 };
 
@@ -60,42 +668,29 @@ export default function SubscriptionScreen() {
     currency?: string;
     mode?: string;
   }>();
-
-  const isSubscriptionMode = params.mode === 'subscription';
-
+  const router = useRouter();
+  const {
+    subscription,
+    loading: subscriptionLoading,
+    refreshSubscription,
+    hasActiveSubscription,
+    availableCredits,
+    creditValue,
+    unlockWithCredits
+  } = useSubscription();
+  const { showSuccess, showError } = useToast();
   const { processPayment, processing } = usePayment();
-  const { subscription, hasActiveSubscription, availableCredits, unlockWithCredits, loading: subscriptionLoading, creditValue, refresh } = useSubscription();
-  const { plans: subscriptionPlans, hasPlans, loading: plansLoading } = useSubscriptionPlans();
-  const { showError, showSuccess } = useToast();
+  const { plans: apiPlans, hasPlans } = useSubscriptionPlans();
+  const formattedPlans = useMemo(() => apiPlans.map(formatPlanForDisplay), [apiPlans]);
 
-  const formattedPlans = subscriptionPlans.map(formatPlanForDisplay);
-
-  const subscriptionPlanMatch = useMemo(() => {
-    const planId = (subscription as any)?.planId || (subscription as any)?.metadata?.planId;
-    if (!planId) return null;
-    return subscriptionPlans.find((p) => p.planId === planId) || null;
-  }, [subscription, subscriptionPlans]);
-
-  const subscriptionPriceDisplay = useMemo(() => {
-    if ((subscription as any)?.planPrice) return (subscription as any).planPrice;
-    if (subscriptionPlanMatch?.priceFormatted) return subscriptionPlanMatch.priceFormatted;
-    if (subscriptionPlanMatch?.monthlyPriceFormatted) return subscriptionPlanMatch.monthlyPriceFormatted;
-    return '';
-  }, [subscription, subscriptionPlanMatch]);
-
-  const drillCount = params.drillCount ? parseInt(params.drillCount, 10) : 0;
-  const drillPrice = params.price ? parseFloat(params.price) : 0;
-  const currency = params.currency;
-
-  const creditsNeeded = useMemo(() => {
-    if (creditValue > 0 && drillPrice > 0) {
-      return Math.ceil(drillPrice / creditValue);
-    }
-    return 0;
-  }, [drillPrice, creditValue]);
-
+  // 1. Extract params first
+  const drillCount = params.drillCount ? parseInt(params.drillCount as string, 10) : 0;
+  const drillPrice = params.price ? parseFloat(params.price as string) : 0;
+  const currency = params.currency as string;
+  const isSubscriptionMode = params.mode === 'subscription';
   const hasRequiredData = isSubscriptionMode || (params.recommendationId && params.skillId && params.price && params.drillCount && params.currency);
 
+  // 2. State Declarations
   const [selectedOption, setSelectedOption] = useState<'subscription' | 'one-time'>(isSubscriptionMode ? 'subscription' : 'one-time');
   const [selectedPlanId, setSelectedPlanId] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -104,6 +699,64 @@ export default function SubscriptionScreen() {
   const [actionLoading, setActionLoading] = useState<'change' | 'cancel' | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+
+  // Promo Code State
+  const [showPromoView, setShowPromoView] = useState(false);
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [orderTotal, setOrderTotal] = useState(0);
+  const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null);
+  const [promoMessage, setPromoMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // 3. Derived State / Memos
+  const subscriptionPlanMatch = useMemo(() => {
+    if (!subscription?.plan) return null;
+    return apiPlans.find(p => p.name.toLowerCase().includes(subscription.plan.toLowerCase()));
+  }, [subscription, apiPlans]);
+
+  const subscriptionPriceDisplay = useMemo(() => {
+    if ((subscription as any)?.planPrice) return (subscription as any).planPrice;
+    if (subscriptionPlanMatch?.price) return `$${subscriptionPlanMatch.price}`;
+    return '';
+  }, [subscription, subscriptionPlanMatch]);
+
+  const selectedPlan = useMemo(() => {
+    return apiPlans.find((p) => p.planId === selectedPlanId) || apiPlans[0];
+  }, [apiPlans, selectedPlanId]);
+
+  const baseSubtotal = useMemo(() => {
+    if (selectedOption === 'subscription') {
+      return selectedPlan?.price || 0;
+    }
+    return drillPrice || 0;
+  }, [selectedOption, selectedPlan, drillPrice]);
+
+  const activeCurrency = useMemo(() => {
+    if (selectedOption === 'subscription') {
+      return selectedPlan?.currency || 'USD';
+    }
+    return currency || 'USD';
+  }, [selectedOption, selectedPlan, currency]);
+
+  const creditsNeeded = useMemo(() => {
+    if (creditValue > 0 && drillPrice > 0) {
+      return Math.ceil(drillPrice / creditValue);
+    }
+    return 0;
+  }, [drillPrice, creditValue]);
+
+  useEffect(() => {
+    if (selectedPlanId === '' && apiPlans.length > 0) {
+      setSelectedPlanId(apiPlans[0].planId);
+    }
+  }, [apiPlans, selectedPlanId]);
+
+  useEffect(() => {
+    // Reset discounts when pricing context changes
+    setDiscountAmount(0);
+    setOrderTotal(baseSubtotal);
+    setAppliedCouponCode(null);
+    setPromoMessage(null);
+  }, [baseSubtotal, selectedOption]);
 
   useEffect(() => {
     if (!isSubscriptionMode && hasActiveSubscription && !subscriptionLoading && creditsNeeded > 0) {
@@ -117,7 +770,7 @@ export default function SubscriptionScreen() {
   }, [isSubscriptionMode, hasActiveSubscription, subscriptionLoading, availableCredits, creditsNeeded]);
 
   const handleRenewMonthly = async () => {
-    const monthlyPlan = subscriptionPlans.find(p => p.durationMonths === 1);
+    const monthlyPlan = apiPlans.find(p => p.durationMonths === 1);
 
     if (monthlyPlan) {
       setShowOutOfCreditsModal(false);
@@ -155,12 +808,17 @@ export default function SubscriptionScreen() {
   };
 
   const handleChangePlanPress = () => {
-    if (hasPlans && subscriptionPlans.length > 0) {
-      const planId = subscriptionPlanMatch?.planId || subscriptionPlans[0].planId;
+    if (hasPlans && apiPlans.length > 0) {
+      const planId = subscriptionPlanMatch?.planId || apiPlans[0].planId;
       setSelectedPlanId(planId);
     }
     setChangePlanMode(true);
     setActionMessage(null);
+  };
+
+  const handleCancelPress = () => {
+    setActionMessage(null);
+    setShowCancelConfirm(true);
   };
 
   const handleExitChangePlan = () => {
@@ -168,9 +826,8 @@ export default function SubscriptionScreen() {
     setActionMessage(null);
   };
 
-  const handleCancelPress = () => {
-    setActionMessage(null);
-    setShowCancelConfirm(true);
+  const handleViewPaymentHistory = () => {
+    router.push('/paymentHistory');
   };
 
   const handleCancelSubscription = async () => {
@@ -191,16 +848,14 @@ export default function SubscriptionScreen() {
     }
   };
 
-  const handleViewPaymentHistory = async () => {
-    router.push('/paymentHistory');
-  };
+
 
   useEffect(() => {
-    if (hasPlans && subscriptionPlans.length > 0 && !selectedPlanId) {
-      const planId = subscriptionPlanMatch?.planId || subscriptionPlans[0].planId;
+    if (hasPlans && apiPlans.length > 0 && !selectedPlanId) {
+      const planId = subscriptionPlanMatch?.planId || apiPlans[0].planId;
       setSelectedPlanId(planId);
     }
-  }, [hasPlans, subscriptionPlans, selectedPlanId, subscriptionPlanMatch]);
+  }, [hasPlans, apiPlans, selectedPlanId, subscriptionPlanMatch]);
 
   const formatDateString = (dateString?: string | null) => {
     if (!dateString) return '—';
@@ -219,6 +874,21 @@ export default function SubscriptionScreen() {
 
   const formattedDrillPrice = (!isSubscriptionMode && currency) ? formatPrice(drillPrice, currency) : '';
 
+  const formatMoney = (amount: number) => formatPrice(amount, activeCurrency);
+
+  const mapCouponError = (message?: string) => {
+    if (!message) return 'Unable to apply this code right now.';
+    const normalized = message.toLowerCase();
+    if (normalized.includes('expired')) return 'This code has expired.';
+    if (normalized.includes('not yet valid')) return 'This code is not active yet.';
+    if (normalized.includes('usage limit')) return 'This code has reached its usage limit.';
+    if (normalized.includes('already used')) return 'You have already used this code.';
+    if (normalized.includes('minimum purchase')) return message;
+    if (normalized.includes('not active')) return 'This code is no longer active.';
+    if (normalized.includes('cannot be used')) return message;
+    return 'This code is not valid for this purchase.';
+  };
+
   const handleDrillPackPayment = async () => {
     if (!params.recommendationId || !params.skillId) {
       showError('Missing required information. Please try again.');
@@ -230,6 +900,7 @@ export default function SubscriptionScreen() {
 
       await processPayment({
         recommendationId: params.recommendationId,
+        couponCode: appliedCouponCode || undefined,
         metadata: {
           skillId: params.skillId,
           assessmentId: params.assessmentId,
@@ -247,7 +918,18 @@ export default function SubscriptionScreen() {
         }
       });
     } catch (error: any) {
-      showError(error.message || 'Payment failed. Please try again.');
+      const errorMessage = error.message || 'Payment failed. Please try again.';
+
+      // Check if it's a price quote expired error
+      if (errorMessage.toLowerCase().includes('price quote expired') || errorMessage.toLowerCase().includes('expired')) {
+        showError('Session expired. Refreshing pricing...');
+        // Navigate back to refresh the pricing
+        setTimeout(() => {
+          router.back();
+        }, 1500);
+      } else {
+        showError(errorMessage);
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -296,6 +978,7 @@ export default function SubscriptionScreen() {
 
       await processPayment({
         planId: selectedPlanId,
+        couponCode: appliedCouponCode || undefined,
         onSuccess: () => {
           showSuccess('Subscription activated! You now have drill credits.');
           router.replace({
@@ -346,6 +1029,63 @@ export default function SubscriptionScreen() {
               <Text style={styles.errorButtonText}>Go Back</Text>
             </TouchableOpacity>
           </View>
+        </SafeAreaView>
+      </GestureHandlerRootView>
+    );
+  }
+
+  if (showPromoView) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaView style={styles.container}>
+          <StatusBar barStyle="dark-content" />
+          <PromoCodeView
+            onClose={() => setShowPromoView(false)}
+            onSuccess={(assignmentId) => {
+              showSuccess('Payment successful! Your drills are unlocked.');
+              // Check if it's a drill pack purchase (has recommendationId) or subscription
+              if (selectedOption === 'one-time' || params.recommendationId) {
+                // Drill pack purchase - redirect to activity page
+                router.push({
+                  pathname: '/activity',
+                  params: { tab: 'drills' }
+                });
+              } else {
+                // Subscription purchase - refresh subscription screen
+                router.replace({
+                  pathname: '/subscriptionScreen',
+                  params: params
+                });
+              }
+            }}
+            basePrice={baseSubtotal}
+            currency={activeCurrency}
+            pricingMode={selectedOption === 'subscription' ? 'SUBSCRIPTION' : (params.recommendationId ? 'DYNAMIC' : 'FIXED')}
+            recommendationId={params.recommendationId}
+            processPayment={async (paymentParams) => {
+              if (selectedOption === 'subscription') {
+                await processPayment({
+                  planId: selectedPlanId,
+                  ...paymentParams,
+                  onSuccess: paymentParams.onSuccess,
+                  onCancel: () => setIsProcessing(false),
+                });
+              } else {
+                await processPayment({
+                  recommendationId: params.recommendationId,
+                  metadata: {
+                    skillId: params.skillId,
+                    assessmentId: params.assessmentId,
+                    recommendationId: params.recommendationId,
+                  },
+                  ...paymentParams,
+                  onSuccess: paymentParams.onSuccess,
+                  onCancel: () => setIsProcessing(false),
+                });
+              }
+            }}
+            isProcessing={isProcessing || processing}
+          />
         </SafeAreaView>
       </GestureHandlerRootView>
     );
@@ -584,6 +1324,13 @@ export default function SubscriptionScreen() {
                           ))}
                         </View>
                       )}
+
+                      <TouchableOpacity
+                        style={styles.promoCodeContainer}
+                        onPress={() => setShowPromoView(true)}
+                      >
+                        <Text style={styles.promoCodeText}>Have a promo code?</Text>
+                      </TouchableOpacity>
                     </>
                   )
                 ) : hasActiveSubscription ? (
@@ -742,6 +1489,13 @@ export default function SubscriptionScreen() {
                         </View>
                       )
                     )}
+
+                    <TouchableOpacity
+                      style={styles.promoCodeContainer}
+                      onPress={() => setShowPromoView(true)}
+                    >
+                      <Text style={styles.promoCodeText}>Have a promo code?</Text>
+                    </TouchableOpacity>
                   </>
                 )}
               </>
@@ -904,511 +1658,3 @@ export default function SubscriptionScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: SCREEN_BACKGROUND,
-  },
-  header: {
-    paddingVertical: SCREEN_WIDTH * 0.04,
-    paddingHorizontal: SCREEN_WIDTH * 0.06,
-    borderBottomWidth: 1.5,
-    borderBottomColor: COLORS.gray[300],
-    backgroundColor: COLORS.white,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: SCREEN_WIDTH * 0.048,
-    fontWeight: '700',
-    color: COLORS.text.primary,
-    marginRight: SCREEN_WIDTH * 0.05,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  loadingText: {
-    ...TYPOGRAPHY.body,
-    marginTop: SPACING.md,
-    color: COLORS.text.tertiary
-  },
-  scrollView: {
-    flex: 1
-  },
-  scrollContent: {
-    paddingBottom: SCREEN_WIDTH * 0.1,
-    paddingHorizontal: SCREEN_WIDTH * 0.06,
-    paddingTop: SCREEN_WIDTH * 0.05,
-  },
-  section: {
-    marginBottom: SCREEN_WIDTH * 0.08,
-  },
-  sectionTitle: {
-    fontSize: SCREEN_WIDTH * 0.045,
-    fontWeight: '700',
-    color: COLORS.text.primary,
-    marginBottom: SCREEN_WIDTH * 0.04,
-    marginTop: SCREEN_WIDTH * 0.025,
-  },
-  plansContainer: {
-    marginTop: -SCREEN_WIDTH * 0.04,
-  },
-  footer: {
-    paddingTop: SCREEN_WIDTH * 0.04,
-    paddingBottom: SCREEN_WIDTH * 0.04,
-    paddingHorizontal: SCREEN_WIDTH * 0.06,
-    backgroundColor: COLORS.white,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.gray[200],
-  },
-  payButton: {
-    backgroundColor: BRAND,
-    borderRadius: SCREEN_WIDTH * 0.075,
-    height: SCREEN_WIDTH * 0.14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...SHADOWS.md,
-  },
-  payButtonText: {
-    fontSize: SCREEN_WIDTH * 0.045,
-    fontWeight: '700',
-    color: COLORS.white,
-  },
-  securePayment: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: SCREEN_WIDTH * 0.04,
-    gap: SCREEN_WIDTH * 0.01,
-  },
-  secureText: {
-    fontSize: SCREEN_WIDTH * 0.03,
-    color: COLORS.text.tertiary,
-  },
-  comingSoonContainer: {
-    marginTop: -SCREEN_WIDTH * 0.04,
-  },
-  comingSoonCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SCREEN_WIDTH * 0.06,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: BRAND,
-    borderStyle: 'dashed',
-    ...SHADOWS.sm,
-  },
-  comingSoonIconContainer: {
-    width: SCREEN_WIDTH * 0.16,
-    height: SCREEN_WIDTH * 0.16,
-    borderRadius: SCREEN_WIDTH * 0.08,
-    backgroundColor: `${BRAND}15`,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SCREEN_WIDTH * 0.04,
-  },
-  comingSoonTitle: {
-    fontSize: SCREEN_WIDTH * 0.05,
-    fontWeight: '700',
-    color: COLORS.text.primary,
-    marginBottom: SCREEN_WIDTH * 0.025,
-  },
-  comingSoonText: {
-    fontSize: SCREEN_WIDTH * 0.035,
-    color: COLORS.text.secondary,
-    textAlign: 'center',
-    lineHeight: SCREEN_WIDTH * 0.05,
-    marginBottom: SCREEN_WIDTH * 0.05,
-  },
-  switchToDrillPackButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: `${BRAND}10`,
-    paddingVertical: SCREEN_WIDTH * 0.03,
-    paddingHorizontal: SCREEN_WIDTH * 0.05,
-    borderRadius: BORDER_RADIUS.full,
-    gap: SCREEN_WIDTH * 0.02,
-  },
-  switchToDrillPackText: {
-    fontSize: SCREEN_WIDTH * 0.035,
-    fontWeight: '600',
-    color: BRAND,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: SCREEN_WIDTH * 0.1,
-  },
-  errorTitle: {
-    fontSize: SCREEN_WIDTH * 0.05,
-    fontWeight: '700',
-    color: COLORS.text.primary,
-    marginTop: SCREEN_WIDTH * 0.04,
-    marginBottom: SCREEN_WIDTH * 0.02,
-  },
-  errorText: {
-    fontSize: SCREEN_WIDTH * 0.035,
-    color: COLORS.text.secondary,
-    textAlign: 'center',
-    lineHeight: SCREEN_WIDTH * 0.05,
-    marginBottom: SCREEN_WIDTH * 0.06,
-  },
-  errorButton: {
-    backgroundColor: BRAND,
-    paddingVertical: SCREEN_WIDTH * 0.035,
-    paddingHorizontal: SCREEN_WIDTH * 0.08,
-    borderRadius: SCREEN_WIDTH * 0.02,
-  },
-  errorButtonText: {
-    fontSize: SCREEN_WIDTH * 0.04,
-    fontWeight: '600',
-    color: COLORS.white,
-  },
-  subscriberContainer: {
-    marginTop: SCREEN_WIDTH * 0.02,
-    gap: SCREEN_WIDTH * 0.05,
-  },
-  unlockHeader: {
-    alignItems: 'center',
-    marginBottom: SCREEN_WIDTH * 0.02,
-  },
-  unlockTitle: {
-    fontSize: SCREEN_WIDTH * 0.06,
-    fontWeight: '800',
-    color: COLORS.text.primary,
-    textAlign: 'center',
-    marginBottom: SCREEN_WIDTH * 0.02,
-  },
-  unlockSubtitle: {
-    fontSize: SCREEN_WIDTH * 0.035,
-    color: COLORS.text.secondary,
-    textAlign: 'center',
-  },
-  balanceCard: {
-    backgroundColor: '#F0FDF4',
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SCREEN_WIDTH * 0.06,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#DCFCE7',
-  },
-  balanceLabel: {
-    fontSize: SCREEN_WIDTH * 0.035,
-    color: COLORS.text.secondary,
-    marginBottom: SCREEN_WIDTH * 0.01,
-  },
-  balanceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SCREEN_WIDTH * 0.02,
-  },
-  balanceValue: {
-    fontSize: SCREEN_WIDTH * 0.12,
-    fontWeight: '800',
-    color: '#166534',
-  },
-  detailsCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SCREEN_WIDTH * 0.06,
-    ...SHADOWS.sm,
-  },
-  costRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SCREEN_WIDTH * 0.04,
-  },
-  costLabel: {
-    fontSize: SCREEN_WIDTH * 0.04,
-    color: COLORS.text.secondary,
-  },
-  costValue: {
-    fontSize: SCREEN_WIDTH * 0.04,
-    fontWeight: '700',
-    color: COLORS.text.primary,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: COLORS.gray[200],
-    marginBottom: SCREEN_WIDTH * 0.04,
-  },
-  checklistTitle: {
-    fontSize: SCREEN_WIDTH * 0.035,
-    color: COLORS.text.secondary,
-    marginBottom: SCREEN_WIDTH * 0.03,
-  },
-  checklistItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SCREEN_WIDTH * 0.03,
-    marginBottom: SCREEN_WIDTH * 0.03,
-  },
-  checklistText: {
-    fontSize: SCREEN_WIDTH * 0.04,
-    fontWeight: '600',
-    color: COLORS.text.primary,
-    flex: 1,
-  },
-  actionContainer: {
-    marginTop: SCREEN_WIDTH * 0.02,
-    gap: SCREEN_WIDTH * 0.04,
-  },
-  remainingText: {
-    fontSize: SCREEN_WIDTH * 0.03,
-    color: COLORS.text.tertiary,
-    textAlign: 'center',
-  },
-  claimButton: {
-    backgroundColor: '#22C55E',
-    borderRadius: BORDER_RADIUS.full,
-    paddingVertical: SCREEN_WIDTH * 0.04,
-    alignItems: 'center',
-    ...SHADOWS.md,
-  },
-  claimButtonText: {
-    fontSize: SCREEN_WIDTH * 0.045,
-    fontWeight: '700',
-    color: COLORS.white,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: SCREEN_WIDTH * 0.08,
-  },
-  modalContent: {
-    backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SCREEN_WIDTH * 0.06,
-    alignItems: 'center',
-    width: '100%',
-    ...SHADOWS.lg,
-  },
-  modalIconContainer: {
-    marginBottom: SCREEN_WIDTH * 0.04,
-    backgroundColor: '#FEF3C7',
-    padding: SCREEN_WIDTH * 0.03,
-    borderRadius: SCREEN_WIDTH * 0.1,
-  },
-  modalTitle: {
-    fontSize: SCREEN_WIDTH * 0.05,
-    fontWeight: '700',
-    color: '#D97706',
-    marginBottom: SCREEN_WIDTH * 0.03,
-  },
-  modalText: {
-    fontSize: SCREEN_WIDTH * 0.038,
-    color: COLORS.text.secondary,
-    textAlign: 'center',
-    lineHeight: SCREEN_WIDTH * 0.055,
-    marginBottom: SCREEN_WIDTH * 0.02,
-  },
-  modalSubText: {
-    fontSize: SCREEN_WIDTH * 0.032,
-    color: COLORS.text.tertiary,
-    textAlign: 'center',
-    marginBottom: SCREEN_WIDTH * 0.06,
-  },
-  modalActions: {
-    width: '100%',
-    gap: SCREEN_WIDTH * 0.03,
-  },
-  renewButton: {
-    backgroundColor: '#1D4ED8',
-    borderRadius: BORDER_RADIUS.md,
-    paddingVertical: SCREEN_WIDTH * 0.035,
-    alignItems: 'center',
-  },
-  renewButtonText: {
-    fontSize: SCREEN_WIDTH * 0.04,
-    fontWeight: '600',
-    color: COLORS.white,
-  },
-  upgradeButton: {
-    backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.md,
-    paddingVertical: SCREEN_WIDTH * 0.035,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#1D4ED8',
-  },
-  upgradeButtonText: {
-    fontSize: SCREEN_WIDTH * 0.04,
-    fontWeight: '600',
-    color: '#1D4ED8',
-  },
-  planOverviewCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: SCREEN_WIDTH * 0.045,
-    padding: SCREEN_WIDTH * 0.055,
-    marginBottom: SCREEN_WIDTH * 0.04,
-    ...SHADOWS.sm,
-  },
-  subscriptionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SCREEN_WIDTH * 0.04,
-  },
-  subscriptionTitle: {
-    fontSize: SCREEN_WIDTH * 0.06,
-    fontWeight: '800',
-    color: COLORS.text.primary,
-  },
-  subscriptionPrice: {
-    fontSize: SCREEN_WIDTH * 0.04,
-    fontWeight: '700',
-    color: COLORS.text.primary,
-    marginTop: SCREEN_WIDTH * 0.01,
-  },
-  statusBadge: {
-    paddingHorizontal: SCREEN_WIDTH * 0.04,
-    paddingVertical: SCREEN_WIDTH * 0.018,
-    borderRadius: BORDER_RADIUS.full,
-  },
-  statusActive: {
-    backgroundColor: '#CFF5D9',
-  },
-  statusInactive: {
-    backgroundColor: COLORS.gray[200],
-  },
-  statusBadgeText: {
-    fontSize: SCREEN_WIDTH * 0.034,
-    fontWeight: '800',
-  },
-  statusActiveText: {
-    color: '#12A150',
-  },
-  statusInactiveText: {
-    color: COLORS.text.secondary,
-  },
-  creditCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: SCREEN_WIDTH * 0.04,
-    padding: SCREEN_WIDTH * 0.045,
-    ...SHADOWS.sm,
-  },
-  creditTitle: {
-    fontSize: SCREEN_WIDTH * 0.048,
-    fontWeight: '800',
-    color: COLORS.text.primary,
-    marginBottom: SCREEN_WIDTH * 0.04,
-  },
-  creditRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SCREEN_WIDTH * 0.03,
-  },
-  creditLabel: {
-    fontSize: SCREEN_WIDTH * 0.04,
-    color: '#5B79A6',
-  },
-  creditValue: {
-    fontSize: SCREEN_WIDTH * 0.05,
-    fontWeight: '800',
-    color: COLORS.text.primary,
-  },
-  creditValueAvailable: {
-    color: '#22A05B',
-  },
-  subscriptionRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
-    alignItems: 'center',
-    marginTop: SCREEN_WIDTH * 0.02,
-    marginBottom: 0,
-  },
-  subscriptionRenewLabel: {
-    fontSize: SCREEN_WIDTH * 0.038,
-    color: '#5B79A6',
-    fontWeight: '500',
-  },
-  subscriptionActions: {
-    marginTop: SCREEN_WIDTH * 0.02,
-    gap: SCREEN_WIDTH * 0.04,
-  },
-  primaryActionButton: {
-    backgroundColor: '#0E64CE',
-    paddingVertical: SCREEN_WIDTH * 0.04,
-    borderRadius: BORDER_RADIUS.full,
-    alignItems: 'center',
-  },
-  primaryActionText: {
-    fontSize: SCREEN_WIDTH * 0.04,
-    fontWeight: '700',
-    color: COLORS.white,
-  },
-  secondaryActionButton: {
-    backgroundColor: '#F3F7FC',
-    paddingVertical: SCREEN_WIDTH * 0.04,
-    borderRadius: BORDER_RADIUS.full,
-    alignItems: 'center',
-  },
-  secondaryActionText: {
-    fontSize: SCREEN_WIDTH * 0.04,
-    fontWeight: '700',
-    color: COLORS.text.primary,
-  },
-  cancelActionButton: {
-    backgroundColor: 'transparent',
-    paddingVertical: SCREEN_WIDTH * 0.04,
-    borderRadius: BORDER_RADIUS.full,
-    alignItems: 'center',
-    marginTop: SCREEN_WIDTH * 0.02,
-  },
-  cancelHelperText: {
-    fontSize: SCREEN_WIDTH * 0.03,
-    color: '#64748B',
-    textAlign: 'center',
-    marginTop: -SCREEN_WIDTH * 0.02,
-    marginBottom: SCREEN_WIDTH * 0.04,
-    paddingHorizontal: SCREEN_WIDTH * 0.04,
-    lineHeight: SCREEN_WIDTH * 0.045,
-  },
-  cancelActionText: {
-    fontSize: SCREEN_WIDTH * 0.044,
-    fontWeight: '800',
-    color: '#D63B30',
-  },
-  actionMessage: {
-    marginTop: SCREEN_WIDTH * 0.03,
-    fontSize: SCREEN_WIDTH * 0.035,
-    textAlign: 'center',
-  },
-  actionMessageSuccess: {
-    color: COLORS.success,
-  },
-  actionMessageError: {
-    color: '#B91C1C',
-  },
-  dangerButton: {
-    backgroundColor: '#DC2626',
-    borderRadius: BORDER_RADIUS.md,
-    paddingVertical: SCREEN_WIDTH * 0.035,
-    alignItems: 'center',
-  },
-  dangerButtonText: {
-    fontSize: SCREEN_WIDTH * 0.04,
-    fontWeight: '700',
-    color: COLORS.white,
-  },
-  neutralButton: {
-    backgroundColor: COLORS.gray[100],
-    borderRadius: BORDER_RADIUS.md,
-    paddingVertical: SCREEN_WIDTH * 0.035,
-    alignItems: 'center',
-  },
-  neutralButtonText: {
-    fontSize: SCREEN_WIDTH * 0.04,
-    fontWeight: '700',
-    color: COLORS.text.primary,
-  },
-});

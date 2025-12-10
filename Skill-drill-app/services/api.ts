@@ -10,7 +10,7 @@ const getApiBaseUrl = () => {
   if (Constants.expoConfig?.extra?.API_BASE_URL) {
     return Constants.expoConfig.extra.API_BASE_URL;
   }
-  
+
   // Platform-specific fallbacks - use Android emulator special IP
   if (Platform.OS === 'android') {
     return 'http://10.0.2.2:3000/api';
@@ -25,13 +25,6 @@ const API_BASE_URL = getApiBaseUrl();
 const API_TIMEOUT = Constants.expoConfig?.extra?.API_TIMEOUT || 60000; // Increased timeout for assessment creation (60 seconds)
 const ACCESS_TOKEN_KEY = Constants.expoConfig?.extra?.ACCESS_TOKEN_KEY || 'skilldrill_access_token';
 const REFRESH_TOKEN_KEY = Constants.expoConfig?.extra?.REFRESH_TOKEN_KEY || 'skilldrill_refresh_token';
-
-// Debug environment variables
-console.log('🔧 API Configuration:');
-console.log('Platform:', Platform.OS);
-console.log('API_BASE_URL:', API_BASE_URL);
-console.log('API_TIMEOUT:', API_TIMEOUT);
-console.log('Constants.expoConfig?.extra:', Constants.expoConfig?.extra);
 
 // API Response types
 export interface ApiResponse<T = any> {
@@ -100,14 +93,6 @@ class ApiService {
   }[] = [];
 
   constructor() {
-    console.log('🚀 Initializing API Service with baseURL:', API_BASE_URL);
-    console.log('🔧 API Configuration:', {
-      platform: Platform.OS,
-      isDev: __DEV__,
-      timeout: API_TIMEOUT,
-      constants: Constants.expoConfig?.extra
-    });
-    
     this.api = axios.create({
       baseURL: API_BASE_URL,
       timeout: API_TIMEOUT,
@@ -115,8 +100,6 @@ class ApiService {
         'Content-Type': 'application/json',
       },
     });
-
-    console.log('✅ API Service initialized successfully');
     this.setupInterceptors();
   }
 
@@ -124,17 +107,9 @@ class ApiService {
     // Request interceptor to add auth token
     this.api.interceptors.request.use(
       async (config) => {
-        const fullUrl = config.baseURL + config.url;
-        console.log('📡 Making request to:', fullUrl);
-        console.log('📡 Method:', config.method?.toUpperCase());
-        console.log('📡 Headers:', config.headers);
-        
         const token = await this.getAccessToken();
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
-          console.log('🔐 Added auth token to request');
-        } else {
-          console.log('ℹ️ No auth token available');
         }
         return config;
       },
@@ -147,11 +122,6 @@ class ApiService {
     // Response interceptor to handle token refresh
     this.api.interceptors.response.use(
       (response) => {
-        console.log('✅ Response received:', {
-          status: response.status,
-          url: response.config.url,
-          data: response.data
-        });
         return response;
       },
       async (error) => {
@@ -169,9 +139,6 @@ class ApiService {
             message: error.message,
             data: error.response?.data
           });
-        } else {
-          // Silently handle expected commerce 404s
-          console.log('ℹ️ Commerce endpoint not yet implemented:', error.config?.url);
         }
 
         if (error.response?.status === 401 && !originalRequest._retry) {
@@ -210,10 +177,10 @@ class ApiService {
           } catch (refreshError) {
             this.processQueue(refreshError, null);
             await this.clearTokens();
-            
+
             // Handle session expiration
             await SessionManager.handleTokenRefreshFailure();
-            
+
             throw refreshError;
           } finally {
             this.isRefreshing = false;
@@ -292,11 +259,7 @@ class ApiService {
 
   public async post<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     try {
-      console.log('📤 Making POST request to:', url);
-      console.log('📤 Full URL:', `${this.api.defaults.baseURL}${url}`);
-      console.log('📤 Request data:', data);
       const response: AxiosResponse<ApiResponse<T>> = await this.api.post(url, data, config);
-      console.log('✅ POST response:', response.data);
       return response.data;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -363,7 +326,6 @@ class ApiService {
 
         // Don't trigger session expiration if user is logging out
         if (SessionManager.isCurrentlyLoggingOut()) {
-          console.log('🔐 Skipping 401 handling - user is logging out');
           const errorData = typeof data === 'object' && data !== null ? data as Record<string, unknown> : undefined;
           const errorCode = typeof data === 'object' && data !== null && 'code' in data ? String(data.code) : undefined;
           return new ApiError('Logout in progress', status || 401, errorCode, errorData);
@@ -426,7 +388,7 @@ class ApiService {
           }
           break;
       }
-      
+
       const errorDataObj = typeof data === 'object' && data !== null ? data as Record<string, unknown> : undefined;
       return new ApiError(message || 'An error occurred', status || 500, errorData.code, errorDataObj);
     } else if (isAxiosError(error) && 'request' in error) {
@@ -438,7 +400,7 @@ class ApiService {
           timeout: error.code === 'ECONNABORTED' ? 'Request timeout' : 'No response received'
         });
       }
-      
+
       if (error.code === 'ECONNABORTED') {
         return new ApiError('Request timeout - server is not responding', 0, 'TIMEOUT');
       } else if (error.code === 'ERR_NETWORK') {
@@ -468,7 +430,6 @@ class ApiService {
    * Fetch all active role types
    */
   public async fetchRoleTypes(): Promise<ApiResponse> {
-    console.log('📋 Fetching role types');
     return this.get('/role-types');
   }
 
@@ -488,7 +449,6 @@ class ApiService {
    * Submit answer and get next question (Sequential)
    */
   public async submitAnswerAndGetNext(sessionId: string, answer: string): Promise<ApiResponse> {
-    console.log('📝 Submitting answer for session:', sessionId);
     return this.post('/assessment/adaptive/answer', {
       sessionId,
       answer
@@ -500,7 +460,6 @@ class ApiService {
    * Get adaptive assessment results
    */
   public async getAdaptiveResults(sessionId: string): Promise<ApiResponse> {
-    console.log('📊 Getting adaptive results for session:', sessionId);
     return this.get(`/assessment/results/${sessionId}`);
   }
 
@@ -508,7 +467,6 @@ class ApiService {
    * Get drill recommendations for a completed assessment
    */
   public async getDrillRecommendations(assessmentId: string): Promise<ApiResponse> {
-    console.log('🧭 Fetching drill recommendations for assessment:', assessmentId);
     return this.get(`/assessment/${assessmentId}/recommendations`);
   }
 
@@ -520,7 +478,6 @@ class ApiService {
    * Create checkout session for payment
    */
   public async createCheckout(params: import('../types/pricing').CheckoutRequest): Promise<ApiResponse> {
-    console.log('💳 Creating checkout session:', params);
     return this.post('/commerce/checkout', params);
   }
 
@@ -528,7 +485,6 @@ class ApiService {
    * Get user's active subscription
    */
   public async getSubscription(): Promise<ApiResponse> {
-    console.log('📅 Fetching user subscription');
     return this.get('/commerce/subscription');
   }
 
@@ -536,7 +492,6 @@ class ApiService {
    * Get subscription pricing plans
    */
   public async getPricingPlans(): Promise<ApiResponse> {
-    console.log('💰 Fetching pricing plans');
     return this.get('/commerce/pricing');
   }
 
@@ -544,7 +499,6 @@ class ApiService {
    * Get subscription plans for user's career level
    */
   public async getSubscriptionPlans(): Promise<ApiResponse> {
-    console.log('📋 Fetching subscription plans');
     return this.get('/commerce/subscription-plans');
   }
 
@@ -569,6 +523,18 @@ class ApiService {
     return this.get('/commerce/payment-history');
   }
 
+  /**
+   * Validate coupon code against an order amount
+   */
+  public async validateCoupon(params: {
+    code: string;
+    orderAmount: number;
+    pricingMode: 'FIXED' | 'DYNAMIC' | 'SUBSCRIPTION';
+    recommendationId?: string;
+  }): Promise<ApiResponse> {
+    return this.post('/commerce/validate-coupon', params);
+  }
+
   // ===========================================
   // DRILL ASSIGNMENT METHODS
   // ===========================================
@@ -580,7 +546,6 @@ class ApiService {
     cursor?: string;
     limit?: number;
   }): Promise<ApiResponse> {
-    console.log('📚 Fetching drill assignments');
     const queryParams = new URLSearchParams();
     if (params?.cursor) queryParams.append('cursor', params.cursor);
     if (params?.limit) queryParams.append('limit', params.limit.toString());
@@ -593,7 +558,6 @@ class ApiService {
    * Get single drill assignment with items
    */
   public async getDrillAssignment(assignmentId: string): Promise<ApiResponse> {
-    console.log('📖 Fetching drill assignment:', assignmentId);
     return this.get(`/drills/assignments/${assignmentId}`);
   }
 
@@ -606,7 +570,6 @@ class ApiService {
     recommendationId?: string;
     drillPackPrice?: number;
   }): Promise<ApiResponse> {
-    console.log('✨ Creating drill assignment:', params);
     return this.post('/drills/assign', params);
   }
 
@@ -620,12 +583,6 @@ class ApiService {
     durationSec?: number;
     sessionId?: string;
   }): Promise<ApiResponse> {
-    console.log('📝 Submitting drill attempt:', {
-      drillItemId: params.drillItemId,
-      hasText: !!params.textContent,
-      hasAudio: !!params.audioUrl,
-      hasSession: !!params.sessionId
-    });
     return this.post('/drills/attempt', params);
   }
 
@@ -633,7 +590,6 @@ class ApiService {
    * Get drill aggregate/progress data
    */
   public async getDrillAggregate(assignmentId: string): Promise<ApiResponse> {
-    console.log('📊 Fetching drill aggregate for assignment:', assignmentId);
     return this.get(`/drills/aggregate?assignmentId=${assignmentId}`);
   }
 
@@ -641,7 +597,6 @@ class ApiService {
    * Start or resume drill session
    */
   public async startDrillSession(assignmentId: string): Promise<ApiResponse> {
-    console.log('🎯 Starting drill session for assignment:', assignmentId);
     return this.post('/drills/session/start', { assignmentId });
   }
 
@@ -649,7 +604,6 @@ class ApiService {
    * Get drill session status
    */
   public async getDrillSessionStatus(assignmentId: string): Promise<ApiResponse> {
-    console.log('📊 Getting drill session status for assignment:', assignmentId);
     return this.get(`/drills/session/status?assignmentId=${assignmentId}`);
   }
 
@@ -657,7 +611,6 @@ class ApiService {
    * Update drill session activity (current drill position)
    */
   public async updateDrillSessionActivity(sessionId: string, currentDrillIndex: number): Promise<ApiResponse> {
-    console.log('🔄 Updating drill session activity:', { sessionId, currentDrillIndex });
     return this.put(`/drills/session/${sessionId}/activity`, { currentDrillIndex });
   }
 
@@ -665,7 +618,6 @@ class ApiService {
    * Complete drill session
    */
   public async completeDrillSession(sessionId: string): Promise<ApiResponse> {
-    console.log('✅ Completing drill session:', sessionId);
     return this.put(`/drills/session/${sessionId}/complete`, {});
   }
 
@@ -673,7 +625,6 @@ class ApiService {
    * Check if user has existing drill assignment for skill
    */
   public async checkExistingDrills(skillId: string): Promise<ApiResponse> {
-    console.log('🔍 Checking for existing drills for skill:', skillId);
     return this.get(`/drills/check-existing?skillId=${skillId}`);
   }
 
@@ -682,7 +633,6 @@ class ApiService {
    * Called when user clicks "Start Drills Practice" on an unlocked drill
    */
   public async generateDrillItems(assignmentId: string): Promise<ApiResponse> {
-    console.log('🎯 Generating drill items for assignment:', assignmentId);
     return this.post(`/drills/assignments/${assignmentId}/generate`, {});
   }
 
@@ -690,7 +640,6 @@ class ApiService {
    * Get user's recommendations (pending assessments + unpurchased drill packs)
    */
   public async getUserRecommendations(): Promise<ApiResponse> {
-    console.log('📋 Fetching user recommendations');
     return this.get('/user/recommendations');
   }
 

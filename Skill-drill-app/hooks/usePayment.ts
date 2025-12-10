@@ -31,6 +31,7 @@ interface PaymentParams {
   recommendationId?: string;
   // Subscription mode: use planId for subscription purchase
   planId?: string;
+  couponCode?: string;
   metadata?: {
     skillId: string;
     assessmentId?: string;
@@ -63,26 +64,17 @@ export const usePayment = (): UsePaymentReturn => {
       }
 
       // Step 1: Create checkout session on backend
-      console.log('[Payment] Creating checkout session...');
-
-      // Build checkout request based on mode
       const checkoutRequest: import('../types/pricing').CheckoutRequest = {
         provider: 'stripe',
+        couponCode: params.couponCode,
       };
 
       // Subscription mode: use planId
       if (params.planId) {
-        console.log('[Payment] Using subscription checkout with planId:', params.planId);
         checkoutRequest.planId = params.planId;
-      }
-      // Dynamic pricing mode: use recommendationId
-      else if (params.recommendationId) {
-        console.log('[Payment] Using dynamic pricing with recommendationId:', params.recommendationId);
+      } else if (params.recommendationId) {
         checkoutRequest.recommendationId = params.recommendationId;
-      }
-      // Legacy fixed pricing mode
-      else if (params.priceId) {
-        console.log('[Payment] Using fixed pricing with priceId:', params.priceId);
+      } else if (params.priceId) {
         checkoutRequest.priceId = params.priceId;
         checkoutRequest.metadata = params.metadata;
       }
@@ -94,8 +86,6 @@ export const usePayment = (): UsePaymentReturn => {
       }
 
       const { clientSecret, publishableKey } = checkoutRes.data;
-
-      console.log('[Payment] Checkout session created');
 
       // Step 2: Initialize Stripe payment sheet
       const { error: initError } = await initPaymentSheet({
@@ -112,15 +102,12 @@ export const usePayment = (): UsePaymentReturn => {
         throw new Error(initError.message || 'Failed to initialize payment');
       }
 
-      console.log('[Payment] Payment sheet initialized');
-
       // Step 3: Present payment sheet to user
       const { error: presentError } = await presentPaymentSheet();
 
       if (presentError) {
         // User cancelled payment
         if (presentError.code === 'Canceled') {
-          console.log('[Payment] User cancelled payment');
           showError('Payment cancelled');
           params.onCancel?.();
           return;
@@ -131,8 +118,6 @@ export const usePayment = (): UsePaymentReturn => {
         throw new Error(presentError.message || 'Payment failed');
       }
 
-      console.log('[Payment] ✅ Payment successful!');
-
       // Success! The Stripe webhook will create the DrillAssignment in the background.
       // We don't need to poll - just redirect to Activity page where user can start drills.
       // The assignment will be there by the time user navigates (webhook is fast).
@@ -140,7 +125,17 @@ export const usePayment = (): UsePaymentReturn => {
 
     } catch (error: unknown) {
       console.error('[Payment] Error:', error);
-      showError(error.message || 'Payment processing failed');
+
+      // Handle specific error types
+      const errorMessage = (error as any)?.message || 'Payment processing failed';
+
+      // Check for price quote expired error
+      if (errorMessage.toLowerCase().includes('price quote expired')) {
+        showError('Price quote has expired. Please go back and try again.');
+      } else {
+        showError(errorMessage);
+      }
+
       throw error;
     } finally {
       setProcessing(false);
@@ -158,16 +153,12 @@ export const usePayment = (): UsePaymentReturn => {
     maxAttempts: number = 15,
     intervalMs: number = 2000
   ): Promise<string> => {
-    console.log('[Payment] Polling for drill assignment...');
-
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         // Wait before polling
         if (attempt > 1) {
           await sleep(intervalMs);
         }
-
-        console.log(`[Payment] Poll attempt ${attempt}/${maxAttempts}`);
 
         // Fetch all assignments
         const res = await apiService.getDrillAssignments();
@@ -186,12 +177,9 @@ export const usePayment = (): UsePaymentReturn => {
             )[0];
 
           if (latestAssignment) {
-            console.log('[Payment] ✅ Assignment found:', latestAssignment.id);
             return latestAssignment.id;
           }
         }
-
-        console.log('[Payment] Assignment not ready yet, retrying...');
 
       } catch (error) {
         console.warn('[Payment] Poll error:', error);

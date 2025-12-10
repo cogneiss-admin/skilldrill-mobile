@@ -24,6 +24,7 @@ export interface CheckoutRequest {
   priceId?: string;
   recommendationId?: string;
   planId?: string; // For subscription checkout
+  couponCode?: string;
   skillId?: string;
   assessmentId?: string;
   metadata?: Record<string, unknown>;

@@ -53,10 +53,16 @@ const SwipeButton: React.FC<SwipeButtonProps> = ({
         );
     }, []);
 
-    // Reset when loading finishes or if disabled changes
+    // Reset when loading finishes (payment completed or failed)
     useEffect(() => {
         if (!loading && swipeComplete) {
-            // Reset logic if needed
+            // Reset the swipe button after payment completes/fails
+            const timer = setTimeout(() => {
+                translateX.value = withSpring(0);
+                isCompleted.value = false;
+                setSwipeComplete(false);
+            }, 500);
+            return () => clearTimeout(timer);
         }
     }, [loading, swipeComplete]);
 
