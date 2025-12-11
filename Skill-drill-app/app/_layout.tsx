@@ -3,7 +3,7 @@ import "react-native-reanimated";
 import React, { Suspense, useEffect, useMemo, useState } from "react";
 import "./global.css";
 import { Slot, useRootNavigationState, useSegments, useRouter } from "expo-router";
-import { View, Animated as RNAnimated } from "react-native";
+import { View, Animated as RNAnimated, StatusBar as RNStatusBar, Platform } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Provider as PaperProvider, MD3LightTheme } from "react-native-paper";
 import { Provider as ReduxProvider } from "react-redux";
@@ -14,7 +14,7 @@ import { useAuth } from "../hooks/useAuth";
 import ToastContainer from "../components/ToastContainer";
 import { useToast } from "../hooks/useToast";
 import { ToastProvider } from "../contexts/ToastContext";
-import { BRAND, LOGO_SRC } from "./components/Brand";
+import { BRAND, LOGO_SRC, SCREEN_CONTAINER_BACKGROUND } from "./components/Brand";
 import SessionManager from "../utils/sessionManager";
 
 const theme = {
@@ -279,6 +279,15 @@ const RootLayout = React.memo(() => {
   // Initialize SessionManager when app starts
   useEffect(() => {
     SessionManager.initialize();
+  }, []);
+
+  // Set a consistent status bar baseline across screens
+  useEffect(() => {
+    RNStatusBar.setBarStyle("dark-content");
+    if (Platform.OS === "android") {
+      RNStatusBar.setBackgroundColor(SCREEN_CONTAINER_BACKGROUND);
+      RNStatusBar.setTranslucent(false);
+    }
   }, []);
 
   // Disable previous blue flash overlay during navigation for smoother transitions

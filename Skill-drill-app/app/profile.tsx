@@ -12,7 +12,7 @@ import { useCountries, getConvertedFlagUrl } from '../hooks/useCountries';
 import CountryPickerModal from './components/CountryPickerModal';
 import CodeBoxes from '../components/CodeBoxes';
 import { isValidEmail, isValidPhone, validationMessageFor } from './components/validators';
-import ProfileSkeleton from './components/ProfileSkeleton';
+import ProfileShimmer from './components/ProfileShimmer';
 
 const { width } = Dimensions.get('window');
 
@@ -969,7 +969,7 @@ export default function ProfileScreen() {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
         <StatusBar barStyle="light-content" />
-        <ProfileSkeleton />
+        <ProfileShimmer />
       </SafeAreaView>
     );
   }

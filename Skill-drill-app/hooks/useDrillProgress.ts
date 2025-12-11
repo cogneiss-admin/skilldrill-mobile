@@ -102,7 +102,7 @@ interface UseDrillProgressReturn {
 }
 
 export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn => {
-  const { showError, showSuccess } = useToast();
+  const { showError } = useToast();
 
   // State
   const [loading, setLoading] = useState(true);
@@ -374,8 +374,7 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
         return;
       }
 
-      // Show success and auto-advance to next drill
-      showSuccess('Drill completed!');
+      // Auto-advance to next drill (no toast)
       setSubmitting(false);
 
       // Check if all drills are completed

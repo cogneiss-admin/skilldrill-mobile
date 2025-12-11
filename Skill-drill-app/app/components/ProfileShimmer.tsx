@@ -4,7 +4,7 @@ import SkeletonLine from './SkeletonLine';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const ProfileSkeleton: React.FC = () => {
+const ProfileShimmer: React.FC = () => {
   return (
     <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
       {/* Header */}
@@ -183,5 +183,4 @@ const ProfileSkeleton: React.FC = () => {
   );
 };
 
-export default ProfileSkeleton;
-
+export default ProfileShimmer;

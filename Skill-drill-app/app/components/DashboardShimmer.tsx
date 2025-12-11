@@ -2,7 +2,6 @@ import React from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'react-native';
-import BottomNavigation from '../../components/BottomNavigation';
 import SkeletonLine from './SkeletonLine';
 import { SCREEN_BACKGROUND, SCREEN_CONTAINER_BACKGROUND, SPACING, BORDER_RADIUS, COLORS } from './Brand';
 
@@ -77,7 +76,6 @@ const DashboardShimmer: React.FC = () => {
         </View>
       </ScrollView>
 
-      <BottomNavigation activeTab="home" />
     </SafeAreaView>
   );
 };

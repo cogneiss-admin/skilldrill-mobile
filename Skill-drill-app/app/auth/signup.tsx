@@ -849,11 +849,14 @@ export default function SignupScreen() {
       {/* OTP Bottom Sheet overlay (renders over entire screen) */}
       {otpSheetVisible && (
         <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'flex-end' }}>
-          <Pressable
-            onPress={() => { if (!otpBusy) setOtpSheetVisible(false); }}
+          <View
             style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: COLORS.background.overlay }}
           />
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 40}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
+            style={{ flex: 1, justifyContent: 'flex-end' }}
+          >
           <View style={{ backgroundColor: COLORS.white, borderTopLeftRadius: BORDER_RADIUS['2xl'], borderTopRightRadius: BORDER_RADIUS['2xl'], paddingHorizontal: responsive.padding.lg, paddingTop: responsive.padding.md, paddingBottom: responsive.padding.lg, shadowColor: COLORS.black, shadowOpacity: 0.2, shadowRadius: 12 }}>
             <View style={{ alignItems: 'center' }}>
               <View style={{ width: 40, height: 4, borderRadius: BORDER_RADIUS.sm, backgroundColor: COLORS.gray[200], marginBottom: responsive.spacing(12) }} />
