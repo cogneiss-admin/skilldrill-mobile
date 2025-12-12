@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { apiService } from '../services/api';
 import authService from '../services/authService';
 import { Skill } from '../features/skillsSlice';
 import { SkillGroup } from '../types/skills';
 import { User } from '../services/api';
+
+const SELECTED_SKILLS_KEY = 'selectedSkills';
 
 export function useSkillsData(params: {
   isAssessmentMode: boolean;
@@ -131,7 +133,7 @@ export function useSkillsData(params: {
   // Restore persisted selection for assessment mode
   useEffect(() => {
     if (skillsData.length > 0 && isAssessmentMode && !isAddToAssessmentMode) {
-      AsyncStorage.getItem('selectedSkills')
+      SecureStore.getItemAsync(SELECTED_SKILLS_KEY)
         .then((persisted) => {
           if (persisted) {
             try {
@@ -150,7 +152,7 @@ export function useSkillsData(params: {
       const has = prev.includes(skillId);
       const next = has ? prev.filter((s) => s !== skillId) : [...prev, skillId];
       if (!isAddToAssessmentMode) {
-        AsyncStorage.setItem('selectedSkills', JSON.stringify(next)).catch(() => {});
+        SecureStore.setItemAsync(SELECTED_SKILLS_KEY, JSON.stringify(next)).catch(() => {});
       }
       return next;
     });

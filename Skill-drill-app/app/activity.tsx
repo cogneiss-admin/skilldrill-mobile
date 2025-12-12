@@ -147,7 +147,6 @@ export default function Activity() {
       setDrills(allDrills);
 
     } catch (error) {
-      console.error('Error loading activity data:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -232,12 +231,10 @@ export default function Activity() {
     try {
       // If drill is Unlocked, generate items first
       if (backendStatus === 'Unlocked') {
-        console.log('🔄 Generating drill items for unlocked assignment:', assignmentId);
         const generateResponse = await apiService.generateDrillItems(assignmentId);
         if (!generateResponse.success) {
           throw new Error(generateResponse.message || 'Failed to generate drills');
         }
-        console.log('✅ Drill items generated:', generateResponse.data);
       }
 
       // Navigate to drillsScenarios - useDrillProgress hook will handle session creation
@@ -274,7 +271,11 @@ export default function Activity() {
     const skill = assessments.find(a => a.id === id);
     const drill = drills.find(d => d.id === id);
     const isDrill = !!drill;
-    const derivedSkillName = skillName || skill?.skillName || drill?.skillName || 'Activity';
+    const derivedSkillName = skillName || skill?.skillName || drill?.skillName;
+    if (!derivedSkillName) {
+      showError('Skill name not found');
+      return;
+    }
 
     switch (action) {
       case 'start':
@@ -296,19 +297,41 @@ export default function Activity() {
         setLoadingResults(true);
         try {
           if (isDrill) {
-            // Fetch drill aggregate data for results
-            const aggregateResponse = await apiService.getDrillAggregate(id);
-            if (aggregateResponse.success && aggregateResponse.data) {
-              const aggregate = aggregateResponse.data;
-              router.push({
-                pathname: '/drillsResults',
-                params: {
-                  assignmentId: id,
-                  percentage: String(drill?.progress?.percentage || 100),
-                  averageScore: String(aggregate.averageScore || 0),
-                  attemptsCount: String(aggregate.attemptsCount || 0)
+            // Fetch drill results (overall feedback) for completed drills
+            const resultsResponse = await apiService.getDrillResults(id);
+            if (resultsResponse.success && resultsResponse.data) {
+              const results = resultsResponse.data;
+              if (results.status === 'ready') {
+                if (!results.stats || results.stats.averageScore === undefined || results.stats.attemptsCount === undefined) {
+                  showError('Stats data incomplete');
+                  return;
                 }
-              });
+
+                if (!results.skillName) {
+                  showError('Skill name not found in results');
+                  return;
+                }
+
+                router.push({
+                  pathname: '/drillsResults',
+                  params: {
+                    assignmentId: id,
+                    averageScore: String(results.stats.averageScore),
+                    attemptsCount: String(results.stats.attemptsCount),
+                    overall: JSON.stringify({
+                      finalScore: results.finalScore,
+                      feedbackGood: results.feedbackGood,
+                      feedbackImprove: results.feedbackImprove,
+                      feedbackSummary: results.feedbackSummary,
+                      skillName: results.skillName
+                    })
+                  }
+                });
+              } else if (results.status === 'processing') {
+                showError('Results are still being generated. Please try again in a moment.');
+              } else {
+                showError('Failed to load drill results');
+              }
             } else {
               showError('Failed to load drill results');
             }
@@ -333,7 +356,6 @@ export default function Activity() {
             }
           }
         } catch (error) {
-          console.error('Failed to load results:', error);
           showError('Failed to load results');
         } finally {
           setLoadingResults(false);

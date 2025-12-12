@@ -7,7 +7,7 @@
  * - Fade in/out animations
  * - Slide animations
  * - Scale animations
- * - Milestone celebration animations
+ * - Completion celebration animations
  * - Progress bar animations
  * - Bounce effects
  *
@@ -150,7 +150,7 @@ export const useAnimation = (): UseAnimationReturn => {
   }, [scaleAnim]);
 
   /**
-   * Celebration animation (for milestones)
+   * Celebration animation (for completion)
    * Combines scale, rotation, and opacity for a fun effect
    */
   const celebrate = useCallback((): Promise<void> => {

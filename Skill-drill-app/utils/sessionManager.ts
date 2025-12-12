@@ -1,16 +1,14 @@
 import { Alert } from 'react-native';
 import { router } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-// Storage keys
-const ACCESS_TOKEN_KEY = 'skilldrill_access_token';
-const REFRESH_TOKEN_KEY = 'skilldrill_refresh_token';
-const USER_DATA_KEY = 'skilldrill_user_data';
+import { store, persistor } from '../store';
+import { clearAuth } from '../features/authSlice';
+import * as SecureStore from 'expo-secure-store';
 
 export class SessionManager {
   private static isHandlingSessionExpiration = false;
   private static isLoggingOut = false;
   private static logoutTimeoutId: NodeJS.Timeout | null = null;
+  private static sessionExpirationDebounceTimer: NodeJS.Timeout | null = null;
 
   /**
    * Set logout state to prevent session expiration alerts during logout
@@ -47,6 +45,7 @@ export class SessionManager {
 
   /**
    * Handle session expiration by showing alert and redirecting to login
+   * Uses debouncing to prevent multiple alerts from race conditions
    */
   static async handleSessionExpiration(reason: string = 'Session expired') {
     // Don't show session expiration alert if user is logging out
@@ -57,12 +56,25 @@ export class SessionManager {
 
     // Prevent multiple simultaneous session expiration handlers
     if (this.isHandlingSessionExpiration) {
+      console.log('🔐 Session expiration already being handled, skipping duplicate');
       return;
     }
+
+    // Debounce: If multiple calls happen within 500ms, only process the first one
+    if (this.sessionExpirationDebounceTimer) {
+      console.log('🔐 Session expiration debounced, skipping duplicate within 500ms');
+      return;
+    }
+
+    this.sessionExpirationDebounceTimer = setTimeout(() => {
+      this.sessionExpirationDebounceTimer = null;
+    }, 500);
 
     this.isHandlingSessionExpiration = true;
 
     try {
+      console.log(`🔐 Handling session expiration: ${reason}`);
+
       // Clear all auth data
       await this.clearAuthData();
 
@@ -82,28 +94,32 @@ export class SessionManager {
         { cancelable: false }
       );
     } catch (error) {
-      console.error('Error handling session expiration:', error);
+      console.error('❌ Error handling session expiration:', error);
       // Fallback: just redirect to login
       this.redirectToLogin();
     } finally {
       // Reset flag after a delay to allow for navigation
       setTimeout(() => {
         this.isHandlingSessionExpiration = false;
-      }, 1000);
+      }, 2000); // Increased to 2 seconds for better safety
     }
   }
 
   /**
-   * Clear all authentication data from storage
+   * Clear all authentication data from Redux and SecureStore
    */
   static async clearAuthData(): Promise<void> {
     try {
-      await AsyncStorage.multiRemove([
-        ACCESS_TOKEN_KEY,
-        REFRESH_TOKEN_KEY,
-        USER_DATA_KEY
-      ]);
-      console.log('🔐 Auth data cleared successfully');
+      // Clear Redux state (in-memory tokens + user data)
+      store.dispatch(clearAuth());
+
+      // Clear persisted SecureStore data (refresh token)
+      await SecureStore.deleteItemAsync('auth');
+
+      // Purge redux-persist storage
+      await persistor.purge();
+
+      console.log('🔐 Auth data cleared successfully from Redux + SecureStore');
     } catch (error) {
       console.error('Error clearing auth data:', error);
     }
@@ -184,6 +200,10 @@ export class SessionManager {
     if (this.logoutTimeoutId) {
       clearTimeout(this.logoutTimeoutId);
       this.logoutTimeoutId = null;
+    }
+    if (this.sessionExpirationDebounceTimer) {
+      clearTimeout(this.sessionExpirationDebounceTimer);
+      this.sessionExpirationDebounceTimer = null;
     }
   }
 

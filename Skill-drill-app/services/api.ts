@@ -1,8 +1,9 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import SessionManager from '../utils/sessionManager';
+import { store } from '../store';
+import { setToken, setRefreshToken, clearAuth } from '../features/authSlice';
 
 // Environment variables with platform detection
 const getApiBaseUrl = () => {
@@ -23,8 +24,6 @@ const getApiBaseUrl = () => {
 
 const API_BASE_URL = getApiBaseUrl();
 const API_TIMEOUT = Constants.expoConfig?.extra?.API_TIMEOUT || 60000; // Increased timeout for assessment creation (60 seconds)
-const ACCESS_TOKEN_KEY = Constants.expoConfig?.extra?.ACCESS_TOKEN_KEY || 'skilldrill_access_token';
-const REFRESH_TOKEN_KEY = Constants.expoConfig?.extra?.REFRESH_TOKEN_KEY || 'skilldrill_refresh_token';
 
 // API Response types
 export interface ApiResponse<T = any> {
@@ -106,8 +105,8 @@ class ApiService {
   private setupInterceptors() {
     // Request interceptor to add auth token
     this.api.interceptors.request.use(
-      async (config) => {
-        const token = await this.getAccessToken();
+      (config) => {
+        const token = this.getAccessToken();
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
@@ -142,22 +141,30 @@ class ApiService {
         }
 
         if (error.response?.status === 401 && !originalRequest._retry) {
+          // If already refreshing, queue this request
           if (this.isRefreshing) {
             return new Promise((resolve, reject) => {
               this.failedQueue.push({ resolve, reject });
             })
               .then((token) => {
-                originalRequest.headers.Authorization = `Bearer ${token}`;
-                return this.api(originalRequest);
+                if (token) {
+                  originalRequest.headers.Authorization = `Bearer ${token}`;
+                  return this.api(originalRequest);
+                }
+                return Promise.reject(new Error('Token refresh failed'));
               })
-              .catch((err) => Promise.reject(err));
+              .catch((err) => {
+                // Don't trigger session expiration for queued requests
+                // The main refresh attempt already handled it
+                return Promise.reject(err);
+              });
           }
 
           originalRequest._retry = true;
           this.isRefreshing = true;
 
           try {
-            const refreshToken = await this.getRefreshToken();
+            const refreshToken = this.getRefreshToken();
             if (!refreshToken) {
               throw new Error('No refresh token available');
             }
@@ -167,19 +174,25 @@ class ApiService {
             const response = await authService.refreshToken(refreshToken);
             const { accessToken, refreshToken: newRefreshToken } = response.data as { accessToken: string; refreshToken: string };
 
-            await this.setAccessToken(accessToken);
-            await this.setRefreshToken(newRefreshToken);
+            this.setAccessToken(accessToken);
+            this.setRefreshTokenValue(newRefreshToken);
 
             this.api.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
             this.processQueue(null, accessToken);
 
             return this.api(originalRequest);
           } catch (refreshError) {
+            // Clear the queue first
             this.processQueue(refreshError, null);
-            await this.clearTokens();
 
-            // Handle session expiration
-            await SessionManager.handleTokenRefreshFailure();
+            // Clear tokens
+            this.clearTokens();
+
+            // Handle session expiration ONLY if not logging out
+            // SessionManager has its own flag to prevent duplicate alerts
+            if (!SessionManager.isCurrentlyLoggingOut()) {
+              await SessionManager.handleTokenRefreshFailure();
+            }
 
             throw refreshError;
           } finally {
@@ -204,47 +217,27 @@ class ApiService {
     this.failedQueue = [];
   }
 
-  // Token management
-  private async getAccessToken(): Promise<string | null> {
-    try {
-      return await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
-    } catch (error) {
-      console.error('Error getting access token:', error);
-      return null;
-    }
+  // Token management (using Redux store)
+  private getAccessToken(): string {
+    const state = store.getState();
+    return state.auth.token || '';
   }
 
-  private async setAccessToken(token: string): Promise<void> {
-    try {
-      await AsyncStorage.setItem(ACCESS_TOKEN_KEY, token);
-    } catch (error) {
-      console.error('Error setting access token:', error);
-    }
+  private setAccessToken(token: string): void {
+    store.dispatch(setToken(token));
   }
 
-  private async getRefreshToken(): Promise<string | null> {
-    try {
-      return await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
-    } catch (error) {
-      console.error('Error getting refresh token:', error);
-      return null;
-    }
+  private getRefreshToken(): string {
+    const state = store.getState();
+    return state.auth.refreshToken || '';
   }
 
-  private async setRefreshToken(token: string): Promise<void> {
-    try {
-      await AsyncStorage.setItem(REFRESH_TOKEN_KEY, token);
-    } catch (error) {
-      console.error('Error setting refresh token:', error);
-    }
+  private setRefreshTokenValue(token: string): void {
+    store.dispatch(setRefreshToken(token));
   }
 
-  public async clearTokens(): Promise<void> {
-    try {
-      await AsyncStorage.multiRemove([ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY]);
-    } catch (error) {
-      console.error('Error clearing tokens:', error);
-    }
+  public clearTokens(): void {
+    store.dispatch(clearAuth());
   }
 
   // Generic request methods
@@ -591,6 +584,13 @@ class ApiService {
    */
   public async getDrillAggregate(assignmentId: string): Promise<ApiResponse> {
     return this.get(`/drills/aggregate?assignmentId=${assignmentId}`);
+  }
+
+  /**
+   * Get drill results (overall feedback) for completed drills
+   */
+  public async getDrillResults(assignmentId: string): Promise<ApiResponse> {
+    return this.get(`/drills/results/${assignmentId}`);
   }
 
   /**

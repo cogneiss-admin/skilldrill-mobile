@@ -6,18 +6,20 @@ export interface AuthState {
   isAuthenticated: boolean;
   user: User | null;
   isLoading: boolean;
-  error: string | null;
-  token: string | null;
-  lastAuthCheck: number | null;
+  error: string;
+  token: string;
+  refreshToken: string;
+  lastAuthCheck: number;
 }
 
 const initialState: AuthState = {
   isAuthenticated: false,
   user: null,
   isLoading: true,
-  error: null,
-  token: null,
-  lastAuthCheck: null,
+  error: '',
+  token: '',
+  refreshToken: '',
+  lastAuthCheck: 0,
 };
 
 // Async thunks for better performance
@@ -109,7 +111,7 @@ const authSlice = createSlice({
   initialState,
   reducers: {
     clearError: (state) => {
-      state.error = null;
+      state.error = '';
     },
     setUser: (state, action: PayloadAction<User>) => {
       state.user = action.payload;
@@ -123,13 +125,27 @@ const authSlice = createSlice({
     setToken: (state, action: PayloadAction<string>) => {
       state.token = action.payload;
     },
+    setRefreshToken: (state, action: PayloadAction<string>) => {
+      state.refreshToken = action.payload;
+    },
+    setTokens: (state, action: PayloadAction<{ accessToken: string; refreshToken: string }>) => {
+      state.token = action.payload.accessToken;
+      state.refreshToken = action.payload.refreshToken;
+    },
+    clearAuth: (state) => {
+      state.isAuthenticated = false;
+      state.user = null;
+      state.token = '';
+      state.refreshToken = '';
+      state.error = '';
+    },
   },
   extraReducers: (builder) => {
     builder
       // Check auth status
       .addCase(checkAuthStatus.pending, (state) => {
         state.isLoading = true;
-        state.error = null;
+        state.error = '';
       })
       .addCase(checkAuthStatus.fulfilled, (state, action) => {
         state.isLoading = false;
@@ -143,48 +159,57 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
         state.user = null;
       })
-      
+
       // Login
       .addCase(loginUser.pending, (state) => {
         state.isLoading = true;
-        state.error = null;
+        state.error = '';
       })
       .addCase(loginUser.fulfilled, (state, action) => {
         state.isLoading = false;
         state.isAuthenticated = true;
         state.user = action.payload;
-        state.error = null;
+        state.error = '';
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
       })
-      
+
       // Verify OTP
       .addCase(verifyOtpUser.pending, (state) => {
         state.isLoading = true;
-        state.error = null;
+        state.error = '';
       })
       .addCase(verifyOtpUser.fulfilled, (state, action) => {
         state.isLoading = false;
         state.isAuthenticated = true;
         state.user = action.payload;
-        state.error = null;
+        state.error = '';
       })
       .addCase(verifyOtpUser.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
       })
-      
+
       // Logout
       .addCase(logoutUser.fulfilled, (state) => {
         state.isAuthenticated = false;
         state.user = null;
-        state.token = null;
-        state.error = null;
+        state.token = '';
+        state.refreshToken = '';
+        state.error = '';
       });
   },
 });
 
-export const { clearError, setUser, updateUserProfile, setToken } = authSlice.actions;
+export const {
+  clearError,
+  setUser,
+  updateUserProfile,
+  setToken,
+  setRefreshToken,
+  setTokens,
+  clearAuth
+} = authSlice.actions;
 export default authSlice.reducer;

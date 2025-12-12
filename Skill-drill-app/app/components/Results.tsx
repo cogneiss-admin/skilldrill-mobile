@@ -1,19 +1,3 @@
-/**
- * Results Component
- *
- * Unified component for both Assessment Results and Drill Milestone screens.
- * Handles conditional rendering based on type prop.
- *
- * Features:
- * - Full-screen layout for assessments
- * - Modal layout for drill milestones
- * - Trophy icon with celebration
- * - Score display (stars + numeric for assessment, numeric for drill)
- * - Detailed feedback sections (assessment only)
- * - Stats summary (drill milestones only)
- * - Adaptive action buttons
- */
-
 import React from "react";
 import { View, Text, ScrollView, TouchableOpacity, StatusBar, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -34,41 +18,30 @@ import {
 
 export interface ResultsProps {
   type: 'assessment' | 'drill';
-  visible?: boolean; // For modal mode (drill)
-  score?: number; // 0-10 score
-  feedbackGood?: string; // Assessment only
-  feedbackImprove?: string; // Assessment only
-  feedbackSummary?: string; // Assessment only
-  stats?: {
-    averageScore: number;
-    count: number;
-  }; // Drill milestones only
-  milestone?: number; // 25, 50, 75, or 100 (drill only)
-  onAction: () => void; // Primary action button
-  actionText?: string; // Custom action button text
-  onBack?: () => void; // For assessment results back button
-  title?: string; // Optional custom title
-  completionText?: string; // Optional completion message
+  score?: number;
+  feedbackGood?: string;
+  feedbackImprove?: string;
+  feedbackSummary?: string;
+  onAction: () => void;
+  actionText?: string;
+  onBack?: () => void;
+  skillName: string;
 }
 
 const ASSESSMENT_BRAND = "#0A66C2";
 
-// Golden Star Rating Component (Assessment only)
 const GoldenStarRating = ({ score }: { score: number }) => {
   const [showAnimation, setShowAnimation] = React.useState(true);
   const lottieRef = React.useRef<LottieView>(null);
 
   React.useEffect(() => {
-    // Play full animation (0-60 frames) as an intro
-    // The animation is approx 2 seconds (60 frames / 30fps)
     const playTimer = setTimeout(() => {
       lottieRef.current?.play(0, 60);
     }, 100);
 
-    // Switch to static stars showing actual score after animation completes
     const switchTimer = setTimeout(() => {
       setShowAnimation(false);
-    }, 2100); // Slightly longer than 2s to ensure full playback
+    }, 2100);
 
     return () => {
       clearTimeout(playTimer);
@@ -141,49 +114,29 @@ const GoldenStarRating = ({ score }: { score: number }) => {
 
 const Results: React.FC<ResultsProps> = ({
   type,
-  visible = true,
   score,
   feedbackGood,
   feedbackImprove,
   feedbackSummary,
-  stats,
-  milestone,
   onAction,
   actionText,
   onBack,
-  title,
-  completionText,
+  skillName,
 }) => {
   const isAssessment = type === 'assessment';
   const isDrill = type === 'drill';
 
-  // Get motivational message based on milestone
-  const getMotivationalMessage = (percentage: number) => {
-    if (percentage === 100) {
-      return "You've completed all drills! You're mastering this skill. Keep up the excellent work!";
-    } else if (percentage >= 75) {
-      return "Almost there! You're doing fantastic. Finish strong!";
-    } else if (percentage >= 50) {
-      return "You're halfway through! Your progress is impressive. Keep going!";
-    } else {
-      return "Great start! You're building momentum. Keep practicing!";
-    }
-  };
-
-  // Determine action button text
   const getActionButtonText = () => {
     if (actionText) return actionText;
     if (isAssessment) return 'Recommended Next Steps';
-    if (milestone === 100) return 'Go to Dashboard';
-    return 'Continue Practice';
+    if (isDrill) return 'Go to Dashboard';
+    return 'Continue';
   };
 
-  // Render Assessment Results (Full Screen)
   const renderAssessmentResults = () => (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
       <StatusBar barStyle="dark-content" />
 
-      {/* Header */}
       {/* Header */}
       <View style={{
         paddingHorizontal: 16,
@@ -215,7 +168,7 @@ const Results: React.FC<ResultsProps> = ({
             color: '#111827',
             textAlign: 'center',
           }}>
-            {title || 'Assessment Result'}
+            Result
           </Text>
         </View>
 
@@ -293,7 +246,7 @@ const Results: React.FC<ResultsProps> = ({
             textAlign: 'center',
             marginBottom: 4, // Reduced from 8
           }}>
-            {completionText || "You've completed the assessment"}
+            You've completed
           </Text>
 
           {/* Golden Star Rating */}
@@ -340,7 +293,7 @@ const Results: React.FC<ResultsProps> = ({
               fontWeight: '700',
               marginBottom: 20,
             }}>
-              Assessment Feedback
+              Feedback
             </Text>
 
             {/* What You Did Well */}
@@ -426,7 +379,7 @@ const Results: React.FC<ResultsProps> = ({
                     textTransform: 'uppercase',
                     letterSpacing: 0.5,
                   }}>
-                    Overall Assessment
+                    Overall Feedback
                   </Text>
                   <View style={{
                     height: 2,
@@ -486,189 +439,11 @@ const Results: React.FC<ResultsProps> = ({
     </SafeAreaView>
   );
 
-  // Render Drill Milestone Modal
-  const renderDrillMilestone = () => (
-    <Modal
-      visible={visible}
-      animationType="fade"
-      transparent
-      onRequestClose={onAction}
-    >
-      <View style={{
-        flex: 1,
-        backgroundColor: COLORS.background.overlay,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: SPACING.padding.lg,
-      }}>
-        <MotiView
-          from={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          style={{
-            width: '100%',
-            maxWidth: 400,
-            borderRadius: BORDER_RADIUS['2xl'],
-            overflow: 'hidden',
-            ...SHADOWS.xl,
-          }}
-        >
-          <LinearGradient
-            colors={GRADIENTS.primary}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={{
-              padding: SPACING.padding['2xl'],
-              alignItems: 'center',
-            }}
-          >
-            {/* Trophy Animation with Celebration */}
-            <MotiView
-              from={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: 'spring', delay: 200 }}
-              style={{
-                width: 160,
-                height: 160,
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: SPACING.lg,
-                overflow: 'visible',
-              }}
-            >
-              {/* Celebration Animation (background) */}
-              <LottieView
-                source={require('../../assets/lottie/CelebrationAnime.json')}
-                autoPlay
-                loop={false}
-                style={{
-                  position: 'absolute',
-                  width: 280,
-                  height: 280,
-                  zIndex: 1,
-                }}
-              />
-              {/* Trophy Animation (foreground) */}
-              <LottieView
-                source={require('../../assets/lottie/TrophyAnime.json')}
-                autoPlay
-                loop={false}
-                style={{
-                  width: 140,
-                  height: 140,
-                  zIndex: 0,
-                }}
-              />
-            </MotiView>
-
-            {/* Milestone Title */}
-            <Text style={{
-              ...TYPOGRAPHY.h1,
-              fontSize: 28,
-              color: COLORS.white,
-              textAlign: 'center',
-              marginBottom: SPACING.xs,
-            }}>
-              {milestone === 100 ? '🎉 Congratulations!' : '🎯 Milestone Reached!'}
-            </Text>
-
-            <Text style={{
-              ...TYPOGRAPHY.subtitle,
-              color: COLORS.white,
-              opacity: 0.9,
-              marginBottom: SPACING.lg,
-            }}>
-              {milestone}% Complete
-            </Text>
-
-            {/* Stats Card */}
-            {stats && (
-              <View style={{
-                flexDirection: 'row',
-                backgroundColor: COLORS.white,
-                borderRadius: BORDER_RADIUS.xl,
-                padding: SPACING.padding.lg,
-                marginBottom: SPACING.lg,
-                width: '100%',
-              }}>
-                <View style={{ flex: 1, alignItems: 'center' }}>
-                  <Text style={{
-                    fontSize: 32,
-                    fontWeight: '800',
-                    color: BRAND,
-                    marginBottom: SPACING.xs,
-                  }}>
-                    {stats.averageScore.toFixed(1)}
-                  </Text>
-                  <Text style={{
-                    ...TYPOGRAPHY.caption,
-                    color: COLORS.text.tertiary,
-                    textAlign: 'center',
-                  }}>
-                    Average Score
-                  </Text>
-                </View>
-
-                <View style={{
-                  width: 1,
-                  backgroundColor: COLORS.border.light,
-                  marginHorizontal: SPACING.md,
-                }} />
-
-                <View style={{ flex: 1, alignItems: 'center' }}>
-                  <Text style={{
-                    fontSize: 32,
-                    fontWeight: '800',
-                    color: BRAND,
-                    marginBottom: SPACING.xs,
-                  }}>
-                    {stats.count}
-                  </Text>
-                  <Text style={{
-                    ...TYPOGRAPHY.caption,
-                    color: COLORS.text.tertiary,
-                    textAlign: 'center',
-                  }}>
-                    Drills Completed
-                  </Text>
-                </View>
-              </View>
-            )}
-
-            {/* Motivational Message */}
-            <Text style={{
-              ...TYPOGRAPHY.body,
-              color: COLORS.white,
-              textAlign: 'center',
-              lineHeight: 22,
-              marginBottom: SPACING.lg,
-            }}>
-              {milestone ? getMotivationalMessage(milestone) : ''}
-            </Text>
-
-            {/* Action Button */}
-            <Button
-              variant="secondary"
-              size="large"
-              onPress={onAction}
-              icon={milestone === 100 ? 'home' : 'arrow-forward'}
-              iconPosition="right"
-              style={{ backgroundColor: COLORS.white }}
-              fullWidth
-            >
-              {getActionButtonText()}
-            </Button>
-          </LinearGradient>
-        </MotiView>
-      </View>
-    </Modal>
-  );
-
-  // Return appropriate component based on type
-  if (isAssessment) {
+  if (isAssessment || isDrill) {
     return renderAssessmentResults();
-  } else {
-    return renderDrillMilestone();
   }
+
+  return null;
 };
 
 export default Results;

@@ -1,11 +1,7 @@
 import { useState, useCallback } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiService } from '../services/api';
 import { useToast } from './useToast';
 import { AssessmentProgress } from '../types/assessment';
-
-// Constants
-const ASSESSMENT_SESSION_KEY = 'assessment_session_data';
 
 export const useAssessmentSession = () => {
   // State (Updated for sequential flow)
@@ -31,51 +27,43 @@ export const useAssessmentSession = () => {
 
   // Clear assessment data
   const clearAssessmentData = useCallback(async () => {
-    try {
-      await AsyncStorage.removeItem(ASSESSMENT_SESSION_KEY);
-      setIsAssessmentActive(false);
-      setSessionId(null);
-      setCurrentQuestion(null);
-      setProgress(null);
-      setSkillName(null);
-      setUserResponses([]);
+    setIsAssessmentActive(false);
+    setSessionId(null);
+    setCurrentQuestion(null);
+    setProgress(null);
+    setSkillName(null);
+    setUserResponses([]);
 
-      // Legacy compatibility
-      setAssessmentId(null);
-      setQuestions([]);
-      setCurrentQuestionIndex(0);
-    } catch (error) {
-      console.error('❌ Error clearing assessment data:', error);
-    }
+    // Legacy compatibility
+    setAssessmentId(null);
+    setQuestions([]);
+    setCurrentQuestionIndex(0);
   }, []);
 
-  // Load session data from AsyncStorage (for when session started externally)
-  const loadSessionFromStorage = useCallback(async () => {
+  // Resume assessment session from backend
+  const loadSessionFromStorage = useCallback(async (skillId: string) => {
     try {
-      const storedData = await AsyncStorage.getItem(ASSESSMENT_SESSION_KEY);
-      if (storedData) {
-        const data = JSON.parse(storedData);
-        console.log('📦 Loading session from storage:', data.sessionId);
-
-        setSessionId(data.sessionId);
-        setCurrentQuestion(data.currentQuestion);
-        setProgress(data.progress);
-        setSkillName(data.skillName);
+      const response = await apiService.resumeAssessment(skillId);
+      
+      if (response.success && response.data) {
+        setSessionId(response.data.sessionId);
+        setCurrentQuestion(response.data.question);
+        setProgress(response.data.progress);
+        setSkillName(response.data.skillName);
         setIsAssessmentActive(true);
 
         // Legacy compatibility
-        setAssessmentId(data.sessionId);
-        if (data.currentQuestion) {
-          setQuestions([data.currentQuestion]);
+        setAssessmentId(response.data.sessionId);
+        if (response.data.question) {
+          setQuestions([response.data.question]);
         }
         setCurrentQuestionIndex(0);
         setUserResponses([]);
 
-        return data;
+        return response.data;
       }
       return null;
     } catch (error) {
-      console.error('❌ Error loading session from storage:', error);
       return null;
     }
   }, []);
@@ -104,16 +92,6 @@ export const useAssessmentSession = () => {
         setQuestions([response.data.question]); // Set as array with single question
         setCurrentQuestionIndex(0);
         setUserResponses([]);
-
-        // Save session data for persistence
-        await AsyncStorage.setItem(ASSESSMENT_SESSION_KEY, JSON.stringify({
-          sessionId: response.data.sessionId,
-          skillId: skillId,
-          skillName: response.data.skillName,
-          currentQuestion: response.data.question,
-          progress: response.data.progress,
-          timestamp: Date.now()
-        }));
 
         return response.data;
       } else {

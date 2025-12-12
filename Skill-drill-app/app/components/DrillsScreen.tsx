@@ -1,13 +1,3 @@
-/**
- * DrillsScreen Component
- *
- * Unified component for drill practice flow - handles both questions and milestone results modes.
- *
- * Modes:
- * - 'questions': Shows drill practice questions using ScenarioInteraction component
- * - 'results': Shows milestone celebration using Results component (as modal)
- */
-
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -16,19 +6,26 @@ import {
   StyleSheet,
   Modal,
   Dimensions,
+  TextStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
+import LottieView from 'lottie-react-native';
+import * as Haptics from 'expo-haptics';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 import { useDrillProgress } from '../../hooks/useDrillProgress';
 import { useAnimation } from '../../hooks/useAnimation';
+import { useToast } from '../../hooks/useToast';
 
 import ScenarioInteraction from './ScenarioInteraction';
 import Results from './Results';
 import Button from '../../components/Button';
+
+const AI_LOADING_ANIMATION = require('../../assets/lottie/AiLoadingAnime.json');
 
 import {
   BRAND,
@@ -39,25 +36,34 @@ import {
 
 export interface DrillsScreenProps {
   mode: 'questions' | 'results';
-  // Props for questions mode
   assignmentId?: string;
-  // Props for results mode (if showing results separately)
-  milestoneData?: {
-    percentage: number;
-    averageScore: number;
-    attemptsCount: number;
+  completionData?: {
     reached: boolean;
+    skillName: string;
+    overall: {
+      finalScore: number;
+      feedbackGood: string;
+      feedbackImprove: string;
+      feedbackSummary: string;
+    };
+    stats: {
+      averageScore: number;
+      attemptsCount: number;
+    };
   };
 }
 
 const DrillsScreen: React.FC<DrillsScreenProps> = ({
   mode,
   assignmentId,
-  milestoneData: externalMilestoneData,
+  completionData: externalCompletionData,
 }) => {
+  if (mode === 'questions' && !assignmentId) {
+    throw new Error('assignmentId is required for questions mode');
+  }
   const router = useRouter();
+  const { showToast } = useToast();
 
-  // ==================== QUESTIONS MODE STATE ====================
   const {
     loading,
     error,
@@ -69,16 +75,15 @@ const DrillsScreen: React.FC<DrillsScreenProps> = ({
     completedCount,
     progress,
     submitting,
-    milestoneData,
+    isLoadingOverallFeedback,
+    completionData,
     submitDrill,
     nextDrill,
     previousDrill,
-    dismissMilestone,
-  } = useDrillProgress(assignmentId || '');
+    handleCompletion,
+  } = useDrillProgress(assignmentId);
 
   const { celebrate, fadeIn } = useAnimation();
-
-  // ==================== QUESTIONS MODE LOGIC ====================
 
   useEffect(() => {
     if (mode === 'questions') {
@@ -87,22 +92,24 @@ const DrillsScreen: React.FC<DrillsScreenProps> = ({
   }, [mode]);
 
   useEffect(() => {
-    if (milestoneData?.reached) {
+    if (completionData?.reached) {
       celebrate();
     }
-  }, [milestoneData]);
+  }, [completionData]);
 
   const handleSubmit = async (text: string) => {
     if (!text.trim()) {
+      showToast('error', 'Response Required', 'Please provide your response before continuing.');
       return;
     }
 
     try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       await submitDrill({
         textContent: text.trim(),
       });
-    } catch (error) {
-      console.error('Submit failed:', error);
+    } catch (error: any) {
+      showToast('error', 'Submission Failed', error?.message || 'Failed to submit response');
     }
   };
 
@@ -111,14 +118,10 @@ const DrillsScreen: React.FC<DrillsScreenProps> = ({
   };
 
   const handleBack = () => {
-    router.back();
+    router.replace('/activity?tab=drills');
   };
 
-  // ==================== RENDER ====================
-
-  // QUESTIONS MODE
   if (mode === 'questions') {
-    // Loading state
     if (loading) {
       return (
         <SafeAreaView style={styles.container}>
@@ -130,13 +133,19 @@ const DrillsScreen: React.FC<DrillsScreenProps> = ({
       );
     }
 
-    // Error state
     if (error || !currentDrill) {
       return (
         <SafeAreaView style={styles.container}>
           <View style={styles.errorContainer}>
             <Ionicons name="alert-circle" size={64} color={COLORS.error} />
-            <Text style={styles.errorTitle}>Oops!</Text>
+            <Text style={{
+              fontSize: 24,
+              fontWeight: '700' as const,
+              letterSpacing: 0.1,
+              color: COLORS.text.primary,
+              marginTop: SPACING.md,
+              marginBottom: SPACING.xs,
+            }}>Oops!</Text>
             <Text style={styles.errorText}>
               {error || 'Failed to load drills'}
             </Text>
@@ -165,20 +174,7 @@ const DrillsScreen: React.FC<DrillsScreenProps> = ({
           loading={loading}
           submitting={submitting}
         />
-        {milestoneData?.reached && (
-          <Results
-            type="drill"
-            visible={true}
-            milestone={milestoneData.percentage}
-            stats={{
-              averageScore: milestoneData.averageScore,
-              count: milestoneData.attemptsCount,
-            }}
-            onAction={dismissMilestone}
-          />
-        )}
 
-        {/* Simple Loader for Scoring/Processing */}
         <Modal
           visible={submitting}
           transparent
@@ -186,28 +182,56 @@ const DrillsScreen: React.FC<DrillsScreenProps> = ({
           statusBarTranslucent
         >
           <View style={styles.blurContainer}>
-            <View style={styles.loadingContainer}>
+            <View style={styles.modalLoadingContainer}>
               <ActivityIndicator size="large" color="#FFFFFF" />
-              <Text style={[styles.loadingText, { color: '#FFFFFF', marginTop: SCREEN_WIDTH * 0.04 }]}>Processing your response...</Text>
+              <Text style={[styles.modalLoadingText, { color: '#FFFFFF', marginTop: SCREEN_WIDTH * 0.04 }]}>Processing your response...</Text>
             </View>
           </View>
+        </Modal>
+
+        <Modal
+          visible={isLoadingOverallFeedback}
+          transparent
+          animationType="fade"
+          statusBarTranslucent
+        >
+          <BlurView intensity={100} tint="dark" style={styles.blurContainer}>
+            <View style={styles.aiLoaderContent}>
+              <View style={styles.aiAnimationContainer}>
+                <LottieView
+                  source={AI_LOADING_ANIMATION}
+                  autoPlay
+                  loop
+                  style={styles.aiAnimation}
+                />
+              </View>
+              <Text style={styles.aiLoaderTitle}>
+                {(() => {
+                  const skillName = completionData?.skillName || assignment?.skillName;
+                  if (!skillName) {
+                    return 'Generating your results...';
+                  }
+                  return `Generating your results for ${skillName}`;
+                })()}
+              </Text>
+            </View>
+          </BlurView>
         </Modal>
       </>
     );
   }
 
-  // RESULTS MODE (if showing separately)
-  if (mode === 'results' && externalMilestoneData) {
+  if (mode === 'results' && externalCompletionData) {
     return (
       <Results
         type="drill"
-        visible={true}
-        milestone={externalMilestoneData.percentage}
-        stats={{
-          averageScore: externalMilestoneData.averageScore,
-          count: externalMilestoneData.attemptsCount,
-        }}
+        score={externalCompletionData.overall.finalScore}
+        feedbackGood={externalCompletionData.overall.feedbackGood}
+        feedbackImprove={externalCompletionData.overall.feedbackImprove}
+        feedbackSummary={externalCompletionData.overall.feedbackSummary}
         onAction={handleGoToDashboard}
+        onBack={handleBack}
+        skillName={externalCompletionData.skillName}
       />
     );
   }
@@ -237,7 +261,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.padding['2xl'],
   },
   errorTitle: {
-    ...TYPOGRAPHY.h1,
+    fontSize: 24,
+    letterSpacing: 0.1,
     color: COLORS.text.primary,
     marginTop: SPACING.md,
     marginBottom: SPACING.xs,
@@ -253,15 +278,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.8)',
   },
-  loadingContainer: {
+  modalLoadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: SCREEN_WIDTH * 0.06,
   },
-  loadingText: {
+  modalLoadingText: {
     marginTop: SCREEN_WIDTH * 0.025,
     fontSize: SCREEN_WIDTH * 0.04,
+  },
+  aiLoaderContent: {
+    alignItems: 'center',
+    padding: 32,
+  },
+  aiAnimationContainer: {
+    width: 200,
+    height: 200,
+    marginBottom: 24,
+  },
+  aiAnimation: {
+    width: '100%',
+    height: '100%',
+  },
+  aiLoaderTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 8,
   },
 });
 

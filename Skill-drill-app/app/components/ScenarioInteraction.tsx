@@ -45,7 +45,7 @@ export interface ScenarioInteractionProps {
   loadingMessage?: string;
   loadingSubMessage?: string;
   submitting?: boolean;
-  progress?: number; // For drill milestones (0-100)
+  progress?: number; // Completion percentage (0-100)
   completedCount?: number; // For drill progress
   showNavigation?: boolean; // Show previous/next buttons
   onPrevious?: () => void;

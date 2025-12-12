@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback, useRef } from "react";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { View, Text, ScrollView, TouchableOpacity, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "react-native";
@@ -177,7 +177,7 @@ export default function SkillsScreen() {
         });
 
         if (response.success) {
-          AsyncStorage.removeItem('selectedSkills').catch(() => {});
+          SecureStore.deleteItemAsync('selectedSkills').catch(() => {});
           showToast('success', 'Skills Added!', `${response.data.addedSkills} skill(s) added to your assessment.`);
 
           if (returnTo === 'discover') {
@@ -210,7 +210,7 @@ export default function SkillsScreen() {
         });
 
         if (response.success) {
-          AsyncStorage.removeItem('selectedSkills').catch(() => {});
+          SecureStore.deleteItemAsync('selectedSkills').catch(() => {});
 
           router.replace({
             pathname: '/assessmentScenarios',
@@ -240,7 +240,7 @@ export default function SkillsScreen() {
         
         if (response.success) {
           showToast('success', 'Success', 'Skills saved successfully!');
-          AsyncStorage.removeItem('selectedSkills').catch(() => {});
+          SecureStore.deleteItemAsync('selectedSkills').catch(() => {});
 
           if (!isAssessmentMode) {
             try {
