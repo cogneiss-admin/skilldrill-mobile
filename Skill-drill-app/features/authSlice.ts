@@ -1,6 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { User } from '../services/api';
-import authService from '../services/authService';
 
 export interface AuthState {
   isAuthenticated: boolean;
@@ -27,6 +26,7 @@ export const checkAuthStatus = createAsyncThunk(
   'auth/checkStatus',
   async (_, { rejectWithValue }) => {
     try {
+      const { default: authService } = await import('../services/authService');
       const isAuthenticated = await authService.isAuthenticated();
       
       if (isAuthenticated) {
@@ -42,7 +42,7 @@ export const checkAuthStatus = createAsyncThunk(
       
       return { isAuthenticated: false, user: null };
     } catch (error: unknown) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error instanceof Error ? error.message : 'An error occurred');
     }
   }
 );
@@ -51,6 +51,7 @@ export const loginUser = createAsyncThunk(
   'auth/login',
   async ({ emailOrPhone, password }: { emailOrPhone: string; password?: string }, { rejectWithValue }) => {
     try {
+      const { default: authService } = await import('../services/authService');
       let response;
       if (password) {
         response = await authService.loginWithPassword({
@@ -72,7 +73,7 @@ export const loginUser = createAsyncThunk(
         throw new Error(response.message);
       }
     } catch (error: unknown) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error instanceof Error ? error.message : 'An error occurred');
     }
   }
 );
@@ -81,6 +82,7 @@ export const verifyOtpUser = createAsyncThunk(
   'auth/verifyOtp',
   async ({ identifier, otp }: { identifier: string; otp: string }, { rejectWithValue }) => {
     try {
+      const { default: authService } = await import('../services/authService');
       const response = await authService.verifyOtp({ identifier, otp });
       
       if (response.success && 'user' in response.data && response.data.user) {
@@ -89,7 +91,7 @@ export const verifyOtpUser = createAsyncThunk(
         throw new Error(response.message);
       }
     } catch (error: unknown) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error instanceof Error ? error.message : 'An error occurred');
     }
   }
 );
@@ -98,10 +100,11 @@ export const logoutUser = createAsyncThunk(
   'auth/logout',
   async (_, { rejectWithValue }) => {
     try {
+      const { default: authService } = await import('../services/authService');
       await authService.logout();
       return true;
     } catch (error: unknown) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error instanceof Error ? error.message : 'An error occurred');
     }
   }
 );

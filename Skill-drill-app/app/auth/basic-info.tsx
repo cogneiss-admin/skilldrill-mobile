@@ -70,7 +70,6 @@ export default function BasicInfoScreen() {
         router.push("/auth/careerRole");
       }
     } catch (error: unknown) {
-      console.error('Profile update error:', error);
     } finally {
       setBusy(false);
     }

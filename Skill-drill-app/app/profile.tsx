@@ -539,16 +539,9 @@ export default function ProfileScreen() {
         
         // Fetch fresh user data from API to ensure we have latest careerLevel and roleType
         const profileResponse = await authService.getProfileFromAPI();
-        console.log('📊 Profile API Response:', JSON.stringify(profileResponse, null, 2));
         
         if (profileResponse.success && profileResponse.data) {
           const user = profileResponse.data;
-          console.log('👤 User data:', {
-            careerLevelId: user.careerLevelId,
-            careerLevel: user.careerLevel,
-            roleTypeId: user.roleTypeId,
-            roleType: user.roleType
-          });
           
           if (user.name) setName(user.name);
           if (user.email) setEmail(user.email);
@@ -677,7 +670,6 @@ export default function ProfileScreen() {
           }
         }
       } catch (error) {
-        console.error('Error loading profile:', error);
         // Fallback to cached data
         try {
           const { authService } = await import('../services/authService');
@@ -732,7 +724,6 @@ export default function ProfileScreen() {
           setRoleTypes(rtResponse.data.map((r: { id: string; name: string }) => ({ id: r.id, name: r.name })));
         }
       } catch (error) {
-        console.error('Error loading dropdown data:', error);
       } finally {
         setLoadingCL(false);
         setLoadingRT(false);
@@ -801,7 +792,6 @@ export default function ProfileScreen() {
         await logout();
         router.replace('/auth/login');
       } catch (error) {
-        console.error('❌ Logout error:', error);
         Alert.alert('Logout Failed', 'Failed to logout. Please try again.');
       }
     };
@@ -952,7 +942,6 @@ export default function ProfileScreen() {
                 }
               }
             } catch (e: unknown) {
-              console.error('Failed to update profile:', e);
               const errorMessage = e instanceof Error ? e.message : 'Failed to update profile. Please try again.';
               Alert.alert('Update Failed', errorMessage);
             } finally {

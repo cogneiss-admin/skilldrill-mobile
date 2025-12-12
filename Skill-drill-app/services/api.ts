@@ -2,8 +2,6 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import SessionManager from '../utils/sessionManager';
-import { store } from '../store';
-import { setToken, setRefreshToken, clearAuth } from '../features/authSlice';
 
 // Environment variables with platform detection
 const getApiBaseUrl = () => {
@@ -105,15 +103,14 @@ class ApiService {
   private setupInterceptors() {
     // Request interceptor to add auth token
     this.api.interceptors.request.use(
-      (config) => {
-        const token = this.getAccessToken();
+      async (config) => {
+        const token = await this.getAccessToken();
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
         return config;
       },
       (error) => {
-        console.error('❌ Request interceptor error:', error);
         return Promise.reject(error);
       }
     );
@@ -130,15 +127,7 @@ class ApiService {
         const isCommerceEndpoint = error.config?.url?.includes('/commerce/');
         const is404 = error.response?.status === 404;
 
-        if (!(isCommerceEndpoint && is404)) {
-          // Only log non-commerce 404 errors
-          console.error('❌ Response error:', {
-            status: error.response?.status,
-            url: error.config?.url,
-            message: error.message,
-            data: error.response?.data
-          });
-        }
+        // Suppress expected 404 errors for commerce endpoints
 
         if (error.response?.status === 401 && !originalRequest._retry) {
           // If already refreshing, queue this request
@@ -164,7 +153,7 @@ class ApiService {
           this.isRefreshing = true;
 
           try {
-            const refreshToken = this.getRefreshToken();
+            const refreshToken = await this.getRefreshToken();
             if (!refreshToken) {
               throw new Error('No refresh token available');
             }
@@ -174,8 +163,8 @@ class ApiService {
             const response = await authService.refreshToken(refreshToken);
             const { accessToken, refreshToken: newRefreshToken } = response.data as { accessToken: string; refreshToken: string };
 
-            this.setAccessToken(accessToken);
-            this.setRefreshTokenValue(newRefreshToken);
+            await this.setAccessToken(accessToken);
+            await this.setRefreshTokenValue(newRefreshToken);
 
             this.api.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
             this.processQueue(null, accessToken);
@@ -186,7 +175,7 @@ class ApiService {
             this.processQueue(refreshError, null);
 
             // Clear tokens
-            this.clearTokens();
+            await this.clearTokens();
 
             // Handle session expiration ONLY if not logging out
             // SessionManager has its own flag to prevent duplicate alerts
@@ -218,25 +207,33 @@ class ApiService {
   }
 
   // Token management (using Redux store)
-  private getAccessToken(): string {
+  private async getAccessToken(): Promise<string> {
+    const { store } = await import('../store');
     const state = store.getState();
     return state.auth.token || '';
   }
 
-  private setAccessToken(token: string): void {
+  private async setAccessToken(token: string): Promise<void> {
+    const { store } = await import('../store');
+    const { setToken } = await import('../features/authSlice');
     store.dispatch(setToken(token));
   }
 
-  private getRefreshToken(): string {
+  private async getRefreshToken(): Promise<string> {
+    const { store } = await import('../store');
     const state = store.getState();
     return state.auth.refreshToken || '';
   }
 
-  private setRefreshTokenValue(token: string): void {
+  private async setRefreshTokenValue(token: string): Promise<void> {
+    const { store } = await import('../store');
+    const { setRefreshToken } = await import('../features/authSlice');
     store.dispatch(setRefreshToken(token));
   }
 
-  public clearTokens(): void {
+  public async clearTokens(): Promise<void> {
+    const { store } = await import('../store');
+    const { clearAuth } = await import('../features/authSlice');
     store.dispatch(clearAuth());
   }
 
@@ -255,16 +252,6 @@ class ApiService {
       const response: AxiosResponse<ApiResponse<T>> = await this.api.post(url, data, config);
       return response.data;
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorStatus = (error as { status?: number }).status;
-      const errorCode = (error as { code?: string }).code;
-      console.error('❌ POST request failed:', {
-        url,
-        data,
-        error: errorMessage,
-        status: errorStatus,
-        code: errorCode
-      });
       throw this.handleError(error);
     }
   }
@@ -293,16 +280,6 @@ class ApiService {
       return typeof err === 'object' && err !== null;
     };
 
-    if (__DEV__ && isAxiosError(error)) {
-      console.debug('🔍 API Error Details:', {
-        message: error.message,
-        code: error.code,
-        status: error.response?.status,
-        url: error.config?.url,
-        method: error.config?.method,
-        data: error.response?.data
-      });
-    }
 
     if (isAxiosError(error) && error.response) {
       const { status, data } = error.response;
@@ -386,14 +363,6 @@ class ApiService {
       return new ApiError(message || 'An error occurred', status || 500, errorData.code, errorDataObj);
     } else if (isAxiosError(error) && 'request' in error) {
       // Network error - provide more specific information
-      if (__DEV__) {
-        console.debug('🌐 Network Error:', {
-          url: error.config?.url,
-          method: error.config?.method,
-          timeout: error.code === 'ECONNABORTED' ? 'Request timeout' : 'No response received'
-        });
-      }
-
       if (error.code === 'ECONNABORTED') {
         return new ApiError('Request timeout - server is not responding', 0, 'TIMEOUT');
       } else if (error.code === 'ERR_NETWORK') {

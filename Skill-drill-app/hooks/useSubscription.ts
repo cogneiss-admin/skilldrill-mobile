@@ -79,31 +79,21 @@ export const useSubscription = (): UseSubscriptionReturn => {
       setLoading(true);
       setError(null);
 
-      console.log('[Subscription] Loading subscription status...');
 
       try {
         const res = await apiService.getSubscription();
 
         if (!res.success) {
           // User might not have a subscription - this is okay
-          console.log('[Subscription] No active subscription found');
           setSubscription(null);
           return;
         }
 
         const subscriptionData = res.data;
         setSubscription(subscriptionData);
-
-        console.log('[Subscription] Subscription loaded:', {
-          plan: subscriptionData.plan,
-          status: subscriptionData.status,
-          credits: subscriptionData.credits,
-          endDate: subscriptionData.endDate
-        });
       } catch (apiError: unknown) {
         // If endpoint doesn't exist yet, just log and continue
         if (apiError.status === 404 || apiError.message?.includes('Route') || apiError.message?.includes('not found')) {
-          console.log('[Subscription] Subscription endpoint not implemented yet');
           setSubscription(null);
         } else {
           throw apiError;
@@ -111,7 +101,6 @@ export const useSubscription = (): UseSubscriptionReturn => {
       }
 
     } catch (err: unknown) {
-      console.error('[Subscription] Load error:', err);
       setError(null); // Don't set error for missing endpoints
       setSubscription(null);
     } finally {
@@ -159,13 +148,6 @@ export const useSubscription = (): UseSubscriptionReturn => {
     }
 
     try {
-      console.log('[Subscription] Unlocking drills with credits:', {
-        skillId: params.skillId,
-        drillPackPrice: params.drillPackPrice,
-        creditValue: subscription.creditValue,
-        creditsNeeded: creditsNeeded,
-        availableCredits: subscription.credits
-      });
 
       // Create drill assignment using subscription credits
       const res = await apiService.createDrillAssignment({
@@ -181,7 +163,6 @@ export const useSubscription = (): UseSubscriptionReturn => {
 
       const assignmentId = res.data.id;
 
-      console.log('[Subscription] ✅ Drills unlocked with credits:', assignmentId);
 
       // Update local subscription state (reduce credits by calculated amount)
       setSubscription({
@@ -195,7 +176,6 @@ export const useSubscription = (): UseSubscriptionReturn => {
       return assignmentId;
 
     } catch (err: unknown) {
-      console.error('[Subscription] Unlock error:', err);
       showError(err.message || 'Failed to unlock drills');
       throw err;
     }

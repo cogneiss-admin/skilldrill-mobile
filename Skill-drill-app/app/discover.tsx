@@ -128,7 +128,6 @@ export default function Discover() {
         setRecommendations(allRecommendations);
       }
     } catch (error) {
-      console.error('Error loading data:', error);
     } finally {
       setLoading(false);
     }

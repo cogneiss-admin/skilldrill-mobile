@@ -162,10 +162,10 @@ export default function ActivityCard({ type, data, onAction }: ActivityCardProps
 
         // Determine button text and action based on status
         let buttonText = 'Resume Practice';
-        let buttonAction: 'start' | 'resume' | 'view_results' | 'view_details' = 'resume';
+        let buttonAction: 'start' | 'resume' | 'view_results' | 'unlock' = 'resume';
         if (isCompleted) {
             buttonText = 'View Results';
-            buttonAction = 'view_details';
+            buttonAction = 'view_results';
         } else if (isUnlocked) {
             buttonText = 'Start Practice';
             buttonAction = 'start';

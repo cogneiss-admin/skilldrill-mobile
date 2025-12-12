@@ -20,10 +20,19 @@ const AssessmentResultsRoute = () => {
     assessmentId?: string;
   }>();
 
+  let parsedResults: import('../types/assessment').AssessmentResults | undefined;
+  if (results) {
+    try {
+      parsedResults = JSON.parse(results);
+    } catch (error) {
+      parsedResults = undefined;
+    }
+  }
+
   return (
     <AssessmentScreen
       mode="results"
-      results={results}
+      results={parsedResults}
       skillName={skillName}
       assessmentId={assessmentId}
     />

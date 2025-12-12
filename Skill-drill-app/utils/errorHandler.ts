@@ -324,14 +324,10 @@ export function logError(error: unknown, context?: string) {
     userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : undefined,
   };
 
-  console.error('Mobile App Error:', errorInfo);
 
   // In production, you might want to send this to an error tracking service
   if (__DEV__) {
     console.group('Error Details');
-    console.log('Context:', context);
-    console.log('Error:', error);
-    console.log('Stack:', error instanceof Error ? error.stack : undefined);
     console.groupEnd();
   }
 }

@@ -29,12 +29,6 @@ export function useSkillsData(params: {
       setError("");
       const response = await apiService.get('/skills/categories');
       if (response.success) {
-        try {
-          console.log('🧩 /skills/categories success:', {
-            groups: Array.isArray(response.data) ? response.data.length : 'n/a',
-            sampleGroup: Array.isArray(response.data) && response.data[0]?.title,
-          });
-        } catch {}
         const allSkills: Skill[] = [];
         response.data.forEach((group: SkillGroup) => {
           if (group.skills && Array.isArray(group.skills)) {
@@ -55,13 +49,12 @@ export function useSkillsData(params: {
         setSkillsData(allSkills);
         try {
           const keys = Array.from(new Set(allSkills.map(s => s?.skillTier?.key).filter(Boolean)));
-          console.log('🧩 Flattened skills:', { count: allSkills.length, tierKeys: keys });
         } catch {}
       } else {
         setError('Failed to load skills');
       }
     } catch (e) {
-      try { console.error('❌ /skills/categories error:', e?.response?.status, e?.response?.data || e?.message); } catch {}
+      try {  } catch {}
       setError('Failed to load skills. Please try again.');
     } finally {
       setLoading(false);
@@ -78,7 +71,7 @@ export function useSkillsData(params: {
       try {
         const user = await authService.getUserData();
         const careerLevelId = user?.careerLevelId || user?.careerLevel?.id;
-        try { console.log('🎯 Eligible fetch: user careerLevelId:', careerLevelId); } catch {}
+        try {  } catch {}
         if (!careerLevelId) return;
         const resp = await apiService.get(`/skills/career-level/${careerLevelId}/categories`);
         if (resp.success) {
@@ -104,12 +97,6 @@ export function useSkillsData(params: {
             }
           });
           setEligibleSet(ids);
-          try { 
-            console.log('🎯 Eligible set ready:', { 
-              count: ids.size,
-              sampleIds: Array.from(ids).slice(0, 3)
-            }); 
-          } catch {}
         }
       } catch {}
     })();

@@ -260,7 +260,9 @@ export default function SignupScreen() {
         }
       }
     } catch (error: unknown) {
-      const friendly = authService.handleAuthError?.(error) || error?.message;
+      const { default: authService } = await import("../../services/authService");
+      const errorObj = error as { message?: string } | undefined;
+      const friendly = authService.handleAuthError?.(error as Error) || errorObj?.message;
       setErrorMessage(friendly || 'Failed to send OTP');
     }
   };

@@ -225,13 +225,11 @@ const RecommendedDrillsScreen = () => {
       if (!isMountedRef.current) return;
 
       if (response.success && response.data.exists) {
-        console.log('✅ Found existing drill assignment:', response.data.assignment);
         setExistingAssignment(response.data.assignment);
       } else {
         setExistingAssignment(null);
       }
     } catch (err: unknown) {
-      console.error('❌ Failed to check existing drills:', err);
       // Don't show error to user, just assume no existing drills
       setExistingAssignment(null);
     } finally {
@@ -277,7 +275,6 @@ const RecommendedDrillsScreen = () => {
         }
       }
     } catch (err: unknown) {
-      console.error('❌ Failed to load drill recommendations:', err);
       const message = err?.message || 'Failed to load recommendations. Please try again.';
       if (!isMountedRef.current) return;
 
@@ -318,7 +315,6 @@ const RecommendedDrillsScreen = () => {
 
     // If drills already exist, navigate to existing assignment
     if (existingAssignment) {
-      console.log('🎯 Navigating to existing drill assignment:', existingAssignment.id);
       router.push({
         pathname: '/drillsScenarios',
         params: { assignmentId: existingAssignment.id }
@@ -345,7 +341,6 @@ const RecommendedDrillsScreen = () => {
         params: { assignmentId }
       });
     } catch (error: unknown) {
-      console.error('Failed to unlock drills:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to unlock drills';
       showError(errorMessage);
     }

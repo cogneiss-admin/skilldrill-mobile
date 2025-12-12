@@ -89,7 +89,6 @@ export const useAuth = () => {
       
       if (userData && !SessionManager.isCurrentlyLoggingOut()) {
         // User was previously logged in but now has no token - session expired
-        console.log('🔐 useAuth: User was logged in but no token found - handling session expiration');
         await SessionManager.handleSessionExpiration('Your session has expired');
       }
       
@@ -104,8 +103,6 @@ export const useAuth = () => {
       
       // Don't set error for aborted requests
       if (error.name === 'AbortError') return;
-      
-      console.error('🔐 useAuth: Error during auth check:', error);
       
       // Check if it's an authentication error that should trigger session expiration
       // But only if user is not currently logging out
@@ -130,16 +127,8 @@ export const useAuth = () => {
   const isOnboardingComplete = (user: User | null): boolean => {
     if (!user) return false;
     
-    console.log('🔍 isOnboardingComplete: Checking user:', {
-      onboardingStep: user.onboardingStep,
-      careerLevelId: user.careerLevelId,
-      roleTypeId: user.roleTypeId,
-      roleType: user.roleType
-    });
-    
     // Check if user has completed onboarding
     if (user.onboardingStep === 'Completed') {
-      console.log('✅ isOnboardingComplete: User has completed onboarding');
       return true;
     }
     
@@ -147,33 +136,22 @@ export const useAuth = () => {
     if (!user.onboardingStep) {
       // Legacy users need career info and skills to be considered complete
       // Since we can't check skills here, we'll assume they need to go through the flow
-      console.log('⚠️ isOnboardingComplete: Legacy user without onboardingStep, assuming incomplete');
       return false;
     }
     
-    console.log('❌ isOnboardingComplete: User has not completed onboarding');
     return false;
   };
 
   const getOnboardingNextStep = (user: User | null): string | null => {
     if (!user) return null;
     
-    console.log('🔄 getOnboardingNextStep: Checking user onboarding state:', {
-      onboardingStep: user.onboardingStep,
-      careerLevelId: user.careerLevelId,
-      roleTypeId: user.roleTypeId,
-      roleType: user.roleType
-    });
-    
     // Check onboarding step progression
     switch (user.onboardingStep) {
       case 'EMAIL_VERIFIED':
         // User just signed up, needs to complete career role
-        console.log('🔄 getOnboardingNextStep: User at EMAIL_VERIFIED, directing to careerRole');
         return '/auth/careerRole';
       case 'Completed':
         // User completed full onboarding
-        console.log('🔄 getOnboardingNextStep: User at COMPLETED, directing to dashboard');
         return '/dashboard';
       default:
         // Legacy users or new users without onboardingStep
@@ -181,13 +159,11 @@ export const useAuth = () => {
         
         // First check: Do they have career/role info?
         if (!user.careerLevelId || !user.roleTypeId) {
-          console.log('🔄 getOnboardingNextStep: User missing career/role info, directing to careerRole');
           return '/auth/careerRole';
         }
         
         // They have career/role info, check if they have skills
         // For now, assume they need to complete skills selection
-        console.log('🔄 getOnboardingNextStep: Legacy user with career/role, directing to skills');
         return '/auth/skills';
     }
   };
@@ -296,7 +272,6 @@ export const useAuth = () => {
 
   const verifyOtp = async (identifier: string, otp: string) => {
     try {
-      console.log('🔐 useAuth: Starting OTP verification...');
       setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
       
       const response = await authService.verifyOtp({
@@ -304,30 +279,14 @@ export const useAuth = () => {
         otp,
       });
       
-      console.log('🔐 useAuth: OTP verification response:', {
-        success: response.success,
-        hasUser: 'user' in response.data && !!response.data.user,
-        userData: response.data.user ? {
-          id: response.data.user.id,
-          name: response.data.user.name,
-          careerLevelId: response.data.user.careerLevelId,
-          roleTypeId: response.data.user.roleTypeId,
-          roleType: response.data.user.roleType,
-          onboardingStep: response.data.user.onboardingStep
-        } : null
-      });
-      
       if (response.success && 'user' in response.data && response.data.user) {
-        console.log('✅ useAuth: OTP verification successful, setting authenticated state');
         setAuthState({
           isAuthenticated: true,
           user: response.data.user,
           isLoading: false,
           error: null,
         });
-        console.log('✅ useAuth: Authentication state updated successfully');
       } else {
-        console.log('❌ useAuth: OTP verification failed, setting error state');
         setAuthState(prev => ({
           ...prev,
           isLoading: false,
@@ -337,7 +296,6 @@ export const useAuth = () => {
       
       return response;
     } catch (error: unknown) {
-      console.error('❌ useAuth: OTP verification error:', error);
       setAuthState(prev => ({
         ...prev,
         isLoading: false,
@@ -371,8 +329,6 @@ export const useAuth = () => {
 
   const updateProfile = async (userData: Partial<User>) => {
     try {
-      console.log('🔄 useAuth: Starting profile update...');
-      console.log('📊 useAuth: Profile data to update:', userData);
       
       // Use the API method to update profile on backend
       const payload: Record<string, unknown> = {};
@@ -384,28 +340,16 @@ export const useAuth = () => {
 
       const response = await authService.updateProfileViaAPI(payload);
       
-      console.log('✅ useAuth: Profile update API response:', response);
-      
       if (response.success && response.data) {
         // Update local state with the response from backend
         setAuthState(prev => ({
           ...prev,
           user: response.data,
         }));
-        console.log('✅ useAuth: Local state updated with new user data');
-        console.log('📊 useAuth: Updated user data:', {
-          careerLevelId: response.data.careerLevelId,
-          roleTypeId: response.data.roleTypeId,
-          roleType: response.data.roleType,
-          onboardingStep: response.data.onboardingStep,
-          onboardingComplete: isOnboardingComplete(response.data)
-        });
       } else {
-        console.error('❌ useAuth: Profile update failed:', response.message);
         throw new Error(response.message || 'Profile update failed');
       }
     } catch (error: unknown) {
-      console.error('❌ useAuth: Profile update error:', error);
       setAuthState(prev => ({
         ...prev,
         error: error instanceof Error ? error.message : 'An error occurred',
@@ -416,15 +360,11 @@ export const useAuth = () => {
 
   const updateOnboardingStep = async (step: string) => {
     try {
-      console.log(`🎯 useAuth: Updating onboarding step to: ${step}`);
       await authService.updateOnboardingStep(step);
       
       // Refresh user data to get updated onboarding step
       await checkAuthStatus();
-      
-      console.log(`✅ useAuth: Onboarding step updated to: ${step}`);
     } catch (error: unknown) {
-      console.error('❌ useAuth: Error updating onboarding step:', error);
       setAuthState(prev => ({
         ...prev,
         error: error instanceof Error ? error.message : 'An error occurred',

@@ -98,7 +98,6 @@ export const usePayment = (): UsePaymentReturn => {
       });
 
       if (initError) {
-        console.error('[Payment] Init error:', initError);
         throw new Error(initError.message || 'Failed to initialize payment');
       }
 
@@ -114,7 +113,6 @@ export const usePayment = (): UsePaymentReturn => {
         }
 
         // Other payment errors
-        console.error('[Payment] Present error:', presentError);
         throw new Error(presentError.message || 'Payment failed');
       }
 
@@ -124,7 +122,6 @@ export const usePayment = (): UsePaymentReturn => {
       params.onSuccess('');
 
     } catch (error: unknown) {
-      console.error('[Payment] Error:', error);
 
       // Handle specific error types
       const errorMessage = (error as any)?.message || 'Payment processing failed';
@@ -182,7 +179,6 @@ export const usePayment = (): UsePaymentReturn => {
         }
 
       } catch (error) {
-        console.warn('[Payment] Poll error:', error);
         // Continue polling even on errors
       }
     }

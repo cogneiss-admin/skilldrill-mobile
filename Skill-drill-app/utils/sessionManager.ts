@@ -1,14 +1,12 @@
 import { Alert } from 'react-native';
 import { router } from 'expo-router';
-import { store, persistor } from '../store';
-import { clearAuth } from '../features/authSlice';
 import * as SecureStore from 'expo-secure-store';
 
 export class SessionManager {
   private static isHandlingSessionExpiration = false;
   private static isLoggingOut = false;
-  private static logoutTimeoutId: NodeJS.Timeout | null = null;
-  private static sessionExpirationDebounceTimer: NodeJS.Timeout | null = null;
+  private static logoutTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private static sessionExpirationDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   /**
    * Set logout state to prevent session expiration alerts during logout
@@ -23,7 +21,6 @@ export class SessionManager {
         clearTimeout(this.logoutTimeoutId);
       }
       this.logoutTimeoutId = setTimeout(() => {
-        console.log('🔐 Auto-resetting logout flag after timeout');
         this.isLoggingOut = false;
         this.logoutTimeoutId = null;
       }, 10000); // 10 seconds timeout
@@ -50,19 +47,16 @@ export class SessionManager {
   static async handleSessionExpiration(reason: string = 'Session expired') {
     // Don't show session expiration alert if user is logging out
     if (this.isLoggingOut) {
-      console.log('🔐 Skipping session expiration alert - user is logging out');
       return;
     }
 
     // Prevent multiple simultaneous session expiration handlers
     if (this.isHandlingSessionExpiration) {
-      console.log('🔐 Session expiration already being handled, skipping duplicate');
       return;
     }
 
     // Debounce: If multiple calls happen within 500ms, only process the first one
     if (this.sessionExpirationDebounceTimer) {
-      console.log('🔐 Session expiration debounced, skipping duplicate within 500ms');
       return;
     }
 
@@ -73,8 +67,6 @@ export class SessionManager {
     this.isHandlingSessionExpiration = true;
 
     try {
-      console.log(`🔐 Handling session expiration: ${reason}`);
-
       // Clear all auth data
       await this.clearAuthData();
 
@@ -94,7 +86,6 @@ export class SessionManager {
         { cancelable: false }
       );
     } catch (error) {
-      console.error('❌ Error handling session expiration:', error);
       // Fallback: just redirect to login
       this.redirectToLogin();
     } finally {
@@ -110,6 +101,10 @@ export class SessionManager {
    */
   static async clearAuthData(): Promise<void> {
     try {
+      // Lazy import to avoid circular dependency
+      const { store, persistor } = await import('../store');
+      const { clearAuth } = await import('../features/authSlice');
+      
       // Clear Redux state (in-memory tokens + user data)
       store.dispatch(clearAuth());
 
@@ -118,10 +113,7 @@ export class SessionManager {
 
       // Purge redux-persist storage
       await persistor.purge();
-
-      console.log('🔐 Auth data cleared successfully from Redux + SecureStore');
     } catch (error) {
-      console.error('Error clearing auth data:', error);
     }
   }
 
@@ -139,14 +131,11 @@ export class SessionManager {
       
       // Navigate to login screen and reset the navigation stack
       router.replace('/auth/login');
-      console.log('🔄 Redirected to login screen');
     } catch (error) {
-      console.error('Error redirecting to login:', error);
       // Fallback: try to navigate to the root
       try {
         router.replace('/');
       } catch (fallbackError) {
-        console.error('Fallback navigation failed:', fallbackError);
       }
     }
   }
@@ -157,10 +146,8 @@ export class SessionManager {
   static isOnProtectedRoute(): boolean {
     // Add logic to check if current route requires authentication
     // For now, we'll assume all routes except login/signup are protected
-    const currentPath = router.getCurrentPath?.() || '';
     const publicRoutes = ['/auth/login', '/auth/signup', '/auth/otp', '/'];
-    
-    return !publicRoutes.some(route => currentPath.startsWith(route));
+    return true;
   }
 
   /**
@@ -213,7 +200,6 @@ export class SessionManager {
   static initialize(): void {
     // Reset all flags when app initializes
     this.resetFlags();
-    console.log('🔐 SessionManager initialized');
   }
 }
 

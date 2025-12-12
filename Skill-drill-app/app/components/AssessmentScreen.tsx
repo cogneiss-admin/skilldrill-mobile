@@ -66,7 +66,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   const [progress, setProgress] = useState(initialProgress);
   const [skillName, setSkillName] = useState(skillNameProp);
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
-  const [assessmentResults, setAssessmentResults] = useState(null);
+  const [assessmentResults, setAssessmentResults] = useState<import('../../types/assessment').AssessmentResults | null>(null);
   const [isLoadingResults, setIsLoadingResults] = useState(false);
   const [completedSessionId, setCompletedSessionId] = useState<string | null>(null);
   const [showAiLoader, setShowAiLoader] = useState(false);
@@ -76,7 +76,12 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
 
   const handleSubmitResponse = async (text: string) => {
     if (!text.trim()) {
-      showToast('error', 'Response Required', 'Please provide your response before continuing.');
+      showToast({ type: 'error', title: 'Response Required', message: 'Please provide your response before continuing.' });
+      return;
+    }
+
+    if (!currentSessionId) {
+      showToast({ type: 'error', message: 'Session ID not found' });
       return;
     }
 
@@ -101,7 +106,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
         throw new Error(response.message || 'Failed to submit answer');
       }
     } catch (error: any) {
-      showToast('error', 'Submission Failed', error.message || 'Failed to submit response');
+      showToast({ type: 'error', title: 'Submission Failed', message: error.message || 'Failed to submit response' });
     } finally {
       setIsSubmitting(false);
     }
@@ -145,29 +150,44 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
     }
 
     setShowCompletionDialog(false);
+    
+    const targetSessionId = completedSessionId || currentSessionId;
+    if (!targetSessionId) {
+      showToast({ type: 'error', message: 'Session ID not found' });
+      return;
+    }
+
+    const sessionId: string = targetSessionId;
+
     setShowAiLoader(true);
     setIsLoadingResults(true);
 
-    if (!completedSessionId && !currentSessionId) {
-      throw new Error('Session ID not available');
-    }
-    const targetSessionId = completedSessionId || currentSessionId;
     const maxRetries = 20;
     const retryDelay = 2000;
     let attempts = 0;
 
     const pollForResults = async (): Promise<void> => {
       try {
-        const response = await apiService.getAdaptiveResults(targetSessionId);
+        const response = await apiService.getAdaptiveResults(sessionId);
 
         if (response.success) {
           if (response.data.status === 'ready') {
-            const resultsData = {
-              finalScore: response.data.finalScore,
-              feedbackGood: response.data.feedbackGood,
-              feedbackImprove: response.data.feedbackImprove,
-              feedbackSummary: response.data.feedbackSummary,
-              skillName: response.data.skillName
+            if (!response.data.skillName) {
+              throw new Error('Skill name not found in response');
+            }
+
+            const resultsData: import('../../types/assessment').AssessmentResults = {
+              assessmentId: sessionId,
+              skillName: response.data.skillName,
+              finalScore: response.data.finalScore || 0,
+              subskillScores: [],
+              feedback: {
+                good: response.data.feedbackGood || '',
+                improve: response.data.feedbackImprove || '',
+                summary: response.data.feedbackSummary || '',
+                flaws: []
+              },
+              completedAt: new Date().toISOString()
             };
             
             setAssessmentResults(resultsData);
@@ -180,9 +200,9 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
               router.replace({
                 pathname: "/assessmentResults",
                 params: {
-                  results: JSON.stringify({ ...resultsData, assessmentId: targetSessionId }),
+                  results: JSON.stringify({ ...resultsData, assessmentId: sessionId }),
                   skillName: response.data.skillName,
-                  assessmentId: targetSessionId,
+                  assessmentId: sessionId,
                 }
               });
             }
@@ -191,26 +211,26 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
             if (attempts >= maxRetries) {
               setShowAiLoader(false);
               setIsLoadingResults(false);
-              showToast('error', 'Timeout', 'Results are taking longer than expected. Please try again later.');
+              showToast({ type: 'error', title: 'Timeout', message: 'Results are taking longer than expected. Please try again later.' });
             } else {
               setTimeout(pollForResults, retryDelay);
             }
           } else {
             setShowAiLoader(false);
             setIsLoadingResults(false);
-            showToast('error', 'Error', 'Unexpected response format');
+            showToast({ type: 'error', message: 'Unexpected response format' });
           }
         } else {
           setShowAiLoader(false);
           setIsLoadingResults(false);
-          showToast('error', 'Error', response.message || 'Failed to load assessment results');
+          showToast({ type: 'error', message: response.message || 'Failed to load assessment results' });
         }
       } catch (error) {
         attempts++;
         if (attempts >= maxRetries) {
           setShowAiLoader(false);
           setIsLoadingResults(false);
-          showToast('error', 'Error', 'Failed to load assessment results. Please try again later.');
+          showToast({ type: 'error', message: 'Failed to load assessment results. Please try again later.' });
         } else {
           setTimeout(pollForResults, retryDelay);
         }
@@ -258,15 +278,15 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
             assessmentId: assessmentId
           });
         } else if (response.data.status === 'processing') {
-          showToast('info', 'Processing', 'Results are still being generated. Please refresh in a moment.');
+          showToast({ type: 'info', title: 'Processing', message: 'Results are still being generated. Please refresh in a moment.' });
         } else {
-          showToast('error', 'Error', 'Unexpected response format');
+          showToast({ type: 'error', message: 'Unexpected response format' });
         }
       } else {
-        showToast('error', 'Error', 'Failed to load assessment results');
+        showToast({ type: 'error', message: 'Failed to load assessment results' });
       }
     } catch (error) {
-      showToast('error', 'Error', 'Failed to load assessment results');
+      showToast({ type: 'error', message: 'Failed to load assessment results' });
     } finally {
       setIsLoadingResultsPage(false);
     }
@@ -290,7 +310,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
     const finalScoreNumber = typeof parsedResults?.finalScore === 'number' ? parsedResults.finalScore : undefined;
 
     if (!derivedAssessmentId) {
-      showToast('error', 'Missing Data', 'We need your assessment details before recommending drills.');
+      showToast({ type: 'error', title: 'Missing Data', message: 'We need your assessment details before recommending drills.' });
       return;
     }
 
@@ -323,7 +343,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
 
         <AssessmentCompletionDialog
           visible={showCompletionDialog}
-          skillName={skillName}
+          skillName={skillName || 'Assessment'}
           onSeeResults={handleSeeResults}
           onContinueNext={handleContinueNext}
           isLoadingResults={false}
@@ -431,12 +451,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
-  },
-  blurContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.8)',
   },
   loadingContainer: {
     flex: 1,

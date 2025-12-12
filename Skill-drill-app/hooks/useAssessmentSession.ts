@@ -74,12 +74,10 @@ export const useAssessmentSession = () => {
       setLoading(true);
       setError(null);
 
-      console.log('🎯 Starting assessment for skill:', skillId);
 
       const response = await apiService.startAssessment(skillId);
 
       if (response.success) {
-        console.log('✅ Assessment started:', response.data);
         
         setSessionId(response.data.sessionId);
         setCurrentQuestion(response.data.question);
@@ -99,7 +97,6 @@ export const useAssessmentSession = () => {
       }
 
     } catch (error: unknown) {
-      console.error('❌ Error starting assessment:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to start assessment';
       setError(errorMessage);
       throw error;
@@ -118,19 +115,16 @@ export const useAssessmentSession = () => {
       setLoading(true);
       setError(null);
 
-      console.log('📝 Submitting answer for sequential assessment');
 
       const response = await apiService.submitAnswerAndGetNext(sessionId, answer.trim());
 
       if (response.success) {
         if (response.data.isComplete) {
           // Assessment is complete
-          console.log('🎉 Sequential assessment completed!');
           // Don't clear data yet - we need sessionId for results fetching
           return { completed: true, isComplete: true, sessionId: response.data.sessionId };
         } else {
           // Got next question
-          console.log('✅ Answer submitted, got next question');
           
           setCurrentQuestion(response.data.question);
           setProgress(response.data.progress);
@@ -146,7 +140,6 @@ export const useAssessmentSession = () => {
       }
 
     } catch (error: unknown) {
-      console.error('❌ Error submitting answer:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to submit answer';
       setError(errorMessage);
       throw error;
@@ -183,7 +176,6 @@ export const useAssessmentSession = () => {
       }
     });
 
-    console.log(`✅ Saved answer for question ${progress?.currentQuestion || 'unknown'}/${progress?.totalQuestions || 'unknown'}`);
   }, [currentQuestion, progress]);
 
   // Move to next question

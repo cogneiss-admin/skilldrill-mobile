@@ -30,17 +30,12 @@ const App = React.memo(() => {
   } = useAuth();
 
   const handleSplashFinish = useCallback(() => {
-    console.log('🎬 Index: Splash finished');
-    console.log('🔐 Index: Auth state:', { isAuthenticated, isLoading, user: user ? { id: user.id, name: user.name } : null });
-    
     setSplashDone(true);
     
     // Only show welcome screen if user is not authenticated
     if (!isAuthenticated) {
-      console.log('👋 Index: User not authenticated, showing welcome screen');
       setShowWelcome(true);
     } else {
-      console.log('🚀 Index: User authenticated, handling routing directly');
       // If authenticated, handle routing directly
       handleRouting();
     }
@@ -55,22 +50,16 @@ const App = React.memo(() => {
   }, [router]);
 
   const handleRouting = useCallback(() => {
-    console.log('🧭 Index: Handling routing...');
-    console.log('📊 Index: Routing state:', { isAuthenticated, isLoading, onboardingComplete: isOnboardingComplete() });
-    
     if (isAuthenticated) {
       const onboardingComplete = isOnboardingComplete();
       if (onboardingComplete) {
-        console.log('🎯 Index: Navigating to dashboard');
         router.replace('/dashboard');
       } else {
         // Use getOnboardingNextStep to determine the exact next step
         const nextStep = getOnboardingNextStep();
-        console.log('📋 Index: Navigating to next step:', nextStep);
         router.replace(nextStep || '/auth/careerRole');
       }
     } else {
-      console.log('🔐 Index: Navigating to login');
       router.replace('/auth/login');
     }
   }, [isAuthenticated, isLoading, isOnboardingComplete, getOnboardingNextStep, router]);

@@ -70,7 +70,7 @@ export const AssessmentCompletionDialog: React.FC<AssessmentCompletionDialogProp
           </View>
 
           {/* Content */}
-          <View style={{ alignItems: 'center', textAlign: 'center' }}>
+          <View style={{ alignItems: 'center' }}>
             {/* Icon */}
             <View style={{
               width: 64,

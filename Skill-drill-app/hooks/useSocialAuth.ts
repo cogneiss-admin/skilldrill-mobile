@@ -13,7 +13,6 @@ export const useSocialAuth = () => {
       setIsLoading(true);
       setError(null);
 
-      console.log(`🚀 Starting ${provider} authentication...`);
 
       // Check if provider is available
       if (!socialAuthService.isProviderAvailable(provider)) {
@@ -23,7 +22,6 @@ export const useSocialAuth = () => {
       // Check network connectivity (basic check)
       // Note: navigator.onLine is not reliable in React Native
       // We'll let the actual network requests handle connectivity issues
-      console.log('🌐 Network check skipped - will rely on actual network requests');
 
       // Perform social authentication
       const response = await socialAuthService.signInWithProvider(provider);
@@ -43,7 +41,6 @@ export const useSocialAuth = () => {
         throw new Error(response.message || `${provider} authentication failed`);
       }
     } catch (error: unknown) {
-      console.error(`❌ ${provider} authentication error:`, error);
       
       let errorMessage = error.message || `${provider} authentication failed`;
       

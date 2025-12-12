@@ -53,12 +53,10 @@ export const useSubscriptionPlans = (): UseSubscriptionPlansReturn => {
       setLoading(true);
       setError(null);
 
-      console.log('[SubscriptionPlans] Loading subscription plans...');
 
       const res = await apiService.getSubscriptionPlans();
 
       if (!res.success) {
-        console.log('[SubscriptionPlans] Failed to load plans:', res.message);
         setPlans([]);
         return;
       }
@@ -66,16 +64,9 @@ export const useSubscriptionPlans = (): UseSubscriptionPlansReturn => {
       const plansData = res.data?.plans || [];
       setPlans(plansData);
 
-      console.log('[SubscriptionPlans] Plans loaded:', {
-        count: plansData.length,
-        plans: plansData.map((p: SubscriptionPlan) => p.planName)
-      });
-
     } catch (err: unknown) {
-      console.error('[SubscriptionPlans] Load error:', err);
       // Don't set error for missing endpoints - just return empty plans
       if ((err as any)?.status === 404 || (err as any)?.message?.includes('not found')) {
-        console.log('[SubscriptionPlans] Endpoint not available yet');
       }
       setPlans([]);
     } finally {

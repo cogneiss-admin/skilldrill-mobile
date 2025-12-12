@@ -81,16 +81,12 @@ export default function LoginScreen() {
       setBusy(true);
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-      console.log('🔍 Send OTP - Input:', emailOrPhone, 'Type:', inputType);
-
       // Import auth service dynamically to avoid circular dependencies
       const { authService } = await import("../../services/authService");
 
       let response;
       if (inputType === "email") {
-        console.log('📧 Sending email login request...');
         response = await authService.loginWithEmail({ email: emailOrPhone.trim() });
-        console.log('📧 Email login response:', response);
       } else {
         // Format phone with country calling code to E.164 when user hasn't typed +<code>
         const rawDigits = (emailOrPhone || '').replace(/\D/g, '');
@@ -99,31 +95,22 @@ export default function LoginScreen() {
           ? emailOrPhone.trim()
           : (phoneCountryCode ? `+${phoneCountryCode}${rawDigits}` : rawDigits);
 
-        console.log('📱 Sending phone login request with:', phoneNo);
         response = await authService.loginWithPhone({ phoneNo });
-        console.log('📱 Phone login response:', response);
       }
 
       if (response.success) {
-        console.log('✅ OTP sent successfully, navigating to OTP screen...');
         // Pass the identifier to the OTP screen
         const params = inputType === "email"
           ? { email: emailOrPhone.trim() }
           : { phone: (emailOrPhone.trim().startsWith('+') ? emailOrPhone.trim() : `+${(selectedPhoneCountry?.phoneCode || '').replace(/\D/g, '')}${(emailOrPhone || '').replace(/\D/g, '')}`) };
 
-        console.log('🚀 Navigating to OTP with params:', params);
         try {
           await router.replace({ pathname: "/auth/otp", params });
-          console.log('✅ Navigation to OTP completed');
         } catch (navError) {
-          console.error('❌ Navigation error:', navError);
           // Fallback: try simple navigation
           try {
-            console.log('🔄 Trying fallback navigation...');
             await router.replace("/auth/otp");
-            console.log('✅ Fallback navigation completed');
           } catch (fallbackError) {
-            console.error('❌ Fallback navigation also failed:', fallbackError);
           }
         }
       } else {
@@ -146,7 +133,6 @@ export default function LoginScreen() {
         }
       }
     } catch (error: unknown) {
-      console.error('❌ Send OTP error:', error);
       const apiError = parseApiError(error);
       const message = formatErrorMessage(apiError);
 
@@ -587,7 +573,6 @@ export default function LoginScreen() {
           {/* Bottom signup link */}
           <Pressable
             onPress={() => {
-              console.log('📝 Navigating to signup screen...');
               router.push("/auth/signup");
             }}
             style={({ pressed }) => [

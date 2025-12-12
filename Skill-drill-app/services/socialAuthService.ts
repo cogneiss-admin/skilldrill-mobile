@@ -75,9 +75,6 @@ class SocialAuthService {
   public async signInWithGoogle(): Promise<ApiResponse<AuthSuccessResponse>> {
     try {
       // Debug configuration
-      console.log('🔍 Google OAuth Configuration:');
-      console.log('Client ID:', this.config.google.clientId);
-      console.log('Scopes:', this.config.google.scopes);
 
       // Check if client ID is properly configured
       if (!this.config.google.clientId || this.config.google.clientId === 'your-google-client-id' || this.config.google.clientId === 'your-actual-google-client-id-here') {
@@ -96,7 +93,6 @@ class SocialAuthService {
         },
       });
 
-      console.log('🚀 Starting Google OAuth flow for Android...');
       const result = await request.promptAsync({
         authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
       });
@@ -109,10 +105,8 @@ class SocialAuthService {
         };
       }
       const oauthResult = result as OAuthResult;
-      console.log('📱 OAuth Result:', oauthResult.type, oauthResult.params);
 
       if (oauthResult.type === 'success' && oauthResult.params?.code) {
-        console.log('✅ Authorization code received, exchanging for tokens...');
         return await this.handleGoogleCallback(oauthResult.params.code);
       } else if (oauthResult.type === 'cancel') {
         throw new Error('Google authentication was cancelled by user');
@@ -122,19 +116,12 @@ class SocialAuthService {
         throw new Error('Google authentication failed - no authorization code received');
       }
     } catch (error: unknown) {
-      console.error('❌ Google sign-in error:', error);
-      console.error('Error details:', {
-        message: error.message,
-        code: error.code,
-        stack: error.stack
-      });
       throw new Error(error.message || 'Google authentication failed');
     }
   }
 
   private async handleGoogleCallback(code: string): Promise<ApiResponse<AuthSuccessResponse>> {
     try {
-      console.log('🔄 Exchanging authorization code for tokens...');
       
       // For Android clients, we don't include redirect_uri in token exchange
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -150,12 +137,9 @@ class SocialAuthService {
         }),
       });
 
-      console.log('📡 Token response status:', tokenResponse.status);
       const tokenData = await tokenResponse.json();
-      console.log('📡 Token response data:', tokenData);
 
       if (!tokenResponse.ok) {
-        console.error('❌ Token exchange failed:', tokenData);
         throw new Error(tokenData.error_description || `Failed to get Google tokens: ${tokenResponse.status}`);
       }
 
@@ -201,7 +185,6 @@ class SocialAuthService {
         avatarUrl: socialUserData.avatar_url,
       });
     } catch (error: unknown) {
-      console.error('Google callback error:', error);
       throw new Error(error.message || 'Google authentication failed');
     }
   }
@@ -242,7 +225,6 @@ class SocialAuthService {
         throw new Error('LinkedIn authentication was cancelled or failed');
       }
     } catch (error: unknown) {
-      console.error('LinkedIn sign-in error:', error);
       throw new Error(error.message || 'LinkedIn authentication failed');
     }
   }
@@ -330,7 +312,6 @@ class SocialAuthService {
         avatarUrl: socialUserData.avatar_url,
       });
     } catch (error: unknown) {
-      console.error('LinkedIn callback error:', error);
       throw new Error(error.message || 'LinkedIn authentication failed');
     }
   }

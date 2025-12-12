@@ -23,14 +23,14 @@ function useCountdown(initialSeconds: number) {
   return { remaining, reset, setTo } as const;
 }
 
-export default function OtpScreen() {
-  console.log('🎯 OTP Screen loaded!');
+const OtpScreen = React.memo(() => {
   const router = useRouter();
   const responsive = useResponsive();
-  const { phone, email } = useLocalSearchParams<{ phone?: string; email?: string }>();
+  const params = useLocalSearchParams<{ phone?: string; email?: string }>();
   const { verifyOtp: verifyOtpFromAuth } = useAuth();
   
-  console.log('📱 OTP Screen params:', { phone, email });
+  const phone = params.phone;
+  const email = params.email;
 
   const [digits, setDigits] = useState<string[]>(["", "", "", "", "", ""]);
   const [busy, setBusy] = useState(false);
@@ -39,12 +39,12 @@ export default function OtpScreen() {
   const { remaining, reset, setTo } = useCountdown(30);
   const [focusIndex, setFocusIndex] = useState<number | undefined>(undefined);
 
-  const refs = [useRef(null), useRef(null), useRef(null), useRef(null), useRef(null), useRef(null)];
+  const refs = useMemo(() => [
+    useRef(null), useRef(null), useRef(null), useRef(null), useRef(null), useRef(null)
+  ], []);
 
-  const contactInfo = phone || email || "";
-  const isEmail = !!email;
-  
-  console.log('📧 Contact info:', contactInfo, 'Is email:', isEmail);
+  const contactInfo = useMemo(() => phone || email || "", [phone, email]);
+  const isEmail = useMemo(() => !!email, [email]);
 
   const masked = useMemo(() => {
     if (!contactInfo) return "";
@@ -180,7 +180,6 @@ export default function OtpScreen() {
         }
       }
     } catch (error: unknown) {
-      console.error('Resend OTP error:', error);
       const errorObj = error as { code?: string; message?: string; data?: { retry_after?: number; retryAfter?: number } } | undefined;
       const isOtpRateLimited = errorObj?.code === 'OTP_RATE_LIMIT_EXCEEDED' || /Too many OTP requests/i.test(errorObj?.message || '');
       if (isOtpRateLimited) {
@@ -201,15 +200,9 @@ export default function OtpScreen() {
       <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: responsive.padding.xs, paddingVertical: responsive.padding.sm }}>
         <Pressable
           onPress={() => {
-            console.log('🔙 Back button pressed, attempting to go back...');
             try {
-              // Try to go back first
               router.back();
-              console.log('✅ Back navigation initiated');
             } catch (error) {
-              console.error('❌ Back navigation failed:', error);
-              // Fallback: go to login screen
-              console.log('🔄 Falling back to login screen...');
               router.replace('/auth/login');
             }
           }}
@@ -289,5 +282,9 @@ export default function OtpScreen() {
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
-}
+});
+
+OtpScreen.displayName = 'OtpScreen';
+
+export default OtpScreen;
 
