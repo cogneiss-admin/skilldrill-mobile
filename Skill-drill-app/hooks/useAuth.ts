@@ -18,7 +18,6 @@ export const useAuth = () => {
     error: null,
   });
 
-  // Use ref to track if component is mounted
   const isMountedRef = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -26,7 +25,6 @@ export const useAuth = () => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
-      // Abort any pending requests
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
@@ -34,12 +32,10 @@ export const useAuth = () => {
   }, []);
 
   const checkAuthStatus = async () => {
-    // Cancel any existing request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
     
-    // Create new abort controller
     abortControllerRef.current = new AbortController();
     
     try {
@@ -47,13 +43,11 @@ export const useAuth = () => {
       
       setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
       
-      // First check if we have a token
       const isAuthenticated = await authService.isAuthenticated();
       
       if (!isMountedRef.current) return;
       
       if (isAuthenticated) {
-        // Validate token and get fresh user data
         const { isValid, user } = await authService.validateTokenAndGetUser();
         
         if (!isMountedRef.current) return;
@@ -67,7 +61,6 @@ export const useAuth = () => {
           });
           return;
         } else {
-          // Token is invalid, handle session expiration
           await SessionManager.handleInvalidToken();
           if (!isMountedRef.current) return;
           
@@ -81,14 +74,11 @@ export const useAuth = () => {
         }
       }
       
-      // No token - check if user was previously logged in
       if (!isMountedRef.current) return;
       
-      // Check if there's user data from previous session
       const userData = await authService.getUserData();
       
       if (userData && !SessionManager.isCurrentlyLoggingOut()) {
-        // User was previously logged in but now has no token - session expired
         await SessionManager.handleSessionExpiration('Your session has expired');
       }
       
@@ -101,11 +91,8 @@ export const useAuth = () => {
     } catch (error: unknown) {
       if (!isMountedRef.current) return;
       
-      // Don't set error for aborted requests
       if (error.name === 'AbortError') return;
       
-      // Check if it's an authentication error that should trigger session expiration
-      // But only if user is not currently logging out
       if (!SessionManager.isCurrentlyLoggingOut() && 
           (error.status === 401 || error.code === 'INVALID_TOKEN' || error.code === 'INVALID_REFRESH_TOKEN')) {
         await SessionManager.handleInvalidToken();
@@ -127,15 +114,11 @@ export const useAuth = () => {
   const isOnboardingComplete = (user: User | null): boolean => {
     if (!user) return false;
     
-    // Check if user has completed onboarding
     if (user.onboardingStep === 'Completed') {
       return true;
     }
     
-    // For legacy users without onboardingStep, check if they have all required info
     if (!user.onboardingStep) {
-      // Legacy users need career info and skills to be considered complete
-      // Since we can't check skills here, we'll assume they need to go through the flow
       return false;
     }
     
@@ -145,25 +128,17 @@ export const useAuth = () => {
   const getOnboardingNextStep = (user: User | null): string | null => {
     if (!user) return null;
     
-    // Check onboarding step progression
     switch (user.onboardingStep) {
       case 'EMAIL_VERIFIED':
-        // User just signed up, needs to complete career role
         return '/auth/careerRole';
       case 'Completed':
-        // User completed full onboarding
         return '/dashboard';
       default:
-        // Legacy users or new users without onboardingStep
-        // Need to determine their progress manually
         
-        // First check: Do they have career/role info?
         if (!user.careerLevelId || !user.roleTypeId) {
           return '/auth/careerRole';
         }
         
-        // They have career/role info, check if they have skills
-        // For now, assume they need to complete skills selection
         return '/auth/skills';
     }
   };
@@ -174,13 +149,11 @@ export const useAuth = () => {
       
       let response;
       if (password) {
-        // Password login
         response = await authService.loginWithPassword({
           email: emailOrPhone,
           password,
         });
       } else {
-        // OTP login - just send OTP, don't complete login yet
         const inputType = emailOrPhone.includes('@') ? 'email' : 'phone';
         if (inputType === 'email') {
           response = await authService.loginWithEmail({ email: emailOrPhone });
@@ -223,14 +196,12 @@ export const useAuth = () => {
       const inputType = emailOrPhone.includes('@') ? 'email' : 'phone';
       
       if (password) {
-        // Password signup
         response = await authService.signupWithPassword({
           email: emailOrPhone,
           name,
           password,
         });
       } else {
-        // OTP signup - just send OTP, don't complete signup yet
         if (inputType === 'email') {
           response = await authService.signupWithEmail({
             email: emailOrPhone,
@@ -270,15 +241,16 @@ export const useAuth = () => {
     }
   };
 
-  const verifyOtp = async (identifier: string, otp: string) => {
+  type VerifyOtpParams =
+    | { otp: string; sessionId: string }
+    | { otp: string; identifier: string };
+
+  const verifyOtp = async (params: VerifyOtpParams) => {
     try {
       setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
-      
-      const response = await authService.verifyOtp({
-        identifier,
-        otp,
-      });
-      
+
+      const response = await authService.verifyOtp(params);
+
       if (response.success && 'user' in response.data && response.data.user) {
         setAuthState({
           isAuthenticated: true,
@@ -330,7 +302,6 @@ export const useAuth = () => {
   const updateProfile = async (userData: Partial<User>) => {
     try {
       
-      // Use the API method to update profile on backend
       const payload: Record<string, unknown> = {};
       if (userData.careerLevelId) payload.careerLevelId = userData.careerLevelId;
       if (userData.roleType) payload.roleType = userData.roleType;
@@ -341,7 +312,6 @@ export const useAuth = () => {
       const response = await authService.updateProfileViaAPI(payload);
       
       if (response.success && response.data) {
-        // Update local state with the response from backend
         setAuthState(prev => ({
           ...prev,
           user: response.data,
@@ -362,7 +332,6 @@ export const useAuth = () => {
     try {
       await authService.updateOnboardingStep(step);
       
-      // Refresh user data to get updated onboarding step
       await checkAuthStatus();
     } catch (error: unknown) {
       setAuthState(prev => ({

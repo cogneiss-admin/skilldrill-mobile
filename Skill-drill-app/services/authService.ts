@@ -55,13 +55,14 @@ export interface PasswordLoginRequest {
 }
 
 export interface OtpVerificationRequest {
-  identifier: string;
   otp: string;
-  signupToken?: string;
+  sessionId?: string;
+  identifier?: string;
 }
 
 export interface ResendOtpRequest {
-  identifier: string;
+  sessionId?: string;
+  identifier?: string;
 }
 
 export interface RefreshTokenRequest {
@@ -73,11 +74,12 @@ export interface LogoutRequest {
 }
 
 export interface SignupResponse {
-  userId: string;
+  sessionId: string;
   phoneNo?: string;
   email?: string;
   authProvider: string;
   hasPhone?: boolean;
+  hasEmail?: boolean;
   countryCode?: string;
   countryName?: string;
   phoneCountryCode?: string;

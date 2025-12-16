@@ -9,7 +9,6 @@ import { Ionicons } from "@expo/vector-icons";
 import GoogleGIcon from "../../components/GoogleGIcon";
 import LinkedInIcon from "../../components/LinkedInIcon";
 import { StatusBar } from "react-native";
-import { useToast } from "../../hooks/useToast";
 import { parseApiError, formatErrorMessage } from "../../utils/errorHandler";
 import { detectInputType, isValidEmail, isValidPhone, validationMessageFor } from "../components/validators";
 import { useSocialAuth } from "../../hooks/useSocialAuth";
@@ -31,18 +30,14 @@ export default function LoginScreen() {
   const [selectedCountryCode, setSelectedCountryCode] = useState("IN");
   const [countryPickerVisible, setCountryPickerVisible] = useState(false);
   const { signInWithGoogle, signInWithLinkedIn, isLoading: socialLoading, isProviderAvailable } = useSocialAuth();
-  const { showError, showSuccess } = useToast();
   const { countries } = useCountries();
 
-  // Detect if input is email or phone number (simple, user-friendly heuristic)
   const inputType = useMemo(() => detectInputType(emailOrPhone), [emailOrPhone]);
 
-  // Get international phone number if it's a phone input
   const internationalPhone = useMemo(() => {
     return emailOrPhone.trim();
   }, [emailOrPhone]);
 
-  // Derive selected phone country from countries + selectedCountryCode
   const selectedPhoneCountry = useMemo(() => {
     return countries.find((c) => c.code === selectedCountryCode) || {
       code: "IN",
@@ -53,7 +48,6 @@ export default function LoginScreen() {
   }, [countries, selectedCountryCode]);
 
 
-  // Country filtering handled inside CountryPickerModal
 
   const isValidInput = useMemo(() => {
     if (!emailOrPhone.trim()) {
@@ -81,14 +75,12 @@ export default function LoginScreen() {
       setBusy(true);
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-      // Import auth service dynamically to avoid circular dependencies
       const { authService } = await import("../../services/authService");
 
       let response;
       if (inputType === "email") {
         response = await authService.loginWithEmail({ email: emailOrPhone.trim() });
       } else {
-        // Format phone with country calling code to E.164 when user hasn't typed +<code>
         const rawDigits = (emailOrPhone || '').replace(/\D/g, '');
         const phoneCountryCode = (selectedPhoneCountry?.phoneCode || '').replace(/\D/g, '');
         const phoneNo = emailOrPhone.trim().startsWith('+')
@@ -99,7 +91,6 @@ export default function LoginScreen() {
       }
 
       if (response.success) {
-        // Pass the identifier to the OTP screen
         const params = inputType === "email"
           ? { email: emailOrPhone.trim() }
           : { phone: (emailOrPhone.trim().startsWith('+') ? emailOrPhone.trim() : `+${(selectedPhoneCountry?.phoneCode || '').replace(/\D/g, '')}${(emailOrPhone || '').replace(/\D/g, '')}`) };
@@ -107,14 +98,12 @@ export default function LoginScreen() {
         try {
           await router.replace({ pathname: "/auth/otp", params });
         } catch (navError) {
-          // Fallback: try simple navigation
           try {
             await router.replace("/auth/otp");
           } catch (fallbackError) {
           }
         }
       } else {
-        // Handle different error cases
         if (response.code === 'USER_NOT_FOUND') {
           setValidationMessage('No account found with this email. Please sign up to create a new account.');
           setShowSignupSuggestion(true);
@@ -136,13 +125,8 @@ export default function LoginScreen() {
       const apiError = parseApiError(error);
       const message = formatErrorMessage(apiError);
 
-      // Show toast notification
-      showError(message);
-
-      // Set validation message for banner
       setValidationMessage(message);
 
-      // Handle specific error codes for UI state
       if (apiError.code === 'USER_NOT_FOUND') {
         setShowSignupSuggestion(true);
       } else {
@@ -157,7 +141,6 @@ export default function LoginScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: BRAND }}>
       <StatusBar barStyle="light-content" />
 
-      {/* Top half - Colorful section like Zomato */}
       <View style={{
         minHeight: responsive.height(25), // 25% of screen height
         backgroundColor: "#E23744", // Zomato red color for reference, we'll use our brand
@@ -166,7 +149,6 @@ export default function LoginScreen() {
         alignItems: "center",
         position: "relative",
       }}>
-        {/* Background pattern/illustrations similar to Zomato */}
         <View style={{
           position: "absolute",
           top: 0,
@@ -175,7 +157,6 @@ export default function LoginScreen() {
           bottom: 0,
           backgroundColor: BRAND, // Our brand blue
         }}>
-          {/* Decorative elements */}
           <View style={{
             position: "absolute",
             top: 50,
@@ -205,7 +186,6 @@ export default function LoginScreen() {
           }} />
         </View>
 
-        {/* Logo (larger) */}
         <Image
           source={logoSrc}
           style={{
@@ -218,7 +198,6 @@ export default function LoginScreen() {
         />
       </View>
 
-      {/* Bottom half - Form section */}
       <View style={{
         flex: 1,
         backgroundColor: SCREEN_BACKGROUND,
@@ -241,7 +220,6 @@ export default function LoginScreen() {
 
 
 
-          {/* Login heading */}
           <View style={{ width: "100%", alignItems: "center", marginBottom: responsive.spacing(8) }}>
             <Text style={{
               fontSize: responsive.typography.h2,
@@ -261,7 +239,6 @@ export default function LoginScreen() {
             </Text>
           </View>
 
-          {/* Smart input field - email or phone */}
           <View style={{ width: "100%", marginBottom: responsive.spacing(16) }}>
             <View style={{
               maxWidth: responsive.maxWidth.form,
@@ -269,7 +246,6 @@ export default function LoginScreen() {
               width: '100%'
             }}>
               {!showPhoneInput ? (
-                // Default email/phone input
                 <View>
                   <TextInput
                     mode="outlined"
@@ -284,7 +260,6 @@ export default function LoginScreen() {
                     maxLength={50}
                     onChangeText={(val) => {
                       setEmailOrPhone(val);
-                      // Auto-switch to phone UI when first character indicates phone (digit or '+')
                       if (!showPhoneInput && val && /^[+0-9]/.test(val[0] || '')) {
                         setShowPhoneInput(true);
                         setTimeout(() => {
@@ -353,7 +328,6 @@ export default function LoginScreen() {
                       value={emailOrPhone}
                       onChangeText={(val) => {
                         setEmailOrPhone(val);
-                        // If cleared, return to email input UI
                         if (!val) {
                           setShowPhoneInput(false);
                         }
@@ -392,7 +366,6 @@ export default function LoginScreen() {
           </View>
 
 
-          {/* Inline validation/auth message (simple red text, like signup) */}
           {validationMessage ? (
             <View style={{
               maxWidth: responsive.maxWidth.form,
@@ -450,7 +423,6 @@ export default function LoginScreen() {
             </Pressable>
           </View>
 
-          {/* Divider */}
           <View style={{
             alignItems: "center",
             flexDirection: "row",
@@ -472,7 +444,6 @@ export default function LoginScreen() {
             <View style={{ flex: 1, height: 1, backgroundColor: COLORS.border.light }} />
           </View>
 
-          {/* OAuth buttons - Google and LinkedIn only */}
           <View style={{
             flexDirection: "row",
             justifyContent: "center",
@@ -483,7 +454,6 @@ export default function LoginScreen() {
             maxWidth: responsive.maxWidth.form,
             alignSelf: 'center'
           }}>
-            {/* Google Sign-in */}
             {isProviderAvailable('GOOGLE') && (
               <Pressable
                 style={({ pressed }) => [
@@ -544,7 +514,6 @@ export default function LoginScreen() {
 
         </ScrollView>
 
-        {/* Footer - Terms and signup link */}
         <View style={{
           paddingHorizontal: responsive.padding.lg,
           paddingBottom: responsive.padding.lg,
@@ -554,7 +523,6 @@ export default function LoginScreen() {
           alignSelf: 'center',
           width: '100%'
         }}>
-          {/* Terms and privacy */}
           <Text style={{
             fontSize: responsive.typography.caption,
             color: COLORS.text.disabled,
@@ -570,7 +538,6 @@ export default function LoginScreen() {
             <Text style={{ color: COLORS.text.tertiary, textDecorationLine: "underline" }}>Content Policy</Text>
           </Text>
 
-          {/* Bottom signup link */}
           <Pressable
             onPress={() => {
               router.push("/auth/signup");
@@ -601,7 +568,6 @@ export default function LoginScreen() {
         </View>
       </View>
 
-      {/* Country Code Picker Modal */}
       <CountryPickerModal
         visible={countryPickerVisible}
         onClose={() => setCountryPickerVisible(false)}

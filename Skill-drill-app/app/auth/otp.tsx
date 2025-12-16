@@ -26,22 +26,24 @@ function useCountdown(initialSeconds: number) {
 const OtpScreen = React.memo(() => {
   const router = useRouter();
   const responsive = useResponsive();
-  const params = useLocalSearchParams<{ phone?: string; email?: string }>();
+  const params = useLocalSearchParams<{ phone?: string; email?: string; sessionId?: string }>();
   const { verifyOtp: verifyOtpFromAuth } = useAuth();
-  
+
   const phone = params.phone;
   const email = params.email;
+  const sessionId = params.sessionId;
 
   const [digits, setDigits] = useState<string[]>(["", "", "", "", "", ""]);
   const [busy, setBusy] = useState(false);
+  const [resending, setResending] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [verified, setVerified] = useState(false);
   const { remaining, reset, setTo } = useCountdown(30);
   const [focusIndex, setFocusIndex] = useState<number | undefined>(undefined);
 
-  const refs = useMemo(() => [
+  const refs = [
     useRef(null), useRef(null), useRef(null), useRef(null), useRef(null), useRef(null)
-  ], []);
+  ];
 
   const contactInfo = useMemo(() => phone || email || "", [phone, email]);
   const isEmail = useMemo(() => !!email, [email]);
@@ -64,7 +66,6 @@ const OtpScreen = React.memo(() => {
 
   const handleChange = (index: number, value: string) => {
     const numeric = value.replace(/\D/g, "");
-    // If user pasted full code into the first field
     if (index === 0 && numeric.length > 1) {
       const next = new Array(6).fill("");
       numeric.slice(0, 6).split("").forEach((d, i) => (next[i] = d));
@@ -100,14 +101,17 @@ const OtpScreen = React.memo(() => {
       setErrorMessage("");
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-      const response = await verifyOtpFromAuth(contactInfo, code);
+      // Use explicit object params to prevent parameter swapping
+      const response = sessionId
+        ? await verifyOtpFromAuth({ otp: code, sessionId })
+        : await verifyOtpFromAuth({ otp: code, identifier: contactInfo });
 
       if (response.success) {
         try { await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
         setVerified(true);
 
         const userData = response.data.user;
-        
+
         if (userData?.onboardingStep === 'Completed') {
           setTimeout(() => {
             router.replace("/dashboard");
@@ -124,11 +128,14 @@ const OtpScreen = React.memo(() => {
       }
     } catch (error: unknown) {
       const errorObj = error as { code?: string; message?: string; data?: { retry_after?: number; retryAfter?: number } } | undefined;
-      const isOtpRateLimited = errorObj?.code === 'OTP_RATE_LIMIT_EXCEEDED' || /Too many OTP requests/i.test(errorObj?.message || '');
-      if (isOtpRateLimited) {
+
+      const isLocked = errorObj?.code === 'OTP_LOCKED';
+      const isRateLimited = errorObj?.code === 'OTP_RATE_LIMIT_EXCEEDED' || errorObj?.code === 'RATE_LIMIT_EXCEEDED';
+
+      if (isLocked || isRateLimited) {
         const retryAfter = Number(errorObj?.data?.retry_after || errorObj?.data?.retryAfter || 300);
         setTo(retryAfter);
-        setErrorMessage(`Too many OTP requests. Try again in ${Math.ceil(retryAfter / 60)} minute(s).`);
+        setErrorMessage(errorObj?.message || `Too many attempts. Try again in ${Math.ceil(retryAfter / 60)} minute(s).`);
       } else {
         setErrorMessage(errorObj?.message || "Incorrect OTP. Please try again.");
       }
@@ -136,15 +143,12 @@ const OtpScreen = React.memo(() => {
     } finally {
       setBusy(false);
     }
-  }, [busy, code, contactInfo, email, phone, router, setTo, verifyOtpFromAuth]);
+  }, [busy, code, contactInfo, email, phone, router, sessionId, setTo, verifyOtpFromAuth]);
 
-  // Auto-verify as soon as 6 digits are entered
   useEffect(() => {
-    // Only attempt verification when all 6 digits are entered and not already verifying
     if (!verified && !busy && code.length === 6) {
       verifyOtp().then((ok) => {
         if (!ok) {
-          // Reset code on failure so user can re-enter quickly
           setDigits(["", "", "", "", "", ""]);
           setFocusIndex(0);
         }
@@ -153,50 +157,56 @@ const OtpScreen = React.memo(() => {
   }, [code, verified, busy, verifyOtp]);
 
   const resend = useCallback(async () => {
-    if (remaining > 0) return;
-    
+    if (remaining > 0 || resending) return;
+
     try {
+      setResending(true);
+      setErrorMessage("");
       await Haptics.selectionAsync();
-      
-      // Import auth service dynamically to avoid circular dependencies
+
       const { authService } = await import("../../services/authService");
-      
-      const response = await authService.resendOtp({
-        identifier: contactInfo
-      });
-      
+
+      const response = await authService.resendOtp(
+        sessionId ? { sessionId } : { identifier: contactInfo }
+      );
+
       if (response.success) {
         reset();
-        Alert.alert("OTP Sent", `We have re-sent the OTP to your ${isEmail ? "email" : "mobile number"}.`);
+        setErrorMessage("");
       } else {
-        // If server blocks due to rate limit, respect it with a 5-minute lockout (or provided retry time)
-        const isOtpRateLimited = response?.code === 'OTP_RATE_LIMIT_EXCEEDED' || /Too many OTP requests/i.test(response?.message || '');
-        if (isOtpRateLimited) {
+        const isLocked = response?.code === 'OTP_LOCKED';
+        const isRateLimited = response?.code === 'OTP_RATE_LIMIT_EXCEEDED' || response?.code === 'RATE_LIMIT_EXCEEDED';
+
+        if (isLocked || isRateLimited) {
           const retryAfter = Number(response?.data?.retry_after || response?.data?.retryAfter || 300);
           setTo(retryAfter);
-          Alert.alert("Please wait", `Too many OTP requests. Try again in ${Math.ceil(retryAfter / 60)} minute(s).`);
+          setErrorMessage(`Too many OTP requests. Try again in ${Math.ceil(retryAfter / 60)} minute(s).`);
         } else {
-          Alert.alert("Error", response.message || "Failed to resend OTP");
+          setErrorMessage(response.message || "Failed to resend OTP");
         }
       }
     } catch (error: unknown) {
       const errorObj = error as { code?: string; message?: string; data?: { retry_after?: number; retryAfter?: number } } | undefined;
-      const isOtpRateLimited = errorObj?.code === 'OTP_RATE_LIMIT_EXCEEDED' || /Too many OTP requests/i.test(errorObj?.message || '');
-      if (isOtpRateLimited) {
+
+      const isLocked = errorObj?.code === 'OTP_LOCKED';
+      const isRateLimited = errorObj?.code === 'OTP_RATE_LIMIT_EXCEEDED' || errorObj?.code === 'RATE_LIMIT_EXCEEDED';
+
+      if (isLocked || isRateLimited) {
         const retryAfter = Number(errorObj?.data?.retry_after || errorObj?.data?.retryAfter || 300);
         setTo(retryAfter);
-        Alert.alert("Please wait", `Too many OTP requests. Try again in ${Math.ceil(retryAfter / 60)} minute(s).`);
+        setErrorMessage(`Too many OTP requests. Try again in ${Math.ceil(retryAfter / 60)} minute(s).`);
       } else {
-        Alert.alert("Error", error.message || "Failed to resend OTP");
+        setErrorMessage(errorObj?.message || "Failed to resend OTP");
       }
+    } finally {
+      setResending(false);
     }
-  }, [remaining, contactInfo, isEmail, reset, setTo]);
+  }, [remaining, resending, contactInfo, sessionId, reset, setTo]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: SCREEN_BACKGROUND }}>
       <StatusBar barStyle="dark-content" />
 
-      {/* Header */}
       <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: responsive.padding.xs, paddingVertical: responsive.padding.sm }}>
         <Pressable
           onPress={() => {
@@ -222,7 +232,6 @@ const OtpScreen = React.memo(() => {
 
       <KeyboardAvoidingView behavior={Platform.select({ ios: "padding", android: undefined })} style={{ flex: 1 }}>
         <View style={{ flex: 1, paddingHorizontal: responsive.padding.lg }}>
-          {/* Info */}
           <View style={{ alignItems: "center", marginTop: responsive.margin.lg }}>
             <Text style={{ fontSize: responsive.typography.body1, color: COLORS.text.secondary, textAlign: "center" }}>
               We have sent a verification code to
@@ -230,7 +239,6 @@ const OtpScreen = React.memo(() => {
             <Text style={{ marginTop: responsive.margin.xs, fontSize: responsive.typography.h4, fontWeight: "800", color: COLORS.gray[900] }}>{masked}</Text>
           </View>
 
-          {/* OTP boxes */}
           <View style={{ marginTop: responsive.margin.xl }}>
             <CodeBoxes
               length={6}
@@ -253,29 +261,31 @@ const OtpScreen = React.memo(() => {
             ) : null}
           </View>
 
-          {/* Resend */}
           <View style={{ alignItems: "center", marginTop: responsive.margin.lg }}>
             <Text style={{ fontSize: responsive.typography.body2, color: COLORS.text.tertiary, fontWeight: '700' }}>
               Didn&apos;t get the OTP?{" "}
               <Text
                 onPress={resend}
-                style={{ color: remaining > 0 ? COLORS.text.disabled : BRAND, fontWeight: "700" }}
+                style={{
+                  color: (remaining > 0 || resending) ? COLORS.text.disabled : BRAND,
+                  fontWeight: "700"
+                }}
               >
-                {remaining > 0
-                  ? `Resend ${isEmail ? 'email' : 'SMS'} in ${
-                      Math.floor(remaining / 60) > 0
-                        ? `${Math.floor(remaining / 60)}m ${String(remaining % 60).padStart(2, '0')}s`
-                        : `${remaining}s`
-                    }`
-                  : `Resend ${isEmail ? 'email' : 'SMS'}`}
+                {resending
+                  ? `Sending...`
+                  : remaining > 0
+                    ? `Resend ${isEmail ? 'email' : 'SMS'} in ${
+                        Math.floor(remaining / 60) > 0
+                          ? `${Math.floor(remaining / 60)}m ${String(remaining % 60).padStart(2, '0')}s`
+                          : `${remaining}s`
+                      }`
+                    : `Resend ${isEmail ? 'email' : 'SMS'}`}
               </Text>
             </Text>
           </View>
 
-          {/* No verify button needed; auto-verifies on 6th digit */}
         </View>
 
-        {/* Bottom link */}
         <Pressable onPress={() => router.replace("/auth/login")} style={{ alignItems: "center", paddingVertical: responsive.padding.lg }}>
           <Text style={{ color: COLORS.error, fontSize: responsive.typography.body2, fontWeight: "700" }}>Go back to login methods</Text>
         </Pressable>

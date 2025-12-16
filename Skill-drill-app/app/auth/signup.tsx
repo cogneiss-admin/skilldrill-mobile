@@ -31,7 +31,6 @@ export default function SignupScreen() {
   const [selectedResidenceCountry, setSelectedResidenceCountry] = useState("IN");
   const [countryPickerVisible, setCountryPickerVisible] = useState(false);
   const [residencePickerVisible, setResidencePickerVisible] = useState(false);
-  // search handled inside CountryPickerModal
   const [residenceSearchQuery, setResidenceSearchQuery] = useState("");
   const [busy, setBusy] = useState(false);
   const { countries, loading: countriesLoading } = useCountries();
@@ -42,8 +41,8 @@ export default function SignupScreen() {
   const [otpMode, setOtpMode] = useState<"email" | "phone">("email");
   const [otpTarget, setOtpTarget] = useState<string>("");
   const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
-  const [emailSignupToken, setEmailSignupToken] = useState<string | null>(null);
-  const [phoneSignupToken, setPhoneSignupToken] = useState<string | null>(null);
+  const [emailSessionId, setEmailSessionId] = useState<string | null>(null);
+  const [phoneSessionId, setPhoneSessionId] = useState<string | null>(null);
   const [otpBusy, setOtpBusy] = useState(false);
   const [otpError, setOtpError] = useState("");
   const [otpVerified, setOtpVerified] = useState(false);
@@ -53,19 +52,16 @@ export default function SignupScreen() {
   const [resendRemaining, setResendRemaining] = useState(0);
   const { signInWithGoogle, signInWithLinkedIn, isLoading: socialLoading, isProviderAvailable } = useSocialAuth();
   
-  // Updated validation with country support
   const nameOk = useMemo(() => name.trim().length >= 2, [name]);
   const emailOk = useMemo(() => (email.trim() ? isValidEmail(email.trim()) : false), [email]);
   const phoneOk = useMemo(() => {
     if (!formattedPhoneNumber.trim()) return false;
-    // Basic phone validation - at least 5 digits, max 15 digits
     const digitsOnly = formattedPhoneNumber.trim().replace(/[^0-9+]/g, "");
     return digitsOnly.length >= 7 && digitsOnly.length <= 17;
   }, [formattedPhoneNumber]);
-  const verifiedOk = emailVerified || phoneVerified; // verifying either is sufficient
+  const verifiedOk = emailVerified || phoneVerified;
   const canContinue = useMemo(() => nameOk && (emailOk || phoneOk), [nameOk, emailOk, phoneOk]);
   
-  // Get international phone number
   const internationalPhone = useMemo(() => {
     if (!formattedPhoneNumber.trim()) return "";
     const selectedCountry = countries.find(c => c.code === selectedCountryCode);
@@ -73,7 +69,6 @@ export default function SignupScreen() {
     return `${phoneCode}${formattedPhoneNumber.trim()}`;
   }, [formattedPhoneNumber, selectedCountryCode, countries]);
 
-  // Get selected country data
   const selectedPhoneCountry = useMemo(() => {
     return countries.find(c => c.code === selectedCountryCode) || { 
       code: "IN", 
@@ -88,7 +83,6 @@ export default function SignupScreen() {
     return countries.find(c => c.code === selectedResidenceCountry);
   }, [countries, selectedResidenceCountry]);
 
-  // Country-code search handled inside CountryPickerModal
 
   const filteredResidenceCountries = useMemo(() => {
     if (!residenceSearchQuery.trim()) return countries;
@@ -106,7 +100,6 @@ export default function SignupScreen() {
       setErrorMessage("");
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-      // If not verified yet, trigger verification flow
       if (!verifiedOk) {
         await handleVerifyAll();
         return;
@@ -114,7 +107,6 @@ export default function SignupScreen() {
 
       const { authService } = await import("../../services/authService");
 
-      // Save locally and check if career info is needed
       await authService.updateUserProfile({
         name: name.trim(),
         email: emailOk ? email.trim() : undefined,
@@ -124,14 +116,11 @@ export default function SignupScreen() {
         region: selectedResidenceCountryData?.region,
       });
 
-      // Check if user already has career info
       const userData = await authService.getUserData();
       if (userData?.careerLevelId && userData?.roleTypeId) {
-        // User already has career info, go directly to dashboard
         try { await Haptics.selectionAsync(); } catch {}
         router.replace("/dashboard");
       } else {
-        // User needs to complete career info
         try { await Haptics.selectionAsync(); } catch {}
         router.push("/auth/careerRole");
       }
@@ -143,7 +132,6 @@ export default function SignupScreen() {
     }
   };
 
-  // Helpers to show masked contact info
   const maskEmail = (value: string) => {
     const [user, domain] = String(value).split('@');
     if (!domain || user.length <= 2) return value;
@@ -162,7 +150,6 @@ export default function SignupScreen() {
     return `We have sent OTP to your ${parts.join(' and ')}.`;
   };
 
-  // Resend cooldown ticker
   useEffect(() => {
     if (resendRemaining <= 0) return;
     const t = setTimeout(() => setResendRemaining((s) => Math.max(0, s - 1)), 1000);
@@ -180,7 +167,6 @@ export default function SignupScreen() {
       
       if (mode === "email") {
         try {
-          // Call signup endpoint directly for email
           const resSignup = await authService.signupWithEmail({ 
             email: target, 
             name: name.trim(), 
@@ -192,9 +178,8 @@ export default function SignupScreen() {
             residenceCountryName: selectedResidenceCountryData?.name,
             region: selectedResidenceCountryData?.region,
               });
-          if (resSignup?.success) { 
-            setEmailSignupToken((resSignup.data as { signupToken?: string })?.signupToken || null);
-            // Success - open OTP sheet
+          if (resSignup?.success) {
+            setEmailSessionId((resSignup.data as { sessionId?: string })?.sessionId || null);
             setOtpMode(mode);
             setOtpDigits(["", "", "", "", "", ""]);
             setOtpError("");
@@ -207,9 +192,7 @@ export default function SignupScreen() {
         } catch (signupError: unknown) {
           const errorObj = signupError as { code?: string; message?: string } | undefined;
           if (errorObj?.code === 'USER_EXISTS' || errorObj?.code === 'USER_PENDING_VERIFICATION') {
-            // User already exists - show error and redirect to login
             setErrorMessage(authService.handleAuthError(signupError as Error));
-            // Redirect to login after a short delay
             setTimeout(() => {
               router.push("/auth/login");
             }, 2000);
@@ -220,7 +203,6 @@ export default function SignupScreen() {
         }
       } else {
         try {
-          // Call signup endpoint directly for phone
           const resSignup = await authService.signupWithPhone({ 
             phoneNo: target, 
             name: name.trim(), 
@@ -232,9 +214,8 @@ export default function SignupScreen() {
             residenceCountryName: selectedResidenceCountryData?.name,
             region: selectedResidenceCountryData?.region,
               });
-          if (resSignup?.success) { 
-            setPhoneSignupToken((resSignup.data as { signupToken?: string })?.signupToken || null);
-            // Success - open OTP sheet
+          if (resSignup?.success) {
+            setPhoneSessionId((resSignup.data as { sessionId?: string })?.sessionId || null);
             setOtpMode(mode);
             setOtpDigits(["", "", "", "", "", ""]);
             setOtpError("");
@@ -247,9 +228,7 @@ export default function SignupScreen() {
         } catch (signupError: unknown) {
           const errorObj = signupError as { code?: string; message?: string } | undefined;
           if (errorObj?.code === 'USER_EXISTS' || errorObj?.code === 'USER_PENDING_VERIFICATION') {
-            // User already exists - show error and redirect to login
             setErrorMessage(authService.handleAuthError(signupError as Error));
-            // Redirect to login after a short delay
             setTimeout(() => {
               router.push("/auth/login");
             }, 2000);
@@ -267,7 +246,6 @@ export default function SignupScreen() {
     }
   };
 
-  // Android hardware back: close open pickers/sheets first
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (countryPickerVisible) { setCountryPickerVisible(false); return true; }
@@ -278,7 +256,6 @@ export default function SignupScreen() {
     return () => sub.remove();
   }, [countryPickerVisible, residencePickerVisible, otpSheetVisible, otpBusy]);
 
-  // Bulk verify: send OTP to both email and phone if available; open sheet prioritizing phone
   const handleVerifyAll = async () => {
     if (!(emailOk || phoneOk)) return;
     try {
@@ -286,7 +263,6 @@ export default function SignupScreen() {
       setErrorMessage("");
       const { authService } = await import("../../services/authService");
       
-      // Send OTPs to both email and phone if both provided
       if (emailOk && phoneOk) {
         const tasks = [
           authService.signupWithEmail({ 
@@ -319,12 +295,12 @@ export default function SignupScreen() {
 
         if (emailRes.status === 'fulfilled' && emailRes.value?.success) {
           anySuccess = true;
-          setEmailSignupToken((emailRes.value.data as { signupToken?: string })?.signupToken || null);
+          setEmailSessionId((emailRes.value.data as { sessionId?: string })?.sessionId || null);
           setOtpSentEmail(true);
         }
         if (phoneRes.status === 'fulfilled' && phoneRes.value?.success) {
           anySuccess = true;
-          setPhoneSignupToken((phoneRes.value.data as { signupToken?: string })?.signupToken || null);
+          setPhoneSessionId((phoneRes.value.data as { sessionId?: string })?.sessionId || null);
           setOtpSentPhone(true);
         }
 
@@ -334,7 +310,6 @@ export default function SignupScreen() {
           return;
         }
 
-        // Prefer phone OTP sheet if available
         if (phoneRes.status === 'fulfilled' && phoneRes.value?.success) {
           setOtpMode('phone');
           setOtpTarget(internationalPhone);
@@ -349,7 +324,6 @@ export default function SignupScreen() {
         setResendRemaining(30);
 
       } else if (emailOk) {
-        // Only email provided
         try {
           const resSignupE = await authService.signupWithEmail({ 
             email: email.trim(), 
@@ -359,8 +333,8 @@ export default function SignupScreen() {
             residenceCountryName: selectedResidenceCountryData?.name,
             region: selectedResidenceCountryData?.region,
               });
-          if (resSignupE?.success) { 
-            setEmailSignupToken((resSignupE.data as { signupToken?: string })?.signupToken || null);
+          if (resSignupE?.success) {
+            setEmailSessionId((resSignupE.data as { sessionId?: string })?.sessionId || null);
             setOtpMode('email');
             setOtpTarget(email.trim());
             setOtpDigits(["", "", "", "", "", ""]);
@@ -376,7 +350,6 @@ export default function SignupScreen() {
             return;
         }
       } else if (phoneOk) {
-        // Only phone provided
         try {
           const resSignupP = await authService.signupWithPhone({ 
             phoneNo: internationalPhone, 
@@ -389,8 +362,8 @@ export default function SignupScreen() {
             residenceCountryName: selectedResidenceCountryData?.name,
             region: selectedResidenceCountryData?.region,
               });
-          if (resSignupP?.success) { 
-            setPhoneSignupToken((resSignupP.data as { signupToken?: string })?.signupToken || null);
+          if (resSignupP?.success) {
+            setPhoneSessionId((resSignupP.data as { sessionId?: string })?.sessionId || null);
             setOtpMode('phone');
             setOtpTarget(internationalPhone);
             setOtpDigits(["", "", "", "", "", ""]);
@@ -413,17 +386,14 @@ export default function SignupScreen() {
     }
   };
 
-  // Resend handler
   const handleResend = async () => {
     if (otpBusy || resendRemaining > 0) return;
     try {
       const { authService } = await import("../../services/authService");
       const tasks: Promise<any>[] = [];
 
-      // If both are available, resend to both; else fallback to current otpTarget
-      if (emailOk) tasks.push(authService.resendOtp({ identifier: email.trim() }));
-      if (phoneOk) tasks.push(authService.resendOtp({ identifier: internationalPhone }));
-      if (tasks.length === 0 && otpTarget) tasks.push(authService.resendOtp({ identifier: otpTarget }));
+      if (emailSessionId) tasks.push(authService.resendOtp({ sessionId: emailSessionId }));
+      if (phoneSessionId) tasks.push(authService.resendOtp({ sessionId: phoneSessionId }));
 
       const results = await Promise.allSettled(tasks);
       let anySuccess = false;
@@ -440,13 +410,13 @@ export default function SignupScreen() {
       setResendRemaining(retryAfter);
       setOtpError(anySuccess ? '' : 'Please wait before requesting a new code.');
     } catch (err: unknown) {
-      const errorObj = err as { code?: string; status?: number; data?: { retry_after?: number; retryAfter?: number } } | undefined;
+      const errorObj = err as { code?: string; status?: number; data?: { retry_after?: number; retryAfter?: number }; message?: string } | undefined;
       const retry = Number(errorObj?.data?.retry_after || errorObj?.data?.retryAfter || 30);
-      if (errorObj?.code === 'OTP_RATE_LIMIT_EXCEEDED' || errorObj?.status === 429) {
+      if (errorObj?.code === 'OTP_LOCKED' || errorObj?.code === 'OTP_RATE_LIMIT_EXCEEDED' || errorObj?.status === 429) {
         setResendRemaining(retry);
-        setOtpError('Too many requests. Please wait a bit and try again.');
+        setOtpError(errorObj?.message || `Too many requests. Please wait ${Math.ceil(retry / 60)} minute(s) and try again.`);
       } else {
-        setOtpError(err?.message || 'Failed to resend code');
+        setOtpError(errorObj?.message || 'Failed to resend code');
       }
     }
   };
@@ -459,23 +429,21 @@ export default function SignupScreen() {
       setOtpBusy(true);
       setOtpError("");
       const { authService } = await import("../../services/authService");
-      const res = await authService.verifyOtp({ identifier: otpTarget, otp: code, signupToken: otpMode === 'phone' ? (phoneSignupToken || undefined) : (emailSignupToken || undefined) });
+      const sessionId = otpMode === 'phone' ? phoneSessionId : emailSessionId;
+      const res = await authService.verifyOtp({ otp: code, sessionId: sessionId || undefined });
       if (res.success) {
         try { await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
         setOtpVerified(true);
         if (otpMode === "email") setEmailVerified(true);
         if (otpMode === "phone") setPhoneVerified(true);
         
-        // Check if user already has career info
         const userData = res.data.user;
         if (userData?.careerLevelId && userData?.roleTypeId) {
-          // User already has career info, go directly to dashboard
           setTimeout(() => {
             setOtpSheetVisible(false);
             router.replace("/dashboard");
           }, 800);
         } else {
-          // User needs to complete career info
           setTimeout(() => {
             setOtpSheetVisible(false);
             router.replace("/auth/careerRole");
@@ -487,10 +455,14 @@ export default function SignupScreen() {
     } catch (err: unknown) {
       try {
         const { authService } = await import("../../services/authService");
-        const errorObj = err as { code?: string; message?: string } | undefined;
+        const errorObj = err as { code?: string; message?: string; data?: { retry_after?: number; retryAfter?: number } } | undefined;
         const friendly = authService.handleAuthError?.(err as Error);
         if (friendly) {
           setOtpError(friendly);
+        } else if (errorObj?.code === 'OTP_LOCKED') {
+          const retryAfter = Number(errorObj?.data?.retry_after || errorObj?.data?.retryAfter || 300);
+          setResendRemaining(retryAfter);
+          setOtpError(errorObj?.message || `Too many attempts. Try again in ${Math.ceil(retryAfter / 60)} minute(s).`);
         } else if (errorObj?.code === 'INVALID_OTP') {
           setOtpError('Incorrect OTP');
         } else if (err?.code === 'OTP_EXPIRED') {
@@ -522,9 +494,7 @@ export default function SignupScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: BRAND }}>
       <StatusBar barStyle="light-content" />
 
-      {/* Removed header back button for signup screen */}
 
-      {/* Top half - Brand section like login (reduced height) */}
       <View style={{ 
         minHeight: 200,
         backgroundColor: BRAND,
@@ -533,7 +503,6 @@ export default function SignupScreen() {
         alignItems: "center",
         position: "relative",
       }}>
-        {/* Decorative bubbles similar to login */}
         <View style={{
           position: "absolute",
           top: 0,
@@ -547,7 +516,6 @@ export default function SignupScreen() {
           <View style={{ position: "absolute", bottom: 100, right: 60, width: 30, height: 30, backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 15 }} />
         </View>
 
-        {/* Logo (slightly smaller) */}
         <Image
           source={logoSrc}
           style={{ width: 150, height: 150, marginBottom: 6, alignSelf: "center" }}
@@ -555,19 +523,16 @@ export default function SignupScreen() {
         />
       </View>
 
-      {/* Bottom half - Form section */}
       <View style={{ flex: 1, backgroundColor: SCREEN_BACKGROUND, borderTopLeftRadius: 0, borderTopRightRadius: 0, marginTop: -20 }}>
         <ScrollView
           contentContainerStyle={{ paddingTop: 16, paddingHorizontal: 24, paddingBottom: 20, alignItems: "center", maxWidth: 560, width: '100%', alignSelf: 'center' }}
           showsVerticalScrollIndicator={false}
         >
-          {/* Heading */}
           <View style={{ width: "100%", alignItems: "center", marginBottom: responsive.spacing(8) }}>
             <Text style={{ fontSize: responsive.typography.h2, fontWeight: "700", color: COLORS.text.primary, marginBottom: responsive.spacing(8) }}>Create your account</Text>
             <Text style={{ fontSize: responsive.typography.body1, color: COLORS.text.tertiary, marginBottom: responsive.spacing(24), textAlign: "center" }}>Enter your name and email or phone number</Text>
           </View>
 
-          {/* Name */}
           <View style={{ width: "100%", marginBottom: responsive.spacing(12) }}>
             <TextInput
               mode="outlined"
@@ -586,7 +551,6 @@ export default function SignupScreen() {
             />
           </View>
 
-          {/* Email */}
           <View style={{ width: "100%", marginBottom: responsive.spacing(12) }}>
             <TextInput
               mode="outlined"
@@ -609,7 +573,6 @@ export default function SignupScreen() {
             />
           </View>
 
-          {/* Phone Number with International Picker */}
           <View style={{ width: "100%", marginBottom: responsive.spacing(12) }}>
             <Text style={{
               fontSize: responsive.typography.body2,
@@ -683,7 +646,6 @@ export default function SignupScreen() {
             </View>
           </View>
 
-          {/* Country of Residence */}
           <View style={{ width: "100%", marginBottom: responsive.spacing(12) }}>
             <Text style={{
               fontSize: responsive.typography.body2,
@@ -718,7 +680,6 @@ export default function SignupScreen() {
             </Pressable>
           </View>
 
-          {/* Contact method validation message */}
           {!emailOk && !phoneOk && (email.trim() || formattedPhoneNumber.trim()) && (
             <View style={{ width: "100%", marginTop: 2, marginBottom: responsive.spacing(8) }}>
               <Text style={{ color: COLORS.errorDark, fontSize: responsive.typography.caption, fontWeight: '700' }}>
@@ -729,7 +690,6 @@ export default function SignupScreen() {
 
 
 
-          {/* Continue */}
           <View style={{ width: "100%", marginTop: responsive.spacing(8) }}>
             {errorMessage ? (
               <Text style={{ color: COLORS.errorDark, fontSize: responsive.typography.caption, fontWeight: '700', marginBottom: responsive.spacing(8) }}>
@@ -749,9 +709,7 @@ export default function SignupScreen() {
             </Button>
           </View>
 
-          {/* Inline verify links handle OTP; no extra buttons needed */}
 
-          {/* Divider (reduced vertical spacing) */}
           <View style={{
             alignItems: "center",
             flexDirection: "row",
@@ -765,7 +723,6 @@ export default function SignupScreen() {
             <View style={{ flex: 1, height: 1, backgroundColor: COLORS.border.light }} />
           </View>
 
-          {/* OAuth buttons - placed earlier and with tighter spacing */}
           <View style={{ flexDirection: "row", justifyContent: "center", gap: responsive.spacing(20), marginBottom: responsive.spacing(12), width: "100%", alignItems: "center" }}>
             {isProviderAvailable('GOOGLE') && (
               <Pressable
@@ -825,9 +782,7 @@ export default function SignupScreen() {
           </View>
         </ScrollView>
 
-        {/* OTP Bottom Sheet moved outside white card */}
 
-        {/* Footer - Terms and login link */}
         <View style={{ paddingHorizontal: responsive.padding.lg, paddingBottom: responsive.padding.lg, paddingTop: responsive.padding.sm, backgroundColor: SCREEN_BACKGROUND }}>
           <Text style={{ fontSize: responsive.typography.caption, color: COLORS.text.disabled, textAlign: "center", lineHeight: responsive.fontSize(18), marginBottom: responsive.spacing(12) }}>
             By continuing, you agree to our{"\n"}
@@ -848,7 +803,6 @@ export default function SignupScreen() {
         </View>
       </View>
 
-      {/* OTP Bottom Sheet overlay (renders over entire screen) */}
       {otpSheetVisible && (
         <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'flex-end' }}>
           <View
@@ -880,7 +834,6 @@ export default function SignupScreen() {
                   <Text style={{ color: COLORS.successDark, marginTop: responsive.spacing(10), textAlign: 'center', fontWeight: '800' }}>Verified! Redirecting…</Text>
                 ) : null}
               </View>
-              {/* Resend */}
               <View style={{ alignItems: 'center', marginTop: responsive.spacing(6) }}>
                 <Text style={{ color: COLORS.text.tertiary }}>
                   Code not received?{' '}
@@ -891,13 +844,11 @@ export default function SignupScreen() {
               </View>
             </View>
 
-            {/* No submit button; auto-verifies on 6th digit */}
           </View>
           </KeyboardAvoidingView>
         </View>
       )}
 
-      {/* Country Code Picker Modal */}
       <CountryPickerModal
         visible={countryPickerVisible}
         onClose={() => setCountryPickerVisible(false)}
@@ -906,7 +857,6 @@ export default function SignupScreen() {
         }}
       />
 
-      {/* Country of Residence Picker Modal via reusable component */}
       <CountryPickerModal
         visible={residencePickerVisible}
         title="Select Country of Residence"
@@ -921,8 +871,6 @@ export default function SignupScreen() {
   );
 }
 
-// OTP Bottom Sheet portal rendered after SafeAreaView to avoid overlap with card footer
-// Keeping it here for clarity – if needed we can lift this to a global portal later.
 export function OtpSheetPortal() {
   return null;
 }
