@@ -10,7 +10,6 @@ import BottomNavigation from '../components/BottomNavigation';
 import ActivityCard, { ActivityCardProps } from './components/ActivityCard';
 import { apiService } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
-import { useToast } from '../hooks/useToast';
 
 const AI_LOADING_ANIMATION = require('../assets/lottie/AiLoadingAnime.json');
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -35,7 +34,6 @@ export default function Activity() {
   const [isResuming, setIsResuming] = useState(false);
   const { user } = useAuth();
   const router = useRouter();
-  const { showToast, showError } = useToast();
 
   useFocusEffect(
     useCallback(() => {
@@ -189,7 +187,6 @@ export default function Activity() {
       }
     } catch (error: any) {
       setShowAiLoader(false);
-      showError(error.message || 'Failed to start assessment');
     }
   };
 
@@ -218,7 +215,6 @@ export default function Activity() {
       }
     } catch (error: any) {
       setShowAiLoader(false);
-      showError(error.message || 'Failed to resume assessment');
     }
   };
 
@@ -245,7 +241,6 @@ export default function Activity() {
       });
     } catch (error: any) {
       setShowAiLoader(false);
-      showError(error.message || 'Failed to start drills');
     }
   };
 
@@ -263,7 +258,6 @@ export default function Activity() {
       });
     } catch (error: any) {
       setShowAiLoader(false);
-      showError(error.message || 'Failed to resume drills');
     }
   };
 
@@ -273,7 +267,6 @@ export default function Activity() {
     const isDrill = !!drill;
     const derivedSkillName = skillName || skill?.skillName || drill?.skillName;
     if (!derivedSkillName) {
-      showError('Skill name not found');
       return;
     }
 
@@ -303,12 +296,10 @@ export default function Activity() {
               const results = resultsResponse.data;
               if (results.status === 'ready') {
                 if (!results.stats || results.stats.averageScore === undefined || results.stats.attemptsCount === undefined) {
-                  showError('Stats data incomplete');
                   return;
                 }
 
                 if (!results.skillName) {
-                  showError('Skill name not found in results');
                   return;
                 }
 
@@ -328,12 +319,12 @@ export default function Activity() {
                   }
                 });
               } else if (results.status === 'processing') {
-                showError('Results are still being generated. Please try again in a moment.');
+                // Results still processing
               } else {
-                showError('Failed to load drill results');
+                // Failed to load drill results
               }
             } else {
-              showError('Failed to load drill results');
+              // Failed to load drill results
             }
           } else if (assessmentId) {
             // Fetch assessment results
@@ -352,18 +343,17 @@ export default function Activity() {
                 }
               });
             } else {
-              showError('Failed to load results');
+              // Failed to load results
             }
           }
         } catch (error) {
-          showError('Failed to load results');
+          // Failed to load results
         } finally {
           setLoadingResults(false);
         }
         break;
       case 'unlock':
         if (!drill?.skillId || !drill?.pricing?.amount || !drill?.pricing?.currency || !drill?.drillCount) {
-          showError('Unable to load pricing information. Please try again.');
           return;
         }
         

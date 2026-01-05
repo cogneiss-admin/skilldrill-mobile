@@ -64,6 +64,9 @@ export interface User {
   countryCode?: string;
   countryName?: string;
   phoneCountryCode?: string;
+  residenceCountryCode?: string;
+  residenceCountryName?: string;
+  region?: string;
 }
 
 // API Error class
@@ -122,12 +125,6 @@ class ApiService {
       },
       async (error) => {
         const originalRequest = error.config;
-
-        // Suppress expected 404 errors for not-yet-implemented commerce endpoints
-        const isCommerceEndpoint = error.config?.url?.includes('/commerce/');
-        const is404 = error.response?.status === 404;
-
-        // Suppress expected 404 errors for commerce endpoints
 
         if (error.response?.status === 401 && !originalRequest._retry) {
           // If already refreshing, queue this request
@@ -610,6 +607,50 @@ class ApiService {
    */
   public async getUserRecommendations(): Promise<ApiResponse> {
     return this.get('/user/recommendations');
+  }
+
+  // ===========================================
+  // AI JOB STATUS METHODS
+  // ===========================================
+
+  /**
+   * Get AI job status with progress information
+   * Used for polling AI processing jobs (scoring, feedback generation)
+   */
+  public async getJobStatus(jobId: string): Promise<ApiResponse> {
+    return this.get(`/assessment/jobs/${jobId}/status`);
+  }
+
+  /**
+   * Trigger final feedback generation for assessment
+   * Called when assessment is complete to start AI feedback processing
+   */
+  public async generateFinalFeedback(assessmentId: string): Promise<ApiResponse> {
+    return this.post(`/assessment/${assessmentId}/generate-final-feedback`, {});
+  }
+
+  /**
+   * Cancel stuck feedback generation
+   * Allows user to cancel a job that's taking too long
+   */
+  public async cancelFeedbackGeneration(assessmentId: string): Promise<ApiResponse> {
+    return this.post(`/assessment/${assessmentId}/cancel-feedback-generation`, {});
+  }
+
+  /**
+   * Get assessment result with state detection
+   * Returns result status and data if available
+   */
+  public async getAssessmentResult(assessmentId: string): Promise<ApiResponse> {
+    return this.get(`/assessment/${assessmentId}/result`);
+  }
+
+  /**
+   * Retry failed drill scoring
+   * Called when AI scoring failed and user wants to retry
+   */
+  public async retryDrillScoring(drillItemId: string): Promise<ApiResponse> {
+    return this.post(`/drills/${drillItemId}/retry-scoring`, {});
   }
 
 }

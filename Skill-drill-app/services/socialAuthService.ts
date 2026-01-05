@@ -74,8 +74,6 @@ class SocialAuthService {
   // Google Authentication
   public async signInWithGoogle(): Promise<ApiResponse<AuthSuccessResponse>> {
     try {
-      // Debug configuration
-
       // Check if client ID is properly configured
       if (!this.config.google.clientId || this.config.google.clientId === 'your-google-client-id' || this.config.google.clientId === 'your-actual-google-client-id-here') {
         throw new Error('Google Client ID is not configured. Please set EXPO_PUBLIC_GOOGLE_CLIENT_ID in your .env file with your actual Google Client ID.');
@@ -116,7 +114,8 @@ class SocialAuthService {
         throw new Error('Google authentication failed - no authorization code received');
       }
     } catch (error: unknown) {
-      throw new Error(error.message || 'Google authentication failed');
+      const err = error as { message?: string };
+      throw new Error(err?.message || 'Google authentication failed');
     }
   }
 
@@ -185,7 +184,8 @@ class SocialAuthService {
         avatarUrl: socialUserData.avatar_url,
       });
     } catch (error: unknown) {
-      throw new Error(error.message || 'Google authentication failed');
+      const err = error as { message?: string };
+      throw new Error(err?.message || 'Google authentication failed');
     }
   }
 
@@ -225,7 +225,8 @@ class SocialAuthService {
         throw new Error('LinkedIn authentication was cancelled or failed');
       }
     } catch (error: unknown) {
-      throw new Error(error.message || 'LinkedIn authentication failed');
+      const err = error as { message?: string };
+      throw new Error(err?.message || 'LinkedIn authentication failed');
     }
   }
 
@@ -312,7 +313,8 @@ class SocialAuthService {
         avatarUrl: socialUserData.avatar_url,
       });
     } catch (error: unknown) {
-      throw new Error(error.message || 'LinkedIn authentication failed');
+      const err = error as { message?: string };
+      throw new Error(err?.message || 'LinkedIn authentication failed');
     }
   }
 

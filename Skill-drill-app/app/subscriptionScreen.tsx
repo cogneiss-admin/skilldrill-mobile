@@ -24,7 +24,6 @@ import PromoCodeView from './components/PromoCodeView';
 import { usePayment } from '../hooks/usePayment';
 import { useSubscription } from '../hooks/useSubscription';
 import { useSubscriptionPlans, SubscriptionPlan } from '../hooks/useSubscriptionPlans';
-import { useToast } from '../hooks/useToast';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -649,12 +648,16 @@ const formatPlanForDisplay = (plan: SubscriptionPlan, index: number) => {
     ? Math.round((1 - (plan.monthlyPrice / (plan.price / plan.durationMonths))) * 100) || 0
     : 0;
 
+  const badge = plan.durationMonths >= 12 ? 'BEST VALUE' as const :
+                plan.durationMonths >= 6 ? 'POPULAR' as const : undefined;
+
   return {
     id: plan.planId,
     duration: `${plan.durationMonths} Month${plan.durationMonths > 1 ? 's' : ''}`,
     price: `${plan.monthlyPriceFormatted}/month`,
     totalPrice: plan.priceFormatted,
     savings: savingsPercent > 0 ? `Save ${savingsPercent}%` : undefined,
+    badge,
   };
 };
 
@@ -672,13 +675,12 @@ export default function SubscriptionScreen() {
   const {
     subscription,
     loading: subscriptionLoading,
-    refreshSubscription,
+    refresh: refreshSubscription,
     hasActiveSubscription,
     availableCredits,
     creditValue,
     unlockWithCredits
   } = useSubscription();
-  const { showSuccess, showError } = useToast();
   const { processPayment, processing } = usePayment();
   const { plans: apiPlans, hasPlans } = useSubscriptionPlans();
   const formattedPlans = useMemo(() => apiPlans.map(formatPlanForDisplay), [apiPlans]);
@@ -710,7 +712,7 @@ export default function SubscriptionScreen() {
   // 3. Derived State / Memos
   const subscriptionPlanMatch = useMemo(() => {
     if (!subscription?.plan) return null;
-    return apiPlans.find(p => p.name.toLowerCase().includes(subscription.plan.toLowerCase()));
+    return apiPlans.find(p => p.planName.toLowerCase().includes(subscription.plan.toLowerCase()));
   }, [subscription, apiPlans]);
 
   const subscriptionPriceDisplay = useMemo(() => {
@@ -779,7 +781,6 @@ export default function SubscriptionScreen() {
         await processPayment({
           planId: monthlyPlan.planId,
           onSuccess: () => {
-            showSuccess('Plan renewed successfully! Credits refreshed.');
             router.replace({
               pathname: '/subscriptionScreen',
               params: params
@@ -790,7 +791,6 @@ export default function SubscriptionScreen() {
           }
         });
       } catch (error: any) {
-        showError(error.message || 'Renewal failed. Please try again.');
         setIsProcessing(false);
       }
     } else {
@@ -838,7 +838,7 @@ export default function SubscriptionScreen() {
       if (!res.success) {
         throw new Error(res.message || 'Unable to cancel subscription.');
       }
-      await refresh();
+      await refreshSubscription();
       setChangePlanMode(false);
       setActionMessage({ type: 'success', text: 'Subscription cancellation scheduled. Your plan remains active until the period ends.' });
     } catch (error: any) {
@@ -891,7 +891,6 @@ export default function SubscriptionScreen() {
 
   const handleDrillPackPayment = async () => {
     if (!params.recommendationId || !params.skillId) {
-      showError('Missing required information. Please try again.');
       return;
     }
 
@@ -907,7 +906,6 @@ export default function SubscriptionScreen() {
           recommendationId: params.recommendationId,
         },
         onSuccess: (assignmentId) => {
-          showSuccess('Payment successful! Your drills are unlocked.');
           router.push({
             pathname: '/activity',
             params: { tab: 'drills' }
@@ -922,13 +920,10 @@ export default function SubscriptionScreen() {
 
       // Check if it's a price quote expired error
       if (errorMessage.toLowerCase().includes('price quote expired') || errorMessage.toLowerCase().includes('expired')) {
-        showError('Session expired. Refreshing pricing...');
         // Navigate back to refresh the pricing
         setTimeout(() => {
           router.back();
         }, 1500);
-      } else {
-        showError(errorMessage);
       }
     } finally {
       setIsProcessing(false);
@@ -937,12 +932,10 @@ export default function SubscriptionScreen() {
 
   const handleUseCredit = async () => {
     if (!params.skillId) {
-      showError('Missing skill information.');
       return;
     }
 
     if (!drillPrice || drillPrice <= 0) {
-      showError('Drill pack price is required.');
       return;
     }
 
@@ -955,13 +948,12 @@ export default function SubscriptionScreen() {
         drillPackPrice: drillPrice,
       });
 
-      showSuccess('Payment successful! Your drills are unlocked.');
       router.push({
         pathname: '/activity',
         params: { tab: 'drills' }
       });
     } catch (error: any) {
-      showError(error.message || 'Failed to unlock drills.');
+      // Handle error silently
     } finally {
       setIsProcessing(false);
     }
@@ -969,7 +961,6 @@ export default function SubscriptionScreen() {
 
   const handleSubscriptionPayment = async () => {
     if (!selectedPlanId) {
-      showError('Please select a subscription plan.');
       return;
     }
 
@@ -980,7 +971,6 @@ export default function SubscriptionScreen() {
         planId: selectedPlanId,
         couponCode: appliedCouponCode || undefined,
         onSuccess: () => {
-          showSuccess('Subscription activated! You now have drill credits.');
           router.replace({
             pathname: '/subscriptionScreen',
             params: params
@@ -991,7 +981,7 @@ export default function SubscriptionScreen() {
         }
       });
     } catch (error: any) {
-      showError(error.message || 'Subscription purchase failed. Please try again.');
+      // Handle error silently
     } finally {
       setIsProcessing(false);
     }
@@ -1042,7 +1032,6 @@ export default function SubscriptionScreen() {
           <PromoCodeView
             onClose={() => setShowPromoView(false)}
             onSuccess={(assignmentId) => {
-              showSuccess('Payment successful! Your drills are unlocked.');
               // Check if it's a drill pack purchase (has recommendationId) or subscription
               if (selectedOption === 'one-time' || params.recommendationId) {
                 // Drill pack purchase - redirect to activity page

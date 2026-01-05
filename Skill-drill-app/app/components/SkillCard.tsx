@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { MotiView } from 'moti';
-import { Skill } from '../../features/skillsSlice';
+import { Skill } from '../../hooks/useSkillsData';
 
 interface SkillCardProps {
   skill: Skill;

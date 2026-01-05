@@ -3,15 +3,9 @@ import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-nati
 import { useRouter, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { BRAND } from '../app/components/Brand';
+import { BRAND, TYPOGRAPHY } from '../app/components/Brand';
 
-// Define constants
 const GRAY = "#9CA3AF";
-
-// Typography System
-const TYPOGRAPHY = {
-  labelSmall: { fontSize: 12, fontWeight: '500', lineHeight: 16 },
-};
 
 interface BottomNavigationProps {
   activeTab?: string;

@@ -7,7 +7,6 @@ import * as Haptics from "expo-haptics";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useAuth } from "../../hooks/useAuth";
 import { apiService } from "../../services/api";
-import { useToast } from "../../hooks/useToast";
 import { Ionicons } from "@expo/vector-icons";
 import { useSkillsData } from "../../hooks/useSkillsData";
 import SkillsSkeleton from "../components/SkillsSkeleton";
@@ -29,7 +28,6 @@ export default function SkillsScreen() {
 
   const router = useRouter();
   const { updateOnboardingStep } = useAuth();
-  const { showToast } = useToast();
   const [busy, setBusy] = useState(false);
   const [skillsWithAssessments, setSkillsWithAssessments] = useState(new Set());
   const [tiers, setTiers] = useState<Array<{ key: string; name: string; order?: number }>>([]);
@@ -71,7 +69,6 @@ export default function SkillsScreen() {
         const response = await apiService.get('/user/skills');
 
         if (response.success && response.data && response.data.length > 0) {
-          showToast('info', 'Skills Already Selected', 'You have already selected skills. Redirecting to dashboard.');
           router.replace('/dashboard');
           return;
         }
@@ -81,7 +78,7 @@ export default function SkillsScreen() {
     };
 
     checkExistingSkills();
-  }, [router, isAddToAssessmentMode, isAddMoreSkillsMode, returnTo, isAssessmentMode, isFromCompleted, showToast]);
+  }, [router, isAddToAssessmentMode, isAddMoreSkillsMode, returnTo, isAssessmentMode, isFromCompleted]);
 
   const checkSkillsWithAssessments = useCallback(async () => {
     try {
@@ -128,28 +125,27 @@ export default function SkillsScreen() {
     })();
   }, []);
 
-  const handleToggleSkill = useCallback(async (skillId) => {
+  const handleToggleSkill = useCallback(async (skillId: string) => {
     const skill = skillsData.find(s => s.id === skillId);
     if (skill) {
       const hasEligible = eligibleSet && eligibleSet.size > 0;
-      const isLocked = hasEligible ? !(eligibleSet.has(skill.id) || eligibleSet.has(skill.mongoId)) : false;
-      
+      const isLocked = hasEligible ? !(eligibleSet.has(skill.id) || eligibleSet.has(skill.mongoId || '')) : false;
+
       if (isLocked) {
-        showToast('info', 'Skill Locked', 'This skill is not available for your career level.');
         return;
       }
-      
-      const hasAssessment = skillsWithAssessments.has(skill.mongoId) || skillsWithAssessments.has(skill.id);
+
+      const hasAssessment = skillsWithAssessments.has(skill.mongoId || '') || skillsWithAssessments.has(skill.id);
       if (hasAssessment) {
         setSelectedSkillName(skill.name);
         setShowAssessmentMessage(true);
         return;
       }
     }
-    
+
     try { await Haptics.selectionAsync(); } catch {}
     toggleSkill(skillId);
-  }, [toggleSkill, skillsData, skillsWithAssessments, eligibleSet, showToast]);
+  }, [toggleSkill, skillsData, skillsWithAssessments, eligibleSet]);
 
   const handleContinue = async () => {
     if (!canContinue || busy) return;
@@ -167,7 +163,6 @@ export default function SkillsScreen() {
           .filter(id => id && id.length > 10);
 
         if (validSkillIds.length === 0) {
-          showToast('error', 'No Valid Skills', 'Please select valid skills before continuing.');
           setBusy(false);
           return;
         }
@@ -178,7 +173,6 @@ export default function SkillsScreen() {
 
         if (response.success) {
           SecureStore.deleteItemAsync('selectedSkills').catch(() => {});
-          showToast('success', 'Skills Added!', `${response.data.addedSkills} skill(s) added to your assessment.`);
 
           if (returnTo === 'discover') {
             router.replace('/discover');
@@ -189,7 +183,7 @@ export default function SkillsScreen() {
           }
           return;
         } else {
-          showToast('error', 'Add Skills Error', response.message || 'Failed to add skills to assessment');
+          // Failed to add skills to assessment
         }
       } else if (isAssessmentMode) {
         const validSkillIds = selected
@@ -200,7 +194,6 @@ export default function SkillsScreen() {
           .filter(id => id && id.length > 10);
 
         if (validSkillIds.length === 0) {
-          showToast('error', 'No Valid Skills', 'Please select valid skills before continuing.');
           setBusy(false);
           return;
         }
@@ -218,7 +211,7 @@ export default function SkillsScreen() {
           });
           return;
         } else {
-          showToast('error', 'Save Error', response.message || 'Failed to save skills');
+          // Failed to save skills
         }
       } else {
         const validSkillIds = selected
@@ -229,17 +222,15 @@ export default function SkillsScreen() {
           .filter(id => id && id.length > 10);
         
         if (validSkillIds.length === 0) {
-          showToast('error', 'No Valid Skills', 'Please select valid skills before continuing.');
           setBusy(false);
           return;
         }
-        
+
         const response = await apiService.post('/user/skills', {
           skillIds: validSkillIds
         });
-        
+
         if (response.success) {
-          showToast('success', 'Success', 'Skills saved successfully!');
           SecureStore.deleteItemAsync('selectedSkills').catch(() => {});
 
           if (!isAssessmentMode) {
@@ -258,11 +249,11 @@ export default function SkillsScreen() {
             router.replace('/dashboard');
           }
         } else {
-          showToast('error', 'Save Error', response.message || 'Failed to save skills');
+          // Failed to save skills
         }
       }
     } catch (error) {
-      showToast('error', 'Save Error', 'Failed to save skills. Please try again.');
+      // Failed to save skills
     } finally {
       setBusy(false);
     }
@@ -332,12 +323,11 @@ export default function SkillsScreen() {
                       const hasEligible = eligibleSet && eligibleSet.size > 0;
                       const skillIdStr = String(skill.id || '');
                       const mongoIdStr = String(skill.mongoId || '');
-                      const isInEligibleSet = eligibleSet?.has(skill.id) || 
-                                              eligibleSet?.has(skill.mongoId) || 
-                                              eligibleSet?.has(skillIdStr) || 
-                                              eligibleSet?.has(mongoIdStr);
+                      const isInEligibleSet = eligibleSet?.has(skill.id) ||
+                                              eligibleSet?.has(mongoIdStr) ||
+                                              eligibleSet?.has(skillIdStr);
                       const locked = hasEligible ? !isInEligibleSet : false;
-                      const hasAssessment = skillsWithAssessments.has(skill.mongoId) || skillsWithAssessments.has(skill.id);
+                      const hasAssessment = skillsWithAssessments.has(mongoIdStr) || skillsWithAssessments.has(skill.id);
                       const isDisabled = locked || hasAssessment;
                       const isSelected = selected.includes(skill.id);
                       const isLastSkill = idx === (tierSkills.length - 1);

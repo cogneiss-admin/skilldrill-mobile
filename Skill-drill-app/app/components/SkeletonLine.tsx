@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Dimensions, StyleProp, ViewStyle } from 'react-native';
+import { View, Dimensions, StyleProp, ViewStyle, DimensionValue } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti';
 import { COLORS, BORDER_RADIUS } from './Brand';
@@ -7,26 +7,25 @@ import { COLORS, BORDER_RADIUS } from './Brand';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface SkeletonLineProps {
-  width?: string | number;
+  width?: DimensionValue;
   height?: number;
   radius?: number;
   style?: StyleProp<ViewStyle>;
 }
 
-const SkeletonLine: React.FC<SkeletonLineProps> = ({ 
-  width = '100%', 
-  height = 14, 
-  radius = 8, 
-  style = {} 
+const SkeletonLine: React.FC<SkeletonLineProps> = ({
+  width = '100%',
+  height = 14,
+  radius = 8,
+  style
 }) => (
-  <View style={{
+  <View style={[{
     width,
     height,
     borderRadius: radius || BORDER_RADIUS.md,
     backgroundColor: COLORS.border.light,
     overflow: 'hidden',
-    ...style
-  }}>
+  }, style]}>
     <MotiView
       from={{ translateX: -SCREEN_WIDTH }}
       animate={{ translateX: SCREEN_WIDTH }}

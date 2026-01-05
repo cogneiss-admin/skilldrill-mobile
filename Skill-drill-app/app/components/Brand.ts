@@ -133,7 +133,7 @@ export const TYPOGRAPHY = {
     semibold: '600',
     bold: '700',
   },
-};
+} as const;
 
 export const CARD = {
   base: {
@@ -295,16 +295,6 @@ export const COMPONENTS = {
 // Centralized screen background colors for easy maintenance
 export const SCREEN_BACKGROUND = COLORS.background.tertiary; // #F3F4F6 - Main screen background color
 export const SCREEN_CONTAINER_BACKGROUND = COLORS.white; // #FFFFFF - Container background (usually white)
-
-// ===== LEGACY SUPPORT =====
-// Keep these for backward compatibility
-export const PADDING = SPACING.padding;
-export const WHITE = COLORS.white;
-export const GRAY = COLORS.gray[400];
-export const DARK_GRAY = COLORS.gray[700];
-export const SUCCESS = COLORS.success;
-export const WARNING = COLORS.warning;
-export const ERROR = COLORS.error;
 
 export default function BrandPlaceholder(): React.JSX.Element | null {
   return null;

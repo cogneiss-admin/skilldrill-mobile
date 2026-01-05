@@ -52,12 +52,12 @@ export default function ProfileScreen() {
   const [otpError, setOtpError] = useState('');
   const [otpVerified, setOtpVerified] = useState(false);
   const [resendRemaining, setResendRemaining] = useState(0);
-  const resendTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const resendTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [phoneValidationError, setPhoneValidationError] = useState('');
   const [emailValidationError, setEmailValidationError] = useState('');
   const [phoneCheckingDB, setPhoneCheckingDB] = useState(false);
   const [emailCheckingDB, setEmailCheckingDB] = useState(false);
-  const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const validationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const { countries } = useCountries();
   const initial = useMemo(() => (name?.trim()?.[0]?.toUpperCase() || 'U'), [name]);
@@ -281,19 +281,17 @@ export default function ProfileScreen() {
           setEmailValidationError('');
         }
       } catch (error: unknown) {
-        // Only show error if it's about email existing or validation
         const errorObj = error as { response?: { data?: { code?: string; message?: string } } } | undefined;
         if (errorObj?.response?.data?.code === 'EMAIL_EXISTS') {
           setEmailValidationError('Entered email already exists!');
-        } else if (error?.response?.data?.code === 'VALIDATION_ERROR') {
-          const errorMsg = error.response.data.message || 'Invalid email address';
+        } else if (errorObj?.response?.data?.code === 'VALIDATION_ERROR') {
+          const errorMsg = errorObj.response?.data?.message || 'Invalid email address';
           if (errorMsg.includes('same as') && email.trim().toLowerCase() === originalEmail.toLowerCase()) {
             setEmailValidationError('');
           } else {
             setEmailValidationError(errorMsg);
           }
         }
-        // Don't show error for network issues
       } finally {
         setEmailCheckingDB(false);
       }
@@ -361,11 +359,11 @@ export default function ProfileScreen() {
       }
     } catch (error: unknown) {
       const { authService } = await import('../services/authService');
-      const errorObj = error as { response?: { data?: { code?: string } } } | undefined;
+      const errorObj = error as { response?: { data?: { code?: string } }; message?: string } | undefined;
       if (errorObj?.response?.data?.code === 'PHONE_EXISTS') {
         setPhoneValidationError('Entered phone number already exists!');
       } else {
-        const errorMessage = authService.handleAuthError?.(error) || error?.message || 'Failed to send OTP';
+        const errorMessage = authService.handleAuthError?.(error) || errorObj?.message || 'Failed to send OTP';
         setPhoneValidationError(errorMessage);
       }
     } finally {
@@ -373,7 +371,6 @@ export default function ProfileScreen() {
     }
   };
 
-  // Send OTP for email (for profile update)
   const handleSendEmailOtp = async () => {
     if (!emailChanged || !emailValid || otpBusy || emailValidationError) return;
     try {
@@ -381,12 +378,12 @@ export default function ProfileScreen() {
       setOtpError('');
       setEmailValidationError('');
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      
+
       const { authService } = await import('../services/authService');
       const response = await authService.sendProfileUpdateOTP({
         email: email.trim()
       });
-      
+
       if (response.success) {
         setOtpMode('email');
         setOtpTarget(email.trim());
@@ -403,11 +400,11 @@ export default function ProfileScreen() {
       }
     } catch (error: unknown) {
       const { authService } = await import('../services/authService');
-      const errorObj = error as { response?: { data?: { code?: string } } } | undefined;
+      const errorObj = error as { response?: { data?: { code?: string } }; message?: string } | undefined;
       if (errorObj?.response?.data?.code === 'EMAIL_EXISTS') {
         setEmailValidationError('Entered email already exists!');
       } else {
-        const errorMessage = authService.handleAuthError?.(error) || error?.message || 'Failed to send OTP';
+        const errorMessage = authService.handleAuthError?.(error) || errorObj?.message || 'Failed to send OTP';
         setEmailValidationError(errorMessage);
       }
     } finally {
@@ -428,8 +425,7 @@ export default function ProfileScreen() {
       
       const { authService } = await import('../services/authService');
       
-      // Use profile-specific OTP verification endpoint
-      const verifyPayload: { otp: string } = { otp: code };
+      const verifyPayload: { otp: string; phoneNo?: string; countryCode?: string; email?: string } = { otp: code };
       if (otpMode === 'phone') {
         verifyPayload.phoneNo = otpTarget;
         verifyPayload.countryCode = selectedCountryCode;
@@ -483,21 +479,22 @@ export default function ProfileScreen() {
       }
     } catch (error: unknown) {
       const { authService } = await import('../services/authService');
-      const friendly = authService.handleAuthError?.(error as Error);
+      const errorObj = error as { code?: string; message?: string } | undefined;
+      const friendly = authService.handleAuthError?.(error);
       if (friendly) {
         setOtpError(friendly);
-      } else if (error?.code === 'INVALID_OTP') {
+      } else if (errorObj?.code === 'INVALID_OTP') {
         setOtpError('Incorrect OTP');
-      } else if (error?.code === 'OTP_EXPIRED') {
+      } else if (errorObj?.code === 'OTP_EXPIRED') {
         setOtpError('OTP expired. Please request a new one.');
       } else {
-        setOtpError(error?.message || 'Failed to verify OTP');
+        setOtpError(errorObj?.message || 'Failed to verify OTP');
       }
       setOtpDigits(['', '', '', '', '', '']);
     } finally {
       setOtpBusy(false);
     }
-  }, [otpBusy, otpDigits, otpTarget, otpMode]);
+  }, [otpBusy, otpDigits, otpTarget, otpMode, selectedCountryCode]);
 
   // Auto-verify OTP when 6 digits entered
   useEffect(() => {

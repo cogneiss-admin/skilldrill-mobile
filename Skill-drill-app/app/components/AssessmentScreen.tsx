@@ -8,8 +8,8 @@
  * - 'results': Shows assessment results using Results component
  */
 
-import React, { useState, useEffect } from "react";
-import { View, Text, Alert, Modal, StyleSheet, ActivityIndicator, Dimensions } from "react-native";
+import React, { useState, useEffect, useCallback } from "react";
+import { View, Text, Alert, Modal, StyleSheet, ActivityIndicator, Dimensions, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "react-native";
 import * as Haptics from "expo-haptics";
@@ -20,12 +20,13 @@ import LottieView from 'lottie-react-native';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 import { useAssessmentSession } from "../../hooks/useAssessmentSession";
-import { useToast } from "../../hooks/useToast";
+import { useAIJobPolling } from "../../hooks/useAIJobPolling";
 import { apiService } from "../../services/api";
 
 import ScenarioInteraction from './ScenarioInteraction';
 import Results from './Results';
 import AssessmentCompletionDialog from './AssessmentCompletionDialog';
+import AIProgressIndicator from './AIProgressIndicator';
 
 const AI_LOADING_ANIMATION = require('../../assets/lottie/AiLoadingAnime.json');
 
@@ -57,7 +58,6 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   assessmentId: assessmentIdProp,
 }) => {
   const router = useRouter();
-  const { showToast } = useToast();
 
   const { submitAnswerAndGetNext, loading, error } = useAssessmentSession();
 
@@ -71,17 +71,94 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   const [completedSessionId, setCompletedSessionId] = useState<string | null>(null);
   const [showAiLoader, setShowAiLoader] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
 
   const [parsedResults, setParsedResults] = useState<any>(null);
 
+  // Helper function to navigate to results
+  const navigateToResults = useCallback((resultsData: import('../../types/assessment').AssessmentResults, sessionId: string, resolvedSkillName: string) => {
+    setAssessmentResults(resultsData);
+    setShowAiLoader(false);
+    setIsLoadingResults(false);
+    setPendingSessionId(null);
+
+    if (onComplete) {
+      onComplete(resultsData);
+    } else {
+      router.replace({
+        pathname: "/assessmentResults",
+        params: {
+          results: JSON.stringify({ ...resultsData, assessmentId: sessionId }),
+          skillName: resolvedSkillName,
+          assessmentId: sessionId,
+        }
+      });
+    }
+  }, [onComplete, router]);
+
+  // AI Job polling hook for results generation
+  const {
+    status: aiJobStatus,
+    progressMessage: aiProgressMessage,
+    isPolling: isPollingResults,
+    canRetry: canRetryResults,
+    startPolling: startResultsPolling,
+    cancelPolling: cancelResultsPolling,
+    retry: retryResultsPolling,
+    reset: resetResultsPolling,
+  } = useAIJobPolling({
+    onComplete: async () => {
+      // Job completed, fetch the actual results
+      if (pendingSessionId) {
+        await fetchAndNavigateToResults(pendingSessionId);
+      }
+    },
+    onError: (errorMessage) => {
+      setShowAiLoader(false);
+      setIsLoadingResults(false);
+      Alert.alert('Error', `Failed to generate results: ${errorMessage}`);
+    },
+  });
+
+  // Fetch results and navigate
+  const fetchAndNavigateToResults = useCallback(async (sessionId: string) => {
+    try {
+      const response = await apiService.getAdaptiveResults(sessionId);
+
+      if (!response.success || response.data.status !== 'ready') {
+        throw new Error('Results not ready');
+      }
+
+      const resolvedSkillName = response.data.skillName || skillName || 'Unknown Skill';
+
+      const resultsData: import('../../types/assessment').AssessmentResults = {
+        assessmentId: sessionId,
+        skillName: resolvedSkillName,
+        finalScore: response.data.finalScore || 0,
+        subskillScores: [],
+        feedback: {
+          good: response.data.feedbackGood || '',
+          improve: response.data.feedbackImprove || '',
+          summary: response.data.feedbackSummary || '',
+          flaws: []
+        },
+        completedAt: new Date().toISOString()
+      };
+
+      navigateToResults(resultsData, sessionId, resolvedSkillName);
+    } catch (err) {
+      setShowAiLoader(false);
+      setIsLoadingResults(false);
+      Alert.alert('Error', 'Failed to load results. Please try again.');
+    }
+  }, [skillName, navigateToResults]);
+
   const handleSubmitResponse = async (text: string) => {
     if (!text.trim()) {
-      showToast({ type: 'error', title: 'Response Required', message: 'Please provide your response before continuing.' });
       return;
     }
 
     if (!currentSessionId) {
-      showToast({ type: 'error', message: 'Session ID not found' });
       return;
     }
 
@@ -105,8 +182,10 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
       } else {
         throw new Error(response.message || 'Failed to submit answer');
       }
-    } catch (error: any) {
-      showToast({ type: 'error', title: 'Submission Failed', message: error.message || 'Failed to submit response' });
+    } catch (error: unknown) {
+      // Log error for debugging but don't show to user for smoother experience
+      const message = error instanceof Error ? error.message : 'Failed to submit answer';
+      console.warn('[AssessmentScreen] Submit error:', message);
     } finally {
       setIsSubmitting(false);
     }
@@ -150,94 +229,84 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
     }
 
     setShowCompletionDialog(false);
-    
+
     const targetSessionId = completedSessionId || currentSessionId;
     if (!targetSessionId) {
-      showToast({ type: 'error', message: 'Session ID not found' });
       return;
     }
 
     const sessionId: string = targetSessionId;
-
+    setPendingSessionId(sessionId);
     setShowAiLoader(true);
     setIsLoadingResults(true);
 
-    const maxRetries = 20;
-    const retryDelay = 2000;
-    let attempts = 0;
+    // Try to get results directly first - they might already be ready
+    try {
+      const response = await apiService.getAdaptiveResults(sessionId);
 
-    const pollForResults = async (): Promise<void> => {
-      try {
-        const response = await apiService.getAdaptiveResults(sessionId);
+      if (response.success && response.data.status === 'ready') {
+        // Results are ready, navigate directly
+        await fetchAndNavigateToResults(sessionId);
+        return;
+      }
 
-        if (response.success) {
-          if (response.data.status === 'ready') {
-            if (!response.data.skillName) {
-              throw new Error('Skill name not found in response');
-            }
+      // If backend returns a jobId, use the polling hook
+      if (response.data?.jobId) {
+        startResultsPolling(response.data.jobId);
+        return;
+      }
 
-            const resultsData: import('../../types/assessment').AssessmentResults = {
-              assessmentId: sessionId,
-              skillName: response.data.skillName,
-              finalScore: response.data.finalScore || 0,
-              subskillScores: [],
-              feedback: {
-                good: response.data.feedbackGood || '',
-                improve: response.data.feedbackImprove || '',
-                summary: response.data.feedbackSummary || '',
-                flaws: []
-              },
-              completedAt: new Date().toISOString()
-            };
-            
-            setAssessmentResults(resultsData);
-            setShowAiLoader(false);
-            setIsLoadingResults(false);
+      // Fallback: poll the results endpoint with exponential backoff
+      const pollForResults = async (attempt = 0): Promise<void> => {
+        const maxAttempts = 30;
+        const delay = Math.min(1000 * Math.pow(1.5, attempt), 10000); // Exponential backoff
 
-            if (onComplete) {
-              onComplete(resultsData);
-            } else {
-              router.replace({
-                pathname: "/assessmentResults",
-                params: {
-                  results: JSON.stringify({ ...resultsData, assessmentId: sessionId }),
-                  skillName: response.data.skillName,
-                  assessmentId: sessionId,
-                }
-              });
-            }
-          } else if (response.data.status === 'processing') {
-            attempts++;
-            if (attempts >= maxRetries) {
-              setShowAiLoader(false);
-              setIsLoadingResults(false);
-              showToast({ type: 'error', title: 'Timeout', message: 'Results are taking longer than expected. Please try again later.' });
-            } else {
-              setTimeout(pollForResults, retryDelay);
-            }
+        try {
+          const pollResponse = await apiService.getAdaptiveResults(sessionId);
+
+          if (pollResponse.success && pollResponse.data.status === 'ready') {
+            await fetchAndNavigateToResults(sessionId);
+          } else if (attempt < maxAttempts) {
+            setTimeout(() => pollForResults(attempt + 1), delay);
           } else {
             setShowAiLoader(false);
             setIsLoadingResults(false);
-            showToast({ type: 'error', message: 'Unexpected response format' });
+            Alert.alert('Timeout', 'Results generation is taking longer than expected. Please try again later.');
           }
-        } else {
-          setShowAiLoader(false);
-          setIsLoadingResults(false);
-          showToast({ type: 'error', message: response.message || 'Failed to load assessment results' });
+        } catch {
+          if (attempt < maxAttempts) {
+            setTimeout(() => pollForResults(attempt + 1), delay);
+          } else {
+            setShowAiLoader(false);
+            setIsLoadingResults(false);
+            Alert.alert('Error', 'Failed to fetch results. Please try again.');
+          }
         }
-      } catch (error) {
-        attempts++;
-        if (attempts >= maxRetries) {
-          setShowAiLoader(false);
-          setIsLoadingResults(false);
-          showToast({ type: 'error', message: 'Failed to load assessment results. Please try again later.' });
-        } else {
-          setTimeout(pollForResults, retryDelay);
-        }
-      }
-    };
+      };
 
-    pollForResults();
+      pollForResults();
+    } catch {
+      setShowAiLoader(false);
+      setIsLoadingResults(false);
+      Alert.alert('Error', 'Failed to fetch results. Please try again.');
+    }
+  };
+
+  // Retry results generation
+  const handleRetryResults = () => {
+    if (pendingSessionId) {
+      setShowAiLoader(true);
+      setIsLoadingResults(true);
+      retryResultsPolling();
+    }
+  };
+
+  // Cancel results generation
+  const handleCancelResults = () => {
+    cancelResultsPolling();
+    setShowAiLoader(false);
+    setIsLoadingResults(false);
+    setPendingSessionId(null);
   };
 
   const handleContinueNext = () => {
@@ -278,15 +347,15 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
             assessmentId: assessmentId
           });
         } else if (response.data.status === 'processing') {
-          showToast({ type: 'info', title: 'Processing', message: 'Results are still being generated. Please refresh in a moment.' });
+          // Results still processing
         } else {
-          showToast({ type: 'error', message: 'Unexpected response format' });
+          // Unexpected response format
         }
       } else {
-        showToast({ type: 'error', message: 'Failed to load assessment results' });
+        // Failed to load assessment results
       }
     } catch (error) {
-      showToast({ type: 'error', message: 'Failed to load assessment results' });
+      // Failed to load assessment results
     } finally {
       setIsLoadingResultsPage(false);
     }
@@ -299,20 +368,13 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   const handleRecommendedSteps = () => {
     const derivedAssessmentId = assessmentIdProp || parsedResults?.assessmentId;
     if (!derivedAssessmentId) {
-      showToast({ type: 'error', message: 'Assessment ID not found' });
       return;
     }
     const resolvedSkillName = parsedResults?.skillName || skillNameProp;
     if (!resolvedSkillName) {
-      showToast({ type: 'error', message: 'Skill name not found' });
       return;
     }
     const finalScoreNumber = typeof parsedResults?.finalScore === 'number' ? parsedResults.finalScore : undefined;
-
-    if (!derivedAssessmentId) {
-      showToast({ type: 'error', title: 'Missing Data', message: 'We need your assessment details before recommending drills.' });
-      return;
-    }
 
     router.push({
       pathname: '/recommended-drills',
@@ -368,6 +430,23 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
               <Text style={styles.aiLoaderTitle}>
                 Generating your results for {skillName}
               </Text>
+              {/* Show AI progress indicator with status messages */}
+              {aiJobStatus && (
+                <AIProgressIndicator
+                  status={aiJobStatus.status}
+                  message={aiProgressMessage || 'Processing your assessment...'}
+                  showRetry={canRetryResults}
+                  showCancel={isPollingResults}
+                  onRetry={handleRetryResults}
+                  onCancel={handleCancelResults}
+                />
+              )}
+              {/* Fallback message when no job status */}
+              {!aiJobStatus && (
+                <Text style={styles.aiLoaderSubtitle}>
+                  This may take a moment...
+                </Text>
+              )}
             </View>
           </BlurView>
         </Modal>

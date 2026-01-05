@@ -1,5 +1,5 @@
 import { PayloadAction, createSlice } from "@reduxjs/toolkit";
-import { Skill } from "./skillsSlice";
+import { Skill } from "../hooks/useSkillsData";
 import { User } from "../services/api";
 
 export type AppState = {

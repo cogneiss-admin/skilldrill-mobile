@@ -41,21 +41,20 @@ export const useSocialAuth = () => {
         throw new Error(response.message || `${provider} authentication failed`);
       }
     } catch (error: unknown) {
-      
-      let errorMessage = error.message || `${provider} authentication failed`;
-      
-      // Enhanced error handling
-      if (error.message?.includes('not configured')) {
+      const errorObj = error as { message?: string } | undefined;
+      let errorMessage = errorObj?.message || `${provider} authentication failed`;
+
+      if (errorObj?.message?.includes('not configured')) {
         errorMessage = `${provider} authentication is not configured. Please check your environment variables.`;
-      } else if (error.message?.includes('network')) {
+      } else if (errorObj?.message?.includes('network')) {
         errorMessage = 'Network error. Please check your internet connection.';
-      } else if (error.message?.includes('cancelled')) {
+      } else if (errorObj?.message?.includes('cancelled')) {
         errorMessage = 'Authentication was cancelled.';
-      } else if (error.message?.includes('Incomplete user data')) {
+      } else if (errorObj?.message?.includes('Incomplete user data')) {
         errorMessage = 'Unable to get complete profile information. Please try again.';
-      } else if (error.message?.includes('Invalid email format')) {
+      } else if (errorObj?.message?.includes('Invalid email format')) {
         errorMessage = 'Invalid email format received. Please check your account settings.';
-      } else if (error.message?.includes('Client ID is not configured')) {
+      } else if (errorObj?.message?.includes('Client ID is not configured')) {
         errorMessage = `${provider} Client ID is not configured. Please set the environment variable.`;
       }
       

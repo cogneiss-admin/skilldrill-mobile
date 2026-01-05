@@ -8,6 +8,9 @@ export interface PhoneSignupRequest {
   countryCode?: string;
   countryName?: string;
   phoneCountryCode?: string;
+  residenceCountryCode?: string;
+  residenceCountryName?: string;
+  region?: string;
 }
 
 export interface EmailSignupRequest {
@@ -17,6 +20,9 @@ export interface EmailSignupRequest {
   countryCode?: string;
   countryName?: string;
   phoneCountryCode?: string;
+  residenceCountryCode?: string;
+  residenceCountryName?: string;
+  region?: string;
 }
 
 export interface PasswordSignupRequest {
@@ -103,6 +109,8 @@ export interface AuthSuccessResponse {
 export interface OtpResponse {
   identifier: string;
   otp?: string;
+  retry_after?: number;
+  retryAfter?: number;
 }
 
 export interface TokenRefreshResponse {
@@ -397,8 +405,9 @@ class AuthService {
     }
   }
 
-  public handleAuthError(error: ApiError): string {
-    switch (error.code) {
+  public handleAuthError(error: unknown): string {
+    const err = error as { code?: string; message?: string };
+    switch (err.code) {
       case 'USER_EXISTS':
         return 'An account with this email/phone already exists. Please log in instead.';
       case 'USER_NOT_FOUND':
@@ -426,7 +435,7 @@ class AuthService {
       case 'OTP_RATE_LIMIT_EXCEEDED':
         return 'Too many OTP requests. Please wait before requesting another.';
       default:
-        return error.message || 'An authentication error occurred';
+        return err.message || 'An authentication error occurred';
     }
   }
 }

@@ -1,12 +1,25 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { apiService } from '../services/api';
 import authService from '../services/authService';
-import { Skill } from '../features/skillsSlice';
 import { SkillGroup } from '../types/skills';
-import { User } from '../services/api';
 
 const SELECTED_SKILLS_KEY = 'selectedSkills';
+
+export interface Skill {
+  id: string;
+  mongoId?: string;
+  name: string;
+  description?: string;
+  category?: string;
+  tier?: string;
+  skillTier?: {
+    id: string;
+    key: string;
+    name: string;
+    order?: number;
+  };
+}
 
 export function useSkillsData(params: {
   isAssessmentMode: boolean;
@@ -20,137 +33,136 @@ export function useSkillsData(params: {
   const [error, setError] = useState("");
   const [eligibleSet, setEligibleSet] = useState<Set<string>>(new Set());
 
+  const initialSelectionLoaded = useRef(false);
+
   const canContinue = useMemo(() => selected.length > 0, [selected]);
 
-
-  const loadSkills = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError("");
-      const response = await apiService.get('/skills/categories');
-      if (response.success) {
-        const allSkills: Skill[] = [];
-        response.data.forEach((group: SkillGroup) => {
-          if (group.skills && Array.isArray(group.skills)) {
-            group.skills.forEach((skill: Skill) => {
-              allSkills.push({
-                id: skill.id,
-                name: skill.name,
-                description: skill.description,
-                category: skill.category,
-                skillTierId: skill.skillTierId,
-                skillTier: skill.skillTier,
-                tier: skill.tier,
-                mongoId: skill.mongoId,
-              });
-            });
-          }
-        });
-        setSkillsData(allSkills);
-        try {
-          const keys = Array.from(new Set(allSkills.map(s => s?.skillTier?.key).filter(Boolean)));
-        } catch {}
-      } else {
-        setError('Failed to load skills');
-      }
-    } catch (e) {
-      try {  } catch {}
-      setError('Failed to load skills. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    loadSkills();
-  }, [loadSkills]);
+    let cancelled = false;
 
-  // Load eligible skills for the user's career level
-  useEffect(() => {
-    (async () => {
+    async function loadAllData() {
       try {
-        const user = await authService.getUserData();
-        const careerLevelId = user?.careerLevelId || user?.careerLevel?.id;
-        try {  } catch {}
-        if (!careerLevelId) return;
-        const resp = await apiService.get(`/skills/career-level/${careerLevelId}/categories`);
-        if (resp.success) {
-          const ids = new Set<string>();
-          (resp.data || []).forEach((group: SkillGroup) => {
-            if (group?.skills && Array.isArray(group.skills)) {
-              group.skills.forEach((s: Skill) => {
-                // Add both id and mongoId as strings to handle different formats
-                if (s?.id) {
-                  ids.add(String(s.id));
-                  ids.add(s.id); // Also add as-is in case it's already a string
-                }
-                if (s?.mongoId) {
-                  ids.add(String(s.mongoId));
-                  ids.add(s.mongoId);
-                }
-                // Also check for skillId field (some API responses might use this)
-                if (s?.skillId) {
-                  ids.add(String(s.skillId));
-                  ids.add(s.skillId);
-                }
+        setLoading(true);
+        setError("");
+
+        const [skillsResponse, userResponse, eligibleResponse] = await Promise.all([
+          apiService.get('/user/skills/categories').catch(() => apiService.get('/skills/categories')),
+          authService.getUserData(),
+          null,
+        ]);
+
+        if (cancelled) return;
+
+        if (skillsResponse.success && skillsResponse.data) {
+          const allSkills: Skill[] = [];
+          skillsResponse.data.forEach((group: { title?: string; skills?: Skill[] }) => {
+            if (group.skills && Array.isArray(group.skills)) {
+              group.skills.forEach((skill) => {
+                allSkills.push({
+                  id: skill.id,
+                  name: skill.name,
+                  description: skill.description,
+                  category: group.title,
+                  tier: skill.tier,
+                  skillTier: skill.skillTier,
+                  mongoId: skill.id,
+                });
               });
             }
           });
-          setEligibleSet(ids);
-        }
-      } catch {}
-    })();
-  }, []);
+          setSkillsData(allSkills);
 
-  // Load user's current skills for add-to-assessment
-  useEffect(() => {
-    if (skillsData.length > 0 && isAddToAssessmentMode) {
-      (async () => {
-        try {
-          const response = await apiService.get('/user/skills');
-          if (response.success && response.data?.length > 0) {
-            const currentSkillIds = response.data.map((userSkill: { skill?: { id: string }; id?: string }) => userSkill.skill?.id || userSkill.id);
-            setSelected(currentSkillIds);
-          }
-        } catch {}
-      })();
-    }
-  }, [skillsData, isAddToAssessmentMode]);
-
-  // Restore persisted selection for assessment mode
-  useEffect(() => {
-    if (skillsData.length > 0 && isAssessmentMode && !isAddToAssessmentMode) {
-      SecureStore.getItemAsync(SELECTED_SKILLS_KEY)
-        .then((persisted) => {
-          if (persisted) {
+          const careerLevelId = userResponse?.careerLevelId || userResponse?.careerLevel?.id;
+          if (careerLevelId) {
             try {
-              const parsed = JSON.parse(persisted);
-              const validSelections = parsed.filter((id: string | number) => skillsData.some((s) => s.id === id));
-              setSelected(validSelections);
+              const resp = await apiService.get(`/skills/career-level/${careerLevelId}/categories`);
+              if (!cancelled && resp.success) {
+                const ids = new Set<string>();
+                (resp.data || []).forEach((group: SkillGroup) => {
+                  if (group?.skills && Array.isArray(group.skills)) {
+                    group.skills.forEach((s: Skill) => {
+                      if (s?.id) {
+                        ids.add(String(s.id));
+                        ids.add(s.id);
+                      }
+                      if (s?.mongoId) {
+                        ids.add(String(s.mongoId));
+                        ids.add(s.mongoId);
+                      }
+                    });
+                  }
+                });
+                setEligibleSet(ids);
+              }
             } catch {}
           }
-        })
-        .catch(() => {});
-    }
-  }, [skillsData, isAssessmentMode, isAddToAssessmentMode]);
 
-  const toggleSkill = useCallback((skillId: string | number) => {
-    setSelected((prev) => {
-      const has = prev.includes(skillId);
-      const next = has ? prev.filter((s) => s !== skillId) : [...prev, skillId];
-      if (!isAddToAssessmentMode) {
-        SecureStore.setItemAsync(SELECTED_SKILLS_KEY, JSON.stringify(next)).catch(() => {});
+          if (!initialSelectionLoaded.current) {
+            initialSelectionLoaded.current = true;
+
+            if (isAddToAssessmentMode) {
+              try {
+                const response = await apiService.get('/user/skills');
+                if (!cancelled && response.success && response.data?.length > 0) {
+                  const currentSkillIds = response.data.map(
+                    (userSkill: { skill?: { id: string }; id?: string }) =>
+                      userSkill.skill?.id || userSkill.id
+                  );
+                  setSelected(currentSkillIds);
+                }
+              } catch {}
+            } else if (isAssessmentMode) {
+              try {
+                const persisted = await SecureStore.getItemAsync(SELECTED_SKILLS_KEY);
+                if (!cancelled && persisted) {
+                  const parsed = JSON.parse(persisted);
+                  const validSelections = parsed.filter(
+                    (id: string | number) => allSkills.some((s) => s.id === id)
+                  );
+                  setSelected(validSelections);
+                }
+              } catch {}
+            }
+          }
+        } else {
+          setError(skillsResponse.message || 'Failed to load skills');
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError('Failed to load skills. Please try again.');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
-      return next;
-    });
-  }, [isAddToAssessmentMode]);
+    }
 
-  // Group by tier memo
+    loadAllData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAssessmentMode, isAddToAssessmentMode]);
+
+  const toggleSkill = useCallback(
+    (skillId: string | number) => {
+      setSelected((prev) => {
+        const has = prev.includes(skillId);
+        const next = has ? prev.filter((s) => s !== skillId) : [...prev, skillId];
+        if (!isAddToAssessmentMode) {
+          SecureStore.setItemAsync(SELECTED_SKILLS_KEY, JSON.stringify(next)).catch(() => {});
+        }
+        return next;
+      });
+    },
+    [isAddToAssessmentMode]
+  );
+
   const skillsByTier = useMemo(() => {
     const groups: Record<string, Skill[]> = {};
     for (const skill of skillsData) {
-      // Use skillTier data for grouping; fall back to 'default'
-      const tierKey = (skill.skillTier && skill.skillTier.key) ? skill.skillTier.key : 'default';
+      const tierKey = skill.skillTier?.key || skill.tier || 'default';
       (groups[tierKey] ||= []).push({ ...skill });
     }
     return groups;
@@ -172,5 +184,3 @@ export function useSkillsData(params: {
 }
 
 export default useSkillsData;
-
-

@@ -1,16 +1,34 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, ScrollView, TouchableOpacity, StatusBar, ActivityIndicator, StyleSheet } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, StatusBar, ActivityIndicator, StyleSheet, TextStyle } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { MotiView } from "moti";
 import { apiService } from "../services/api";
-import { useToast } from "../hooks/useToast";
 import { useAnimation } from "../hooks/useAnimation";
 import Button from "../components/Button";
 import { PricingCard, PricingData } from "../components/PricingCard";
 import { BRAND, BRAND_LIGHT, BRAND_ACCENT, TYPOGRAPHY, CARD, SPACING, COLORS, BORDER_RADIUS, SHADOWS, GRADIENTS } from "./components/Brand";
+
+type APIPricingResponse = {
+  pricingMode?: string;
+  finalPrice?: number;
+  expiresAt?: string;
+  pricePerDrill?: number;
+  tokens?: {
+    totalPerDrill?: number;
+    totalWithBuffer?: number;
+    buffer?: number;
+  };
+  calculation?: {
+    marginType?: string;
+    marginValue?: number;
+    bufferPercent?: number;
+    baseCost?: number;
+    marginApplied?: number;
+  };
+};
 
 type RecommendationResponse = {
   id?: string; // Recommendation ID (legacy)
@@ -55,8 +73,7 @@ type RecommendationResponse = {
   };
   status?: string;
   createdAt?: string;
-  // New dynamic pricing structure
-  pricing?: PricingData;
+  pricing?: APIPricingResponse;
 };
 
 type DrillItem = {
@@ -179,7 +196,6 @@ const RecommendedDrillsScreen = () => {
     finalScore?: string;
   }>();
   const router = useRouter();
-  const { showError, showInfo } = useToast();
   const isMountedRef = useRef(true);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -268,30 +284,27 @@ const RecommendedDrillsScreen = () => {
         if (message.toLowerCase().includes('no active drill recommendation policy')) {
           setPolicyMissing(true);
           setRecommendation(null);
-          showInfo('No active drill recommendation policy. Please contact your admin to activate one.');
         } else {
           setError(message);
-          showError(message);
         }
       }
     } catch (err: unknown) {
-      const message = err?.message || 'Failed to load recommendations. Please try again.';
+      const errorObj = err as { message?: string } | undefined;
+      const message = errorObj?.message || 'Failed to load recommendations. Please try again.';
       if (!isMountedRef.current) return;
 
       if (message.toLowerCase().includes('no active drill recommendation policy')) {
         setPolicyMissing(true);
         setRecommendation(null);
-        showInfo('No active drill recommendation policy. Please contact your admin to activate one.');
       } else {
         setError(message);
-        showError(message);
       }
     } finally {
       if (isMountedRef.current) {
         setIsLoading(false);
       }
     }
-  }, [assessmentId, showError, showInfo, checkExistingDrills]);
+  }, [assessmentId, checkExistingDrills]);
 
   useEffect(() => {
     loadRecommendations();
@@ -309,7 +322,6 @@ const RecommendedDrillsScreen = () => {
 
   const handleUnlockDrills = async () => {
     if (!recommendation) {
-      showError('Recommendation data not available');
       return;
     }
 
@@ -341,8 +353,7 @@ const RecommendedDrillsScreen = () => {
         params: { assignmentId }
       });
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to unlock drills';
-      showError(errorMessage);
+      // Handle error silently
     }
   };
 

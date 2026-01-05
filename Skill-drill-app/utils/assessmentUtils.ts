@@ -142,7 +142,7 @@ export const normalizeProgressData = (
 };
 
 // Import safe utilities from mathUtils (single source of truth)
-import { safeNumber, safePercentage as safePercentageUtil } from './mathUtils';
+import { safeNumber } from './mathUtils';
 
 /**
  * Safe percentage calculation (assessment-specific wrapper)

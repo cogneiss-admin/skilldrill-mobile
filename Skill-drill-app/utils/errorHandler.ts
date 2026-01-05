@@ -325,11 +325,8 @@ export function logError(error: unknown, context?: string) {
   };
 
 
-  // In production, you might want to send this to an error tracking service
-  if (__DEV__) {
-    console.group('Error Details');
-    console.groupEnd();
-  }
+  // In production, send this to an error tracking service like Sentry
+  // For now, we just capture the error info for potential future use
 }
 
 // Validation helpers

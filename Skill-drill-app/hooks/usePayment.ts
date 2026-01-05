@@ -22,7 +22,6 @@
 import { useState } from 'react';
 import { useStripe } from '@stripe/stripe-react-native';
 import apiService from '../services/api';
-import { useToast } from './useToast';
 
 interface PaymentParams {
   // Legacy mode: use priceId for fixed pricing
@@ -48,7 +47,6 @@ interface UsePaymentReturn {
 
 export const usePayment = (): UsePaymentReturn => {
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
-  const { showError, showSuccess } = useToast();
   const [processing, setProcessing] = useState(false);
 
   /**
@@ -107,7 +105,6 @@ export const usePayment = (): UsePaymentReturn => {
       if (presentError) {
         // User cancelled payment
         if (presentError.code === 'Canceled') {
-          showError('Payment cancelled');
           params.onCancel?.();
           return;
         }
@@ -122,16 +119,6 @@ export const usePayment = (): UsePaymentReturn => {
       params.onSuccess('');
 
     } catch (error: unknown) {
-
-      // Handle specific error types
-      const errorMessage = (error as any)?.message || 'Payment processing failed';
-
-      // Check for price quote expired error
-      if (errorMessage.toLowerCase().includes('price quote expired')) {
-        showError('Price quote has expired. Please go back and try again.');
-      } else {
-        showError(errorMessage);
-      }
 
       throw error;
     } finally {
@@ -163,6 +150,7 @@ export const usePayment = (): UsePaymentReturn => {
         if (res.success && res.data?.assignments) {
           // Find most recent assignment for this skill
           interface DrillAssignment {
+            id: string;
             skillId: string;
             createdAt: string;
           }

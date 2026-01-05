@@ -31,7 +31,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import apiService from '../services/api';
-import { useToast } from './useToast';
+import { useAIJobPolling } from './useAIJobPolling';
+import { AIJobStatusType } from '../types/api';
 
 interface DrillItem {
   id: string;
@@ -96,6 +97,9 @@ interface UseDrillProgressReturn {
   };
   submitting: boolean;
   isLoadingOverallFeedback: boolean; // AI loader state for overall feedback generation
+  aiStatus: AIJobStatusType | null; // Current AI job status
+  aiProgressMessage: string; // Progress message from backend
+  canRetryFeedback: boolean; // Whether feedback generation can be retried
   completionData: CompletionData | null; // Only set when 100% complete
   sessionId: string | null;
   submitDrill: (params: SubmitDrillParams) => Promise<void>;
@@ -103,12 +107,13 @@ interface UseDrillProgressReturn {
   previousDrill: () => void;
   goToDrill: (index: number) => void;
   handleCompletion: () => void; // Called when user dismisses 100% completion results
+  retryFeedback: () => void; // Retry failed feedback generation
+  cancelFeedback: () => void; // Cancel stuck feedback generation
   refresh: () => Promise<void>;
 }
 
 export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn => {
   const router = useRouter();
-  const { showError } = useToast();
 
   // State
   const [loading, setLoading] = useState(true);
@@ -116,10 +121,86 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
-  const [isLoadingOverallFeedback, setIsLoadingOverallFeedback] = useState(false);
   const [completionData, setCompletionData] = useState<CompletionData | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [pendingResultsAssignmentId, setPendingResultsAssignmentId] = useState<string | null>(null);
 
+  // AI Job Polling hook for feedback generation
+  const {
+    status: aiJobStatus,
+    progressMessage: aiProgressMessage,
+    isPolling: isPollingFeedback,
+    canRetry: canRetryFeedback,
+    startPolling: startFeedbackPolling,
+    cancelPolling: cancelFeedbackPolling,
+    retry: retryFeedbackPolling,
+    reset: resetFeedbackPolling,
+  } = useAIJobPolling({
+    onComplete: async (jobStatus) => {
+      // Feedback generation completed, fetch results
+      if (pendingResultsAssignmentId) {
+        await fetchAndNavigateToResults(pendingResultsAssignmentId);
+      }
+    },
+    onError: (errorMessage) => {
+      setError(`Feedback generation failed: ${errorMessage}`);
+    },
+  });
+
+  // Computed state for isLoadingOverallFeedback (for backward compatibility)
+  const isLoadingOverallFeedback = isPollingFeedback;
+
+  // Helper function to fetch results and navigate to results screen
+  const fetchAndNavigateToResults = useCallback(async (assignmentIdForResults: string) => {
+    try {
+      const response = await apiService.getDrillResults(assignmentIdForResults);
+
+      if (!response.success || response.data.status !== 'ready') {
+        throw new Error('Results not ready');
+      }
+
+      const aggregateRes = await apiService.getDrillAggregate(assignmentIdForResults);
+      const aggregate = aggregateRes.success ? aggregateRes.data : null;
+
+      const skillName = response.data.skillName || assignment?.skillName || 'Unknown Skill';
+      const averageScore = aggregate?.averageScore ?? response.data.finalScore;
+      const attemptsCount = aggregate?.attemptsCount ?? assignment?.completed ?? 1;
+
+      const completionDataToSet = {
+        reached: true,
+        skillName,
+        overall: {
+          finalScore: response.data.finalScore,
+          feedbackGood: response.data.feedbackGood,
+          feedbackImprove: response.data.feedbackImprove,
+          feedbackSummary: response.data.feedbackSummary,
+        },
+        stats: {
+          averageScore,
+          attemptsCount,
+        },
+      };
+
+      setCompletionData(completionDataToSet);
+      setPendingResultsAssignmentId(null);
+      resetFeedbackPolling();
+
+      router.replace({
+        pathname: '/drillsResults',
+        params: {
+          overall: JSON.stringify({
+            ...completionDataToSet.overall,
+            skillName,
+          }),
+          averageScore: String(averageScore),
+          attemptsCount: String(attemptsCount),
+        },
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch results';
+      setError(message);
+    }
+  }, [assignment, router, resetFeedbackPolling]);
 
   const startOrResumeSession = useCallback(async (assignmentData: Assignment) => {
     try {
@@ -140,7 +221,8 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
         } else {
           sessionResponse = await apiService.startDrillSession(assignmentId);
         }
-      } catch (err) {
+      } catch {
+        // Session status check failed, start new session
         sessionResponse = await apiService.startDrillSession(assignmentId);
       }
 
@@ -202,12 +284,12 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
       }
 
     } catch (err: unknown) {
-      setError(err.message || 'Failed to load drills');
-      showError(err.message || 'Failed to load drills');
+      const message = err instanceof Error ? err.message : 'Failed to load drills';
+      setError(message);
     } finally {
       setLoading(false);
     }
-  }, [assignmentId, showError, startOrResumeSession]);
+  }, [assignmentId, startOrResumeSession]);
 
   useEffect(() => {
     if (assignmentId) {
@@ -217,7 +299,6 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
 
   const submitDrill = async (params: SubmitDrillParams) => {
     if (!assignment || !currentDrill) {
-      showError('No drill selected');
       return;
     }
 
@@ -258,7 +339,7 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
               id: 'new',
               finalScore: result.finalScore,
               submittedAt: new Date().toISOString(),
-              responseType: params.textContent ? 'TEXT' : 'AUDIO'
+              responseType: (params.textContent ? 'TEXT' : 'AUDIO') as 'TEXT' | 'AUDIO'
             }
           };
         }
@@ -326,7 +407,8 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
               }
             });
             return;
-          } catch (err) {
+          } catch {
+            // Aggregate fetch failed, use fallback data
             if (!assignment.skillName) {
               throw new Error('Skill name not found in assignment');
             }
@@ -365,95 +447,47 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
         }
 
         setSubmitting(false);
-        setIsLoadingOverallFeedback(true);
 
         const assignmentIdForPolling = result.assignmentId || assignment.id;
         if (!assignmentIdForPolling) {
           throw new Error('Assignment ID not found for polling');
         }
 
-        const maxRetries = 20;
-        const retryDelay = 2000;
-        let attempts = 0;
+        // Store assignment ID for when polling completes
+        setPendingResultsAssignmentId(assignmentIdForPolling);
 
-        const pollForOverallFeedback = async (): Promise<void> => {
-          try {
-            const response = await apiService.getDrillResults(assignmentIdForPolling);
+        // If backend returns a jobId, use AI job polling for progress updates
+        if (result.jobId) {
+          startFeedbackPolling(result.jobId);
+        } else {
+          // Fallback: fetch results directly after a short delay
+          // The backend is generating feedback, poll results endpoint
+          const pollForResults = async (attempt = 0): Promise<void> => {
+            const maxAttempts = 30;
+            const delay = Math.min(1000 * Math.pow(1.5, attempt), 10000); // Exponential backoff
 
-            if (response.success) {
-              if (response.data.status === 'ready') {
-                setIsLoadingOverallFeedback(false);
-                
-                const aggregateRes = await apiService.getDrillAggregate(assignmentIdForPolling);
-                if (!aggregateRes.success || !aggregateRes.data) {
-                  throw new Error('Failed to fetch aggregate data');
-                }
-                const aggregate = aggregateRes.data;
-
-                if (!response.data.skillName) {
-                  throw new Error('Skill name not found in drill results');
-                }
-
-                if (aggregate.averageScore === undefined || aggregate.attemptsCount === undefined) {
-                  throw new Error('Aggregate data incomplete');
-                }
-
-                const completionDataToSet = {
-                  reached: true,
-                  skillName: response.data.skillName,
-                  overall: {
-                    finalScore: response.data.finalScore,
-                    feedbackGood: response.data.feedbackGood,
-                    feedbackImprove: response.data.feedbackImprove,
-                    feedbackSummary: response.data.feedbackSummary
-                  },
-                  stats: {
-                    averageScore: aggregate.averageScore,
-                    attemptsCount: aggregate.attemptsCount
-                  }
-                };
-
-                setCompletionData(completionDataToSet);
-
-                router.replace({
-                  pathname: "/drillsResults",
-                  params: {
-                    overall: JSON.stringify({
-                      ...completionDataToSet.overall,
-                      skillName: response.data.skillName
-                    }),
-                    averageScore: String(aggregate.averageScore),
-                    attemptsCount: String(aggregate.attemptsCount),
-                  }
-                });
-              } else if (response.data.status === 'processing') {
-                attempts++;
-                if (attempts >= maxRetries) {
-                  setIsLoadingOverallFeedback(false);
-                  showError('Results are taking longer than expected. Please try again later.');
-                } else {
-                  setTimeout(pollForOverallFeedback, retryDelay);
-                }
+            try {
+              const response = await apiService.getDrillResults(assignmentIdForPolling);
+              if (response.success && response.data.status === 'ready') {
+                await fetchAndNavigateToResults(assignmentIdForPolling);
+              } else if (attempt < maxAttempts) {
+                setTimeout(() => pollForResults(attempt + 1), delay);
               } else {
-                setIsLoadingOverallFeedback(false);
-                showError('Unexpected response format');
+                setError('Feedback generation timed out. Please try again.');
+                resetFeedbackPolling();
               }
-            } else {
-              setIsLoadingOverallFeedback(false);
-              showError(response.message || 'Failed to load drill results');
+            } catch {
+              if (attempt < maxAttempts) {
+                setTimeout(() => pollForResults(attempt + 1), delay);
+              } else {
+                setError('Failed to fetch feedback. Please try again.');
+                resetFeedbackPolling();
+              }
             }
-          } catch (error) {
-            attempts++;
-            if (attempts >= maxRetries) {
-              setIsLoadingOverallFeedback(false);
-              showError('Failed to load drill results. Please try again later.');
-            } else {
-              setTimeout(pollForOverallFeedback, retryDelay);
-            }
-          }
-        };
+          };
 
-        pollForOverallFeedback();
+          pollForResults();
+        }
         return;
       }
 
@@ -463,7 +497,8 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
           try {
             await apiService.completeDrillSession(sessionId);
             setSessionId(null);
-          } catch (err) {
+          } catch {
+            // Session completion failed silently - non-critical
           }
         }
 
@@ -472,7 +507,6 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
       }
 
     } catch (err: unknown) {
-      showError(err.message || 'Failed to submit drill');
       setSubmitting(false);
       throw err;
     }
@@ -482,7 +516,8 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
     if (sessionId && assignmentId) {
       try {
         await apiService.updateDrillSessionActivity(sessionId, newIndex);
-      } catch (err) {
+      } catch {
+        // Session activity update failed silently - non-critical
       }
     }
   }, [sessionId, assignmentId]);
@@ -522,7 +557,8 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
       try {
         await apiService.completeDrillSession(sessionId);
         setSessionId(null);
-      } catch (err) {
+      } catch {
+        // Session completion failed silently - non-critical
       }
     }
   };
@@ -530,6 +566,19 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
   const refresh = async () => {
     await loadAssignment();
   };
+
+  // Retry and cancel functions for AI feedback
+  const retryFeedback = useCallback(() => {
+    if (pendingResultsAssignmentId) {
+      retryFeedbackPolling();
+    }
+  }, [pendingResultsAssignmentId, retryFeedbackPolling]);
+
+  const cancelFeedback = useCallback(() => {
+    cancelFeedbackPolling();
+    setPendingResultsAssignmentId(null);
+    setError(null);
+  }, [cancelFeedbackPolling]);
 
   if (!assignment) {
     return {
@@ -544,6 +593,9 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
       progress: { percentage: 0 },
       submitting: false,
       isLoadingOverallFeedback: false,
+      aiStatus: null,
+      aiProgressMessage: '',
+      canRetryFeedback: false,
       completionData: null,
       sessionId: null,
       submitDrill: async () => {},
@@ -551,6 +603,8 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
       previousDrill: () => {},
       goToDrill: () => {},
       handleCompletion: () => {},
+      retryFeedback: () => {},
+      cancelFeedback: () => {},
       refresh: async () => {}
     };
   }
@@ -581,6 +635,9 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
     progress,
     submitting,
     isLoadingOverallFeedback,
+    aiStatus: aiJobStatus?.status || null,
+    aiProgressMessage,
+    canRetryFeedback,
     completionData,
     sessionId,
     submitDrill,
@@ -588,6 +645,8 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
     previousDrill,
     goToDrill,
     handleCompletion,
+    retryFeedback,
+    cancelFeedback,
     refresh
   };
 };

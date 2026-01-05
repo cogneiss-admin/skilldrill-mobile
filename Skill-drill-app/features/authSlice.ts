@@ -109,6 +109,89 @@ export const logoutUser = createAsyncThunk(
   }
 );
 
+export const signupUser = createAsyncThunk(
+  'auth/signup',
+  async (
+    { emailOrPhone, name, password }: { emailOrPhone: string; name: string; password?: string },
+    { rejectWithValue }
+  ) => {
+    try {
+      const { default: authService } = await import('../services/authService');
+      let response;
+      const inputType = emailOrPhone.includes('@') ? 'email' : 'phone';
+
+      if (password) {
+        response = await authService.signupWithPassword({
+          email: emailOrPhone,
+          name,
+          password,
+        });
+      } else {
+        if (inputType === 'email') {
+          response = await authService.signupWithEmail({
+            email: emailOrPhone,
+            name,
+          });
+        } else {
+          response = await authService.signupWithPhone({
+            phoneNo: emailOrPhone,
+            name,
+          });
+        }
+      }
+
+      if (response.success && 'user' in response.data && response.data.user) {
+        return { user: response.data.user, response };
+      } else {
+        return { user: null, response };
+      }
+    } catch (error: unknown) {
+      return rejectWithValue(error instanceof Error ? error.message : 'An error occurred');
+    }
+  }
+);
+
+export const updateProfileUser = createAsyncThunk(
+  'auth/updateProfile',
+  async (userData: Partial<User>, { rejectWithValue }) => {
+    try {
+      const { default: authService } = await import('../services/authService');
+
+      const payload: Record<string, unknown> = {};
+      if (userData.careerLevelId) payload.careerLevelId = userData.careerLevelId;
+      if (userData.roleType) payload.roleType = userData.roleType;
+      if (userData.onboardingStep) payload.onboardingStep = userData.onboardingStep;
+      if (userData.name) payload.name = userData.name;
+      if (userData.email) payload.email = userData.email;
+
+      const response = await authService.updateProfileViaAPI(payload);
+
+      if (response.success && response.data) {
+        return response.data;
+      } else {
+        throw new Error(response.message || 'Profile update failed');
+      }
+    } catch (error: unknown) {
+      return rejectWithValue(error instanceof Error ? error.message : 'An error occurred');
+    }
+  }
+);
+
+export const updateOnboardingStepUser = createAsyncThunk(
+  'auth/updateOnboardingStep',
+  async (step: string, { dispatch, rejectWithValue }) => {
+    try {
+      const { default: authService } = await import('../services/authService');
+      await authService.updateOnboardingStep(step);
+      // Re-check auth status to get updated user data
+      dispatch(checkAuthStatus());
+      return step;
+    } catch (error: unknown) {
+      return rejectWithValue(error instanceof Error ? error.message : 'An error occurred');
+    }
+  }
+);
+
 const authSlice = createSlice({
   name: 'auth',
   initialState,
@@ -202,6 +285,53 @@ const authSlice = createSlice({
         state.token = '';
         state.refreshToken = '';
         state.error = '';
+      })
+
+      // Signup
+      .addCase(signupUser.pending, (state) => {
+        state.isLoading = true;
+        state.error = '';
+      })
+      .addCase(signupUser.fulfilled, (state, action) => {
+        state.isLoading = false;
+        if (action.payload.user) {
+          state.isAuthenticated = true;
+          state.user = action.payload.user;
+        }
+        state.error = '';
+      })
+      .addCase(signupUser.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      })
+
+      // Update Profile
+      .addCase(updateProfileUser.pending, (state) => {
+        state.isLoading = true;
+        state.error = '';
+      })
+      .addCase(updateProfileUser.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.user = action.payload;
+        state.error = '';
+      })
+      .addCase(updateProfileUser.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      })
+
+      // Update Onboarding Step
+      .addCase(updateOnboardingStepUser.pending, (state) => {
+        state.isLoading = true;
+        state.error = '';
+      })
+      .addCase(updateOnboardingStepUser.fulfilled, (state) => {
+        state.isLoading = false;
+        state.error = '';
+      })
+      .addCase(updateOnboardingStepUser.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
       });
   },
 });

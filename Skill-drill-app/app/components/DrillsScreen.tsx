@@ -19,7 +19,6 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 import { useDrillProgress } from '../../hooks/useDrillProgress';
 import { useAnimation } from '../../hooks/useAnimation';
-import { useToast } from '../../hooks/useToast';
 
 import ScenarioInteraction from './ScenarioInteraction';
 import Results from './Results';
@@ -62,7 +61,6 @@ const DrillsScreen: React.FC<DrillsScreenProps> = ({
     throw new Error('assignmentId is required for questions mode');
   }
   const router = useRouter();
-  const { showToast } = useToast();
 
   const {
     loading,
@@ -81,7 +79,7 @@ const DrillsScreen: React.FC<DrillsScreenProps> = ({
     nextDrill,
     previousDrill,
     handleCompletion,
-  } = useDrillProgress(assignmentId);
+  } = useDrillProgress(assignmentId!);
 
   const { celebrate, fadeIn } = useAnimation();
 
@@ -99,7 +97,6 @@ const DrillsScreen: React.FC<DrillsScreenProps> = ({
 
   const handleSubmit = async (text: string) => {
     if (!text.trim()) {
-      showToast('error', 'Response Required', 'Please provide your response before continuing.');
       return;
     }
 
@@ -109,7 +106,7 @@ const DrillsScreen: React.FC<DrillsScreenProps> = ({
         textContent: text.trim(),
       });
     } catch (error: any) {
-      showToast('error', 'Submission Failed', error?.message || 'Failed to submit response');
+      // Handle error silently
     }
   };
 

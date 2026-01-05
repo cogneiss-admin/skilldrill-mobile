@@ -61,7 +61,8 @@ export default function CareerRoleScreen() {
         setCareerLevels(levels);
         setRoleTypes(types);
       } catch (e: unknown) {
-        setErrorMessage(e?.message || 'Failed to load career information. Please try again.');
+        const err = e as { message?: string };
+        setErrorMessage(err?.message || 'Failed to load career information. Please try again.');
       }
     })();
   }, []);
@@ -99,7 +100,7 @@ export default function CareerRoleScreen() {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       await updateProfile({
         careerLevelId: selectedCareerLevel?.id,
-        roleType: selectedRoleType?.id,
+        roleTypeId: selectedRoleType?.id,
         onboardingStep: 'Pending'
       });
       try { await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}

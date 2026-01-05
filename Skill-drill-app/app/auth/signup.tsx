@@ -465,15 +465,15 @@ export default function SignupScreen() {
           setOtpError(errorObj?.message || `Too many attempts. Try again in ${Math.ceil(retryAfter / 60)} minute(s).`);
         } else if (errorObj?.code === 'INVALID_OTP') {
           setOtpError('Incorrect OTP');
-        } else if (err?.code === 'OTP_EXPIRED') {
+        } else if (errorObj?.code === 'OTP_EXPIRED') {
           setOtpError('OTP expired. Please request a new one.');
-        } else if (err?.code === 'OTP_RATE_LIMIT_EXCEEDED' || err?.status === 429) {
+        } else if (errorObj?.code === 'OTP_RATE_LIMIT_EXCEEDED') {
           setOtpError('Too many attempts. Please wait a few minutes and try again.');
         } else {
-          setOtpError(err?.message || 'Incorrect OTP');
+          setOtpError(errorObj?.message || 'Incorrect OTP');
         }
       } catch {
-        setOtpError(err?.message || 'Incorrect OTP');
+        setOtpError('Incorrect OTP');
       }
     } finally {
       setOtpBusy(false);
@@ -662,7 +662,6 @@ export default function SignupScreen() {
                 borderColor: COLORS.border.light,
                 borderRadius: BORDER_RADIUS.lg,
                 minHeight: responsive.input.height,
-                justifyContent: 'center',
                 paddingHorizontal: responsive.padding.md,
                 flexDirection: 'row',
                 alignItems: 'center',

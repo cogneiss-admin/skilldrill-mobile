@@ -1,228 +1,256 @@
-import { useState, useCallback } from 'react';
+import { useReducer, useCallback } from 'react';
 import { apiService } from '../services/api';
-import { useToast } from './useToast';
-import { AssessmentProgress } from '../types/assessment';
+import { AssessmentProgress, AssessmentScenario } from '../types/assessment';
+
+interface UserResponse {
+  questionId: string;
+  answer: string;
+  timeTaken?: number;
+}
+
+interface AssessmentState {
+  sessionId: string | null;
+  currentQuestion: any;
+  progress: AssessmentProgress | null;
+  skillName: string | null;
+  userResponses: UserResponse[];
+  loading: boolean;
+  error: string | null;
+  isAssessmentActive: boolean;
+  assessmentId: string | null;
+  questions: AssessmentScenario[];
+  currentQuestionIndex: number;
+}
+
+type AssessmentAction =
+  | { type: 'START_LOADING' }
+  | { type: 'SET_ERROR'; payload: string }
+  | { type: 'CLEAR_ERROR' }
+  | { type: 'SESSION_STARTED'; payload: { sessionId: string; question: any; progress: AssessmentProgress; skillName: string } }
+  | { type: 'SESSION_RESUMED'; payload: { sessionId: string; question: any; progress: AssessmentProgress; skillName: string } }
+  | { type: 'NEXT_QUESTION'; payload: { question: any; progress: AssessmentProgress } }
+  | { type: 'SAVE_ANSWER'; payload: UserResponse }
+  | { type: 'MOVE_TO_QUESTION'; payload: number }
+  | { type: 'CLEAR_SESSION' }
+  | { type: 'STOP_LOADING' };
+
+const initialState: AssessmentState = {
+  sessionId: null,
+  currentQuestion: null,
+  progress: null,
+  skillName: null,
+  userResponses: [],
+  loading: false,
+  error: null,
+  isAssessmentActive: false,
+  assessmentId: null,
+  questions: [],
+  currentQuestionIndex: 0,
+};
+
+function assessmentReducer(state: AssessmentState, action: AssessmentAction): AssessmentState {
+  switch (action.type) {
+    case 'START_LOADING':
+      return { ...state, loading: true, error: null };
+
+    case 'STOP_LOADING':
+      return { ...state, loading: false };
+
+    case 'SET_ERROR':
+      return { ...state, loading: false, error: action.payload };
+
+    case 'CLEAR_ERROR':
+      return { ...state, error: null };
+
+    case 'SESSION_STARTED':
+    case 'SESSION_RESUMED':
+      return {
+        ...state,
+        loading: false,
+        sessionId: action.payload.sessionId,
+        currentQuestion: action.payload.question,
+        progress: action.payload.progress,
+        skillName: action.payload.skillName,
+        isAssessmentActive: true,
+        assessmentId: action.payload.sessionId,
+        questions: action.payload.question ? [action.payload.question] : [],
+        currentQuestionIndex: 0,
+        userResponses: [],
+      };
+
+    case 'NEXT_QUESTION':
+      return {
+        ...state,
+        loading: false,
+        currentQuestion: action.payload.question,
+        progress: action.payload.progress,
+        questions: [...state.questions, action.payload.question],
+        currentQuestionIndex: state.currentQuestionIndex + 1,
+      };
+
+    case 'SAVE_ANSWER': {
+      const existingIndex = state.userResponses.findIndex(
+        r => r.questionId === action.payload.questionId
+      );
+      const newResponses = existingIndex >= 0
+        ? state.userResponses.map((r, i) => i === existingIndex ? action.payload : r)
+        : [...state.userResponses, action.payload];
+      return { ...state, userResponses: newResponses };
+    }
+
+    case 'MOVE_TO_QUESTION':
+      return { ...state, currentQuestionIndex: action.payload };
+
+    case 'CLEAR_SESSION':
+      return initialState;
+
+    default:
+      return state;
+  }
+}
 
 export const useAssessmentSession = () => {
-  // State (Updated for sequential flow)
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [currentQuestion, setCurrentQuestion] = useState<any>(null);
-  const [progress, setProgress] = useState<AssessmentProgress | null>(null);
-  const [skillName, setSkillName] = useState<string | null>(null);
-  const [userResponses, setUserResponses] = useState<Array<{
-    questionId: string;
-    answer: string;
-    timeTaken?: number;
-  }>>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isAssessmentActive, setIsAssessmentActive] = useState(false);
+  const [state, dispatch] = useReducer(assessmentReducer, initialState);
 
-  const { showToast } = useToast();
-  
-  // Legacy compatibility - for components that still expect these
-  const [assessmentId, setAssessmentId] = useState<string | null>(null);
-  const [questions, setQuestions] = useState<import('../types/assessment').AssessmentScenario[]>([]);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-
-  // Clear assessment data
   const clearAssessmentData = useCallback(async () => {
-    setIsAssessmentActive(false);
-    setSessionId(null);
-    setCurrentQuestion(null);
-    setProgress(null);
-    setSkillName(null);
-    setUserResponses([]);
-
-    // Legacy compatibility
-    setAssessmentId(null);
-    setQuestions([]);
-    setCurrentQuestionIndex(0);
+    dispatch({ type: 'CLEAR_SESSION' });
   }, []);
 
-  // Resume assessment session from backend
   const loadSessionFromStorage = useCallback(async (skillId: string) => {
     try {
       const response = await apiService.resumeAssessment(skillId);
-      
+
       if (response.success && response.data) {
-        setSessionId(response.data.sessionId);
-        setCurrentQuestion(response.data.question);
-        setProgress(response.data.progress);
-        setSkillName(response.data.skillName);
-        setIsAssessmentActive(true);
-
-        // Legacy compatibility
-        setAssessmentId(response.data.sessionId);
-        if (response.data.question) {
-          setQuestions([response.data.question]);
-        }
-        setCurrentQuestionIndex(0);
-        setUserResponses([]);
-
+        dispatch({
+          type: 'SESSION_RESUMED',
+          payload: {
+            sessionId: response.data.sessionId,
+            question: response.data.question,
+            progress: response.data.progress,
+            skillName: response.data.skillName,
+          },
+        });
         return response.data;
       }
       return null;
-    } catch (error) {
+    } catch {
       return null;
     }
   }, []);
 
-  // Start new assessment (Updated for sequential flow)
   const startAssessmentSession = useCallback(async (skillId: string) => {
     try {
-      setLoading(true);
-      setError(null);
-
+      dispatch({ type: 'START_LOADING' });
 
       const response = await apiService.startAssessment(skillId);
 
       if (response.success) {
-        
-        setSessionId(response.data.sessionId);
-        setCurrentQuestion(response.data.question);
-        setProgress(response.data.progress);
-        setSkillName(response.data.skillName);
-        setIsAssessmentActive(true);
-        
-        // Legacy compatibility - set these for components that expect them
-        setAssessmentId(response.data.sessionId); // Use sessionId as assessmentId for compatibility
-        setQuestions([response.data.question]); // Set as array with single question
-        setCurrentQuestionIndex(0);
-        setUserResponses([]);
-
+        dispatch({
+          type: 'SESSION_STARTED',
+          payload: {
+            sessionId: response.data.sessionId,
+            question: response.data.question,
+            progress: response.data.progress,
+            skillName: response.data.skillName,
+          },
+        });
         return response.data;
       } else {
         throw new Error(response.message || 'Failed to start assessment');
       }
-
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to start assessment';
-      setError(errorMessage);
+      dispatch({ type: 'SET_ERROR', payload: errorMessage });
       throw error;
-    } finally {
-      setLoading(false);
     }
   }, []);
 
-  // Submit answer and get next question (Sequential)
   const submitAnswerAndGetNext = useCallback(async (answer: string) => {
-    if (!sessionId) {
+    if (!state.sessionId) {
       throw new Error('No active session');
     }
 
     try {
-      setLoading(true);
-      setError(null);
+      dispatch({ type: 'START_LOADING' });
 
-
-      const response = await apiService.submitAnswerAndGetNext(sessionId, answer.trim());
+      const response = await apiService.submitAnswerAndGetNext(state.sessionId, answer.trim());
 
       if (response.success) {
         if (response.data.isComplete) {
-          // Assessment is complete
-          // Don't clear data yet - we need sessionId for results fetching
+          dispatch({ type: 'STOP_LOADING' });
           return { completed: true, isComplete: true, sessionId: response.data.sessionId };
         } else {
-          // Got next question
-          
-          setCurrentQuestion(response.data.question);
-          setProgress(response.data.progress);
-          
-          // Legacy compatibility - update questions array
-          setQuestions(prev => [...prev, response.data.question]);
-          setCurrentQuestionIndex(prev => prev + 1);
-          
+          dispatch({
+            type: 'NEXT_QUESTION',
+            payload: {
+              question: response.data.question,
+              progress: response.data.progress,
+            },
+          });
           return { completed: false, question: response.data.question, progress: response.data.progress };
         }
       } else {
         throw new Error(response.message || 'Failed to submit answer');
       }
-
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to submit answer';
-      setError(errorMessage);
+      dispatch({ type: 'SET_ERROR', payload: errorMessage });
       throw error;
-    } finally {
-      setLoading(false);
     }
-  }, [sessionId, clearAssessmentData]);
+  }, [state.sessionId]);
 
-  // Save answer for current question (Legacy compatibility)
   const saveAnswer = useCallback((answer: string, timeTaken?: number) => {
-    if (!currentQuestion) {
+    if (!state.currentQuestion) {
       throw new Error('No current question');
     }
-
-    if (!progress) {
+    if (!state.progress) {
       throw new Error('No progress data available');
     }
 
-    const newResponse = {
-      questionId: currentQuestion.id || `q_${progress.currentQuestion}`,
-      answer: answer.trim(),
-      timeTaken: timeTaken
-    };
-
-    // Update or add response for current question
-    setUserResponses(prev => {
-      const existing = prev.findIndex(r => r.questionId === newResponse.questionId);
-      if (existing >= 0) {
-        const updated = [...prev];
-        updated[existing] = newResponse;
-        return updated;
-      } else {
-        return [...prev, newResponse];
-      }
+    dispatch({
+      type: 'SAVE_ANSWER',
+      payload: {
+        questionId: state.currentQuestion.id || `q_${state.progress.currentQuestion}`,
+        answer: answer.trim(),
+        timeTaken,
+      },
     });
+  }, [state.currentQuestion, state.progress]);
 
-  }, [currentQuestion, progress]);
-
-  // Move to next question
   const nextQuestion = useCallback(() => {
-    if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(prev => prev + 1);
+    if (state.currentQuestionIndex < state.questions.length - 1) {
+      dispatch({ type: 'MOVE_TO_QUESTION', payload: state.currentQuestionIndex + 1 });
       return true;
     }
-    return false; // No more questions
-  }, [currentQuestionIndex, questions.length]);
+    return false;
+  }, [state.currentQuestionIndex, state.questions.length]);
 
-  // Move to previous question
   const previousQuestion = useCallback(() => {
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(prev => prev - 1);
+    if (state.currentQuestionIndex > 0) {
+      dispatch({ type: 'MOVE_TO_QUESTION', payload: state.currentQuestionIndex - 1 });
       return true;
     }
-    return false; // Already at first question
-  }, [currentQuestionIndex]);
-
+    return false;
+  }, [state.currentQuestionIndex]);
 
   return {
-    // Sequential state (NEW)
-    sessionId,
-    currentQuestion,
-    progress,
-    skillName,
-    
-    // Sequential actions (NEW)
+    sessionId: state.sessionId,
+    currentQuestion: state.currentQuestion,
+    progress: state.progress,
+    skillName: state.skillName,
     submitAnswerAndGetNext,
-    
-    // Legacy state (for compatibility)
-    assessmentId,
-    questions,
-    currentQuestionIndex,
-    userResponses,
-    loading,
-    error,
-    isAssessmentActive,
-
-    // Actions
+    assessmentId: state.assessmentId,
+    questions: state.questions,
+    currentQuestionIndex: state.currentQuestionIndex,
+    userResponses: state.userResponses,
+    loading: state.loading,
+    error: state.error,
+    isAssessmentActive: state.isAssessmentActive,
     startAssessmentSession,
-    startAdaptiveSession: startAssessmentSession, // Legacy alias for backward compatibility
     loadSessionFromStorage,
     saveAnswer,
     nextQuestion,
     previousQuestion,
-    clearAssessmentData
+    clearAssessmentData,
   };
 };

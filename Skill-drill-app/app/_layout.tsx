@@ -12,9 +12,6 @@ import { useFonts } from "expo-font";
 import { Ionicons } from "@expo/vector-icons";
 import { store, persistor } from "../store";
 import { useAuth } from "../hooks/useAuth";
-import ToastContainer from "../components/ToastContainer";
-import { useToast } from "../hooks/useToast";
-import { ToastProvider } from "../contexts/ToastContext";
 import { BRAND, LOGO_SRC, SCREEN_CONTAINER_BACKGROUND } from "./components/Brand";
 import SessionManager from "../utils/sessionManager";
 
@@ -90,12 +87,6 @@ const AuthMiddleware = React.memo(({ children }: { children: React.ReactNode }) 
     const isDashboardScreen = segments[0] === 'dashboard';
     if (isDashboardScreen) return;
 
-    const isAssessmentScreen = segments[0] === 'assessment';
-    if (isAssessmentScreen) return;
-
-    const isAssessmentResultsScreen = segments[0] === 'assessment-results';
-    if (isAssessmentResultsScreen) return;
-
     const isAssessmentScenariosScreen = segments[0] === 'assessmentScenarios';
     if (isAssessmentScenariosScreen) return;
 
@@ -131,7 +122,7 @@ const AuthMiddleware = React.memo(({ children }: { children: React.ReactNode }) 
       const nextStep = getOnboardingNextStep();
 
       if (onboardingComplete) {
-        const isOnAuthFlow = segments[0] === 'auth' || segments.includes('auth');
+        const isOnAuthFlow = segments[0] === 'auth';
         if (isOnAuthFlow) return;
         router.replace('/dashboard');
       } else if (nextStep) {
@@ -160,7 +151,6 @@ const RootLayout = React.memo(() => {
   const navState = useRootNavigationState();
   const segments = useSegments();
   const [routeOverlayVisible, setRouteOverlayVisible] = useState(false);
-  const { toasts, dismissToast } = useToast();
 
   // Load Ionicons font to prevent "?" rendering
   const [fontsLoaded] = useFonts({
@@ -209,8 +199,6 @@ const RootLayout = React.memo(() => {
                 </Suspense>
                 {/* Global OTP Bottom Sheet Portal */}
                 <GlobalOtpSheet />
-                {/* Toast Container */}
-                <ToastContainer toasts={toasts} onDismiss={dismissToast} />
               </>
             ) : (
               <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: BRAND }}>
@@ -226,13 +214,4 @@ const RootLayout = React.memo(() => {
 
 RootLayout.displayName = 'RootLayout';
 
-// Wrap with ToastProvider so all components share the same toast state
-function RootLayoutWithToast() {
-  return (
-    <ToastProvider>
-      <RootLayout />
-    </ToastProvider>
-  );
-}
-
-export default RootLayoutWithToast;
+export default RootLayout;

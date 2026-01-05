@@ -10,10 +10,8 @@ interface Country {
   flag: string
 }
 
-// Convert SVG flag URLs to PNG format (React Native compatible)
-export const getConvertedFlagUrl = (flagUrl: string | null) => {
-  if (!flagUrl) return null;
-  // Convert SVG to PNG: https://flagcdn.com/xx.svg -> https://flagcdn.com/w20/xx.png
+export const getConvertedFlagUrl = (flagUrl: string | null | undefined): string | undefined => {
+  if (!flagUrl) return undefined;
   return flagUrl.replace('.svg', '.png').replace('flagcdn.com/', 'flagcdn.com/w20/');
 };
 
@@ -37,7 +35,8 @@ export function useCountries() {
         }
       } catch (err: unknown) {
         if (!isMounted) return
-        setError(err?.message || 'Unknown error occurred')
+        const e = err as { message?: string }
+        setError(e?.message || 'Unknown error occurred')
       } finally {
         if (isMounted) setLoading(false)
       }
