@@ -1,6 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MotiView } from 'moti';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, BRAND, BRAND_LIGHT } from './Brand';
 
 export interface ActivityCardProps {
@@ -9,9 +11,9 @@ export interface ActivityCardProps {
         id: string;
         skillId?: string; // For drill recommendations - needed for subscription screen
         skillName: string;
-        // Assessment statuses: NOT_STARTED, IN_PROGRESS, COMPLETED
-        // Drill statuses: Unlocked, Active, Completed, NOT_STARTED (locked)
-        status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'Unlocked' | 'Active' | 'Completed';
+        // Assessment statuses: NOT_STARTED, IN_PROGRESS, COMPLETED, GENERATING
+        // Drill statuses: Unlocked, Pending, Active, Completed, NOT_STARTED (locked)
+        status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'GENERATING' | 'Unlocked' | 'Pending' | 'Active' | 'Completed';
         progress?: {
             current: number;
             total: number;
@@ -28,6 +30,7 @@ export interface ActivityCardProps {
             currency: string;
         };
         drillCount?: number; // Number of drills in the pack (for recommendations)
+        jobProgressMessage?: string; // Dynamic message from backend for generating state
     };
     onAction: (action: 'start' | 'resume' | 'view_results' | 'unlock', id: string, assessmentId?: string, skillName?: string) => void;
 }
@@ -48,6 +51,7 @@ export default function ActivityCard({ type, data, onAction }: ActivityCardProps
     const renderAssessmentCard = () => {
         const isCompleted = data.status === 'COMPLETED';
         const isInProgress = data.status === 'IN_PROGRESS';
+        const isGenerating = data.status === 'GENERATING';
         const isNotStarted = data.status === 'NOT_STARTED';
 
         return (
@@ -62,22 +66,27 @@ export default function ActivityCard({ type, data, onAction }: ActivityCardProps
                     <View style={[
                         styles.badge,
                         isCompleted ? styles.badgeSuccess :
-                            isInProgress ? styles.badgeProgress : styles.badgeNotStarted
+                            isInProgress ? styles.badgeProgress :
+                                isGenerating ? styles.badgeGenerating : styles.badgeNotStarted
                     ]}>
                         <View style={[
                             styles.badgeDot,
                             isCompleted ? styles.dotSuccess :
-                                isInProgress ? styles.dotProgress : styles.dotNotStarted
+                                isInProgress ? styles.dotProgress :
+                                    isGenerating ? styles.dotGenerating : styles.dotNotStarted
                         ]} />
                         <Text style={[
                             styles.badgeText,
                             isCompleted ? styles.textSuccess :
-                                isInProgress ? styles.textProgress : styles.textNotStarted
+                                isInProgress ? styles.textProgress :
+                                    isGenerating ? styles.textGenerating : styles.textNotStarted
                         ]}>
                             {isCompleted ? 'COMPLETED' :
-                                isInProgress ? 'IN PROGRESS' : 'NOT STARTED'}
+                                isInProgress ? 'IN PROGRESS' :
+                                    isGenerating ? 'GENERATING' : 'NOT STARTED'}
                         </Text>
                     </View>
+
 
                     {/* Started On (Only for In Progress) */}
                     {isInProgress && data.startedAt && (
@@ -90,10 +99,29 @@ export default function ActivityCard({ type, data, onAction }: ActivityCardProps
                     {isInProgress && data.progress && (
                         <View style={styles.progressContainer}>
                             <View style={styles.progressBarBg}>
-                                <View style={[styles.progressBarFill, { width: `${data.progress.percentage}%` }]} />
+                                <LinearGradient
+                                    colors={['#0A66C2', '#3B82F6']} // Brand Primary -> Brand Accent
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={[styles.progressBarFill, { width: `${data.progress.percentage}%` }]}
+                                >
+                                    <MotiView
+                                        from={{ translateX: -100 }}
+                                        animate={{ translateX: 200 }}
+                                        transition={{ type: 'timing', duration: 1500, loop: true }}
+                                        style={{ width: '50%', height: '100%', position: 'absolute', opacity: 0.3 }}
+                                    >
+                                        <LinearGradient
+                                            colors={['transparent', '#FFFFFF', 'transparent']}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 0 }}
+                                            style={{ flex: 1 }}
+                                        />
+                                    </MotiView>
+                                </LinearGradient>
                             </View>
                             <Text style={styles.progressText}>
-                                {data.progress.current}/{data.progress.total} Answered
+                                <Text style={styles.progressHighlight}>{data.progress.current}</Text>/<Text style={styles.progressHighlight}>{data.progress.total}</Text> Answered
                             </Text>
                         </View>
                     )}
@@ -114,6 +142,14 @@ export default function ActivityCard({ type, data, onAction }: ActivityCardProps
                             >
                                 <Text style={styles.primaryButtonText}>Resume Assessment</Text>
                             </TouchableOpacity>
+                        ) : isGenerating ? (
+                            <TouchableOpacity
+                                style={[styles.primaryButton, styles.disabledButton]}
+                                disabled={true}
+                            >
+                                <Ionicons name="hourglass-outline" size={16} color={COLORS.white} style={{ marginRight: 8 }} />
+                                <Text style={styles.primaryButtonText}>Generating...</Text>
+                            </TouchableOpacity>
                         ) : (
                             <TouchableOpacity
                                 style={styles.primaryButton}
@@ -133,6 +169,7 @@ export default function ActivityCard({ type, data, onAction }: ActivityCardProps
         const isLocked = !data.progress && data.status === 'NOT_STARTED'; // Assuming no progress means locked/unpurchased
         const isCompleted = data.status === 'Completed';
         const isUnlocked = data.status === 'Unlocked'; // Purchased but drills not generated yet
+        const isPending = data.status === 'Pending'; // Questions generating
         const isActive = data.status === 'Active'; // Drills generated, in progress
 
         if (isLocked) {
@@ -163,12 +200,16 @@ export default function ActivityCard({ type, data, onAction }: ActivityCardProps
         // Determine button text and action based on status
         let buttonText = 'Resume Practice';
         let buttonAction: 'start' | 'resume' | 'view_results' | 'unlock' = 'resume';
+        let isButtonDisabled = false;
         if (isCompleted) {
             buttonText = 'View Results';
             buttonAction = 'view_results';
         } else if (isUnlocked) {
             buttonText = 'Start Practice';
             buttonAction = 'start';
+        } else if (isPending) {
+            buttonText = 'Generating...';
+            isButtonDisabled = true;
         }
 
         return (
@@ -183,16 +224,43 @@ export default function ActivityCard({ type, data, onAction }: ActivityCardProps
                                 <Text style={{ fontSize: 12, color: '#10B981', marginLeft: 4 }}>Ready</Text>
                             </View>
                         )}
+                        {/* Status indicator for pending drills */}
+                        {isPending && (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}>
+                                <Ionicons name="hourglass-outline" size={16} color="#D97706" />
+                                <Text style={{ fontSize: 12, color: '#D97706', marginLeft: 4 }}>Generating</Text>
+                            </View>
+                        )}
                     </View>
 
+
                     {/* Progress Bar - show for active drills with progress */}
-                    {data.progress && !isUnlocked && (
+                    {data.progress && !isUnlocked && !isPending && (
                         <View style={styles.progressSection}>
                             <View style={styles.progressBarBg}>
-                                <View style={[styles.progressBarFill, { width: `${data.progress.percentage}%` }]} />
+                                <LinearGradient
+                                    colors={['#0A66C2', '#3B82F6']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={[styles.progressBarFill, { width: `${data.progress.percentage}%` }]}
+                                >
+                                    <MotiView
+                                        from={{ translateX: -100 }}
+                                        animate={{ translateX: 200 }}
+                                        transition={{ type: 'timing', duration: 1500, loop: true }}
+                                        style={{ width: '50%', height: '100%', position: 'absolute', opacity: 0.3 }}
+                                    >
+                                        <LinearGradient
+                                            colors={['transparent', '#FFFFFF', 'transparent']}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 0 }}
+                                            style={{ flex: 1 }}
+                                        />
+                                    </MotiView>
+                                </LinearGradient>
                             </View>
                             <Text style={styles.progressText}>
-                                {data.progress.current}/{data.progress.total} drills completed - {data.progress.percentage}%
+                                <Text style={styles.progressHighlight}>{data.progress.current}/{data.progress.total}</Text> drills completed • <Text style={styles.progressHighlight}>{data.progress.percentage}%</Text>
                             </Text>
                         </View>
                     )}
@@ -213,9 +281,14 @@ export default function ActivityCard({ type, data, onAction }: ActivityCardProps
 
                     {/* Action Button */}
                     <TouchableOpacity
-                        style={isCompleted ? styles.secondaryButtonFull : styles.primaryButton}
-                        onPress={() => onAction(buttonAction, data.id)}
+                        style={[
+                            isCompleted ? styles.secondaryButtonFull : styles.primaryButton,
+                            isButtonDisabled && styles.disabledButton
+                        ]}
+                        onPress={() => !isButtonDisabled && onAction(buttonAction, data.id)}
+                        disabled={isButtonDisabled}
                     >
+                        {isPending && <Ionicons name="hourglass-outline" size={16} color={COLORS.white} style={{ marginRight: 8 }} />}
                         <Text style={isCompleted ? styles.secondaryButtonText : styles.primaryButtonText}>
                             {buttonText}
                         </Text>
@@ -272,6 +345,7 @@ const styles = StyleSheet.create({
     },
     badgeSuccess: { backgroundColor: '#DCFCE7' },
     badgeProgress: { backgroundColor: '#F3E8FF' },
+    badgeGenerating: { backgroundColor: '#FEF3C7' },
     badgeNotStarted: { backgroundColor: '#FFE4E6' },
 
     badgeDot: {
@@ -282,6 +356,7 @@ const styles = StyleSheet.create({
     },
     dotSuccess: { backgroundColor: '#16A34A' },
     dotProgress: { backgroundColor: '#9333EA' },
+    dotGenerating: { backgroundColor: '#D97706' },
     dotNotStarted: { backgroundColor: '#E11D48' },
 
     badgeText: {
@@ -291,7 +366,12 @@ const styles = StyleSheet.create({
     },
     textSuccess: { color: '#166534' },
     textProgress: { color: '#6B21A8' },
+    textGenerating: { color: '#92400E' },
     textNotStarted: { color: '#9F1239' },
+
+    disabledButton: {
+        opacity: 0.7,
+    },
 
     startedOnText: {
         fontSize: TYPOGRAPHY.fontSize.sm,
@@ -304,15 +384,21 @@ const styles = StyleSheet.create({
         marginBottom: SPACING.padding.lg,
     },
     progressBarBg: {
-        height: 6,
-        backgroundColor: '#E2E8F0',
-        borderRadius: 3,
+        height: 10,
+        backgroundColor: '#F1F5F9', // Slate 100 
+        borderRadius: 5,
         overflow: 'hidden',
     },
     progressBarFill: {
         height: '100%',
-        backgroundColor: '#A855F7', // Purple for progress
-        borderRadius: 3,
+        borderRadius: 5,
+        overflow: 'hidden', // Ensure shimmer stays inside
+        // Glow Effect
+        shadowColor: '#3B82F6',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.6,
+        shadowRadius: 6,
+        elevation: 3,
     },
 
     // Buttons
@@ -433,7 +519,12 @@ const styles = StyleSheet.create({
     progressText: {
         fontSize: TYPOGRAPHY.fontSize.sm,
         color: COLORS.text.secondary,
-        marginTop: SPACING.xs,
+        marginTop: SPACING.sm,
+        fontWeight: '500',
+    },
+    progressHighlight: {
+        color: '#0A66C2', // Brand Color
+        fontWeight: '700',
     },
     scoreContainer: {
         marginBottom: SPACING.padding.lg,

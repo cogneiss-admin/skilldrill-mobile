@@ -25,7 +25,7 @@ const DEFAULT_CONFIG: PollingConfig = {
   initialDelay: 1000,
   maxDelay: 10000,
   backoffFactor: 1.5,
-  maxAttempts: 30,
+  maxAttempts: 0, // 0 = no limit, backend controls lifecycle via job status
 };
 
 export const useAIJobPolling = (
@@ -106,7 +106,8 @@ export const useAIJobPolling = (
         attemptRef.current += 1;
         setAttemptCount(attemptRef.current);
 
-        if (attemptRef.current >= config.maxAttempts) {
+        // Only enforce maxAttempts if it's > 0 (0 = no limit, backend controls)
+        if (config.maxAttempts > 0 && attemptRef.current >= config.maxAttempts) {
           setIsPolling(false);
           setCanRetry(true);
           const timeoutError = new Error('Processing is taking longer than expected. Please try again.');
@@ -128,7 +129,8 @@ export const useAIJobPolling = (
       attemptRef.current += 1;
       setAttemptCount(attemptRef.current);
 
-      if (attemptRef.current >= config.maxAttempts) {
+      // Only enforce maxAttempts if it's > 0 (0 = no limit, backend controls)
+      if (config.maxAttempts > 0 && attemptRef.current >= config.maxAttempts) {
         setIsPolling(false);
         setCanRetry(true);
         const pollingError = err instanceof Error ? err : new Error('Polling failed');

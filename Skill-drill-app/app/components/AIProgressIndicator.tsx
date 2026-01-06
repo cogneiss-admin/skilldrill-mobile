@@ -27,7 +27,7 @@ const getStatusLabel = (status: AIJobStatusType): string => {
     case 'running':
       return 'Processing...';
     case 'runningSecondary':
-      return 'Taking longer than usual...';
+      return 'Processing...';
     case 'completed':
       return 'Complete';
     case 'failed':

@@ -324,6 +324,17 @@ export function logError(error: unknown, context?: string) {
     userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : undefined,
   };
 
+  // Log to console for debugging
+  console.group(`🔴 Error${context ? ` [${context}]` : ''}`);
+  console.error('Message:', errorInfo.message);
+  if (errorInfo.stack) {
+    console.error('Stack:', errorInfo.stack);
+  }
+  if (error && typeof error === 'object') {
+    console.error('Full Error Object:', error);
+  }
+  console.error('Timestamp:', errorInfo.timestamp);
+  console.groupEnd();
 
   // In production, send this to an error tracking service like Sentry
   // For now, we just capture the error info for potential future use

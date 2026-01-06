@@ -10,6 +10,7 @@ import BottomNavigation from '../components/BottomNavigation';
 import ActivityCard, { ActivityCardProps } from './components/ActivityCard';
 import { apiService } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+import { logError, parseApiError, formatErrorMessage } from '../utils/errorHandler';
 
 const AI_LOADING_ANIMATION = require('../assets/lottie/AiLoadingAnime.json');
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -32,8 +33,33 @@ export default function Activity() {
   const [loadingResults, setLoadingResults] = useState(false);
   const [loadingSkillName, setLoadingSkillName] = useState<string>('');
   const [isResuming, setIsResuming] = useState(false);
+
+  // Progress and error states for job creation
+  const [progressMessage, setProgressMessage] = useState<string>('');
+  const [showErrorDialog, setShowErrorDialog] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string>('');
+  const [retryAction, setRetryAction] = useState<(() => void) | null>(null);
+  const [loadingType, setLoadingType] = useState<'assessment' | 'drill'>('assessment');
+  const [currentSkillId, setCurrentSkillId] = useState<string>('');
+
   const { user } = useAuth();
   const router = useRouter();
+
+  // Helper function to handle errors consistently
+  const handleError = useCallback((error: any, context: string) => {
+    // Log technical error to console for debugging
+    logError(error, context);
+
+    // Parse and format user-friendly message
+    const parsedError = parseApiError(error);
+    const userMessage = formatErrorMessage(parsedError);
+
+    // Show error dialog
+    setShowAiLoader(false);
+    setProgressMessage('');
+    setErrorMessage(userMessage);
+    setShowErrorDialog(true);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -51,17 +77,20 @@ export default function Activity() {
       if (userSkillsResponse.success && userSkillsResponse.data) {
         const mappedAssessments: ActivityCardProps['data'][] = userSkillsResponse.data.map((item: any) => {
           // Use backend status directly
-          // null = no session (Start Assessment)
-          // PENDING = session in progress (Resume Assessment)
+          // null = no session or job failed (Start Assessment)
+          // GENERATING = job is actively running (show generating state with backend message)
+          // InProgress = questions ready, can resume (Resume Assessment)
           // COMPLETED = session done (See Results)
           const backendStatus = item.assessmentStatus;
 
           // Map backend status to UI status
-          let status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
+          let status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'GENERATING';
           if (backendStatus === 'COMPLETED') {
             status = 'COMPLETED';
-          } else if (backendStatus === 'PENDING') {
+          } else if (backendStatus === 'InProgress') {
             status = 'IN_PROGRESS';
+          } else if (backendStatus === 'GENERATING') {
+            status = 'GENERATING';
           } else {
             status = 'NOT_STARTED';
           }
@@ -70,13 +99,14 @@ export default function Activity() {
             id: item.skill.id,
             skillName: item.skill.name,
             status: status,
-            progress: backendStatus === 'PENDING' ? {
+            progress: backendStatus === 'InProgress' && item.progress ? {
               current: item.progress.completed,
               total: item.progress.total,
               percentage: item.progress.percentage
             } : undefined,
             startedAt: item.startedAt,
-            assessmentId: item.assessmentId
+            assessmentId: item.assessmentId,
+            jobProgressMessage: item.jobProgressMessage
           };
         });
 
@@ -92,25 +122,30 @@ export default function Activity() {
         const mappedAssignments: ActivityCardProps['data'][] = assignmentsResponse.data.assignments.map((assignment: any) => {
           // Map backend status to UI status
           // Backend: 'Unlocked', 'Pending', 'InProgress', 'Completed'
-          let uiStatus: 'Unlocked' | 'Active' | 'Completed';
+          // Unlocked = purchased, ready to start
+          // Pending = questions generating
+          // InProgress = questions ready, can practice
+          // Completed = all drills done
+          let uiStatus: 'Unlocked' | 'Pending' | 'Active' | 'Completed';
           if (assignment.status === 'Completed' || assignment.status === 'COMPLETED') {
             uiStatus = 'Completed';
           } else if (assignment.status === 'Unlocked') {
-            uiStatus = 'Unlocked'; // New status - purchased but drills not generated yet
+            uiStatus = 'Unlocked';
+          } else if (assignment.status === 'Pending') {
+            uiStatus = 'Pending'; // Questions generating
           } else {
-            uiStatus = 'Active'; // Pending or InProgress
+            uiStatus = 'Active'; // InProgress
           }
 
           return {
             id: assignment.id,
             skillName: assignment.skillName,
             status: uiStatus,
-            backendStatus: assignment.status, // Keep original status for generation check
-            progress: {
+            progress: assignment.status === 'InProgress' || assignment.status === 'Completed' ? {
               current: assignment.completed,
               total: assignment.total,
               percentage: assignment.completionPercentage
-            },
+            } : undefined,
             score: assignment.averageScore ? {
               average: assignment.averageScore
             } : undefined
@@ -163,30 +198,128 @@ export default function Activity() {
   }, []);
 
   const handleStartAssessment = async (skillId: string, skillName: string) => {
+    // Store for retry
+    setCurrentSkillId(skillId);
     setLoadingSkillName(skillName);
+    setLoadingType('assessment');
     setIsResuming(false);
+    setProgressMessage(''); // Initially empty - will be updated from backend
     setShowAiLoader(true);
 
+    const retryFn = () => handleStartAssessment(skillId, skillName);
+    setRetryAction(() => retryFn);
+
     try {
+      // Step 1: Call backend to create job
       const response = await apiService.startAssessment(skillId);
 
       if (response.success && response.data) {
-        setShowAiLoader(false);
-        router.push({
-          pathname: '/assessmentScenarios',
-          params: {
-            skillId,
-            sessionId: response.data.sessionId,
-            skillName: response.data.skillName,
-            question: JSON.stringify(response.data.question),
-            progress: JSON.stringify(response.data.progress)
+        // Check if questions are ready or still being generated
+        if (response.data.status === 'PENDING') {
+          // Update progress message from backend (no fallback - backend provides all messages)
+          if (response.data.message) {
+            setProgressMessage(response.data.message);
           }
-        });
+
+          // Poll until ready or failed
+          await pollForAssessmentReady(skillId, skillName, response.data.assessmentId);
+        } else if (response.data.sessionId && response.data.question) {
+          // Questions already ready, navigate to assessment
+          setShowAiLoader(false);
+          setProgressMessage('');
+          router.push({
+            pathname: '/assessmentScenarios',
+            params: {
+              skillId,
+              sessionId: response.data.sessionId,
+              skillName: response.data.skillName,
+              question: JSON.stringify(response.data.question),
+              progress: JSON.stringify(response.data.progress)
+            }
+          });
+        } else {
+          throw new Error(response.message);
+        }
       } else {
-        throw new Error(response.message || 'Failed to start assessment');
+        throw new Error(response.message);
       }
     } catch (error: any) {
-      setShowAiLoader(false);
+      handleError(error, 'Start Assessment');
+      // Retry action already set at the beginning of function
+    }
+  };
+
+  // Poll for assessment questions to be ready
+  // No timeout - backend controls lifecycle via job status (completed/failed)
+  const pollForAssessmentReady = async (skillId: string, skillName: string, assessmentId: string) => {
+    const pollInterval = 2000; // 2 seconds
+    let consecutiveErrors = 0;
+    const maxConsecutiveErrors = 5; // Only stop on repeated network failures
+
+    while (true) {
+      try {
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+
+        const response = await apiService.startAssessment(skillId);
+        consecutiveErrors = 0; // Reset on successful API call
+
+        if (response.success && response.data) {
+          // Update progress message from backend
+          if (response.data.message) {
+            setProgressMessage(response.data.message);
+          }
+
+          // Check job status for failure - backend controls when to stop
+          if (response.data.jobStatus === 'failed') {
+            throw new Error(response.data.message || 'Generation failed. Please try again.');
+          }
+
+          if (response.data.status === 'PENDING') {
+            // Still generating, continue polling - backend will eventually return ready or failed
+            continue;
+          } else if (response.data.sessionId && response.data.question) {
+            // Questions ready, navigate to assessment
+            setShowAiLoader(false);
+            setProgressMessage('');
+            router.push({
+              pathname: '/assessmentScenarios',
+              params: {
+                skillId,
+                sessionId: response.data.sessionId,
+                skillName: response.data.skillName,
+                question: JSON.stringify(response.data.question),
+                progress: JSON.stringify(response.data.progress)
+              }
+            });
+            return;
+          }
+        } else {
+          // API returned error - check if it's a job failure
+          throw new Error(response.message || 'Failed to check status');
+        }
+      } catch (error: any) {
+        consecutiveErrors++;
+
+        // Only show error for job failures or after multiple network failures
+        if (error.message && !error.message.includes('network') && !error.message.includes('timeout')) {
+          // This is a job failure from backend - log and show error
+          handleError(error, 'Poll Status - Job Failed');
+          return;
+        }
+
+        // Network error - retry unless too many consecutive failures
+        if (consecutiveErrors >= maxConsecutiveErrors) {
+          logError(error, 'Poll Status - Network Error');
+          setShowAiLoader(false);
+          setProgressMessage('');
+          setErrorMessage('Connection lost. Please check your internet and try again.');
+          setShowErrorDialog(true);
+          return;
+        }
+
+        // Continue polling after network error
+        continue;
+      }
     }
   };
 
@@ -220,27 +353,115 @@ export default function Activity() {
 
   // Drill handlers - similar to assessment but navigates to drillsScenarios
   const handleStartDrill = async (assignmentId: string, skillName: string, backendStatus?: string) => {
+    // Store for retry
     setLoadingSkillName(skillName);
+    setLoadingType('drill');
     setIsResuming(false);
+    setProgressMessage(''); // Initially empty - will be updated from backend
     setShowAiLoader(true);
 
-    try {
-      // If drill is Unlocked, generate items first
-      if (backendStatus === 'Unlocked') {
-        const generateResponse = await apiService.generateDrillItems(assignmentId);
-        if (!generateResponse.success) {
-          throw new Error(generateResponse.message || 'Failed to generate drills');
-        }
-      }
+    const retryFn = () => handleStartDrill(assignmentId, skillName, backendStatus);
+    setRetryAction(() => retryFn);
 
-      // Navigate to drillsScenarios - useDrillProgress hook will handle session creation
-      setShowAiLoader(false);
-      router.push({
-        pathname: '/drillsScenarios',
-        params: { assignmentId }
-      });
+    try {
+      // Use session/start endpoint which handles all status transitions
+      const response = await apiService.startDrillSession(assignmentId);
+
+      if (response.success && response.data) {
+        // Check if drills are ready or still being generated
+        if (response.data.status === 'Pending') {
+          // Update progress message from backend (no fallback)
+          if (response.data.message) {
+            setProgressMessage(response.data.message);
+          }
+
+          // Poll until ready or failed
+          await pollForDrillReady(assignmentId, skillName);
+        } else if (response.data.sessionId && response.data.currentDrill) {
+          // Drills already ready, navigate to drill screen
+          setShowAiLoader(false);
+          setProgressMessage('');
+          router.push({
+            pathname: '/drillsScenarios',
+            params: { assignmentId }
+          });
+        } else {
+          throw new Error(response.message);
+        }
+      } else {
+        throw new Error(response.message);
+      }
     } catch (error: any) {
-      setShowAiLoader(false);
+      handleError(error, 'Start Drill');
+      // Retry action already set at the beginning of function
+    }
+  };
+
+  // Poll for drill questions to be ready
+  // No timeout - backend controls lifecycle via job status (completed/failed)
+  const pollForDrillReady = async (assignmentId: string, skillName: string) => {
+    const pollInterval = 2000; // 2 seconds
+    let consecutiveErrors = 0;
+    const maxConsecutiveErrors = 5; // Only stop on repeated network failures
+
+    while (true) {
+      try {
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+
+        const response = await apiService.startDrillSession(assignmentId);
+        consecutiveErrors = 0; // Reset on successful API call
+
+        if (response.success && response.data) {
+          // Update progress message from backend
+          if (response.data.message) {
+            setProgressMessage(response.data.message);
+          }
+
+          // Check job status for failure - backend controls when to stop
+          if (response.data.jobStatus === 'failed') {
+            throw new Error(response.data.message || 'Generation failed. Please try again.');
+          }
+
+          if (response.data.status === 'Pending') {
+            // Still generating, continue polling - backend will eventually return ready or failed
+            continue;
+          } else if (response.data.sessionId && response.data.currentDrill) {
+            // Drills ready, navigate to drill screen
+            setShowAiLoader(false);
+            setProgressMessage('');
+            router.push({
+              pathname: '/drillsScenarios',
+              params: { assignmentId }
+            });
+            return;
+          }
+        } else {
+          // API returned error - check if it's a job failure
+          throw new Error(response.message || 'Failed to check status');
+        }
+      } catch (error: any) {
+        consecutiveErrors++;
+
+        // Only show error for job failures or after multiple network failures
+        if (error.message && !error.message.includes('network') && !error.message.includes('timeout')) {
+          // This is a job failure from backend - log and show error
+          handleError(error, 'Poll Status - Job Failed');
+          return;
+        }
+
+        // Network error - retry unless too many consecutive failures
+        if (consecutiveErrors >= maxConsecutiveErrors) {
+          logError(error, 'Poll Status - Network Error');
+          setShowAiLoader(false);
+          setProgressMessage('');
+          setErrorMessage('Connection lost. Please check your internet and try again.');
+          setShowErrorDialog(true);
+          return;
+        }
+
+        // Continue polling after network error
+        continue;
+      }
     }
   };
 
@@ -458,6 +679,21 @@ export default function Activity() {
                 </View>
               ) : (
                 <View style={styles.listContainer}>
+                  {/* Pending Drills - Generating Questions */}
+                  {drills.some(d => d.status === 'Pending') && (
+                    <View style={styles.sectionHeader}>
+                      <Text style={styles.sectionTitle}>Generating</Text>
+                    </View>
+                  )}
+                  {drills.filter(d => d.status === 'Pending').map((item, index) => (
+                    <ActivityCard
+                      key={`pending-${index}`}
+                      type="drill"
+                      data={item}
+                      onAction={handleAction}
+                    />
+                  ))}
+
                   {/* Unlocked Drills - Ready to Start */}
                   {drills.some(d => d.status === 'Unlocked') && (
                     <View style={styles.sectionHeader}>
@@ -552,18 +788,57 @@ export default function Activity() {
                 style={styles.aiAnimation}
               />
             </View>
-            <Text style={styles.aiLoaderTitle}>
-              {isResuming ? 'Resuming Your Assessment' : 'Preparing Your Assessment'}
-            </Text>
-            <Text style={styles.aiLoaderSubtitle}>
-              {isResuming
-                ? `Resuming your ${loadingSkillName} assessment`
-                : `Crafting personalized questions for ${loadingSkillName}`
-              }
-            </Text>
+            <Text style={styles.aiLoaderTitle}>Generating...</Text>
+            {/* Dynamic progress message from backend */}
+            {progressMessage ? (
+              <Text style={styles.aiLoaderSubtitle}>{progressMessage}</Text>
+            ) : null}
           </View>
         </BlurView>
       </Modal>
+
+      {/* Error Dialog */}
+      <Modal
+        visible={showErrorDialog}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+      >
+        <View style={styles.errorDialogBackdrop}>
+          <View style={styles.errorDialogContainer}>
+            <View style={styles.errorIconContainer}>
+              <Ionicons name="alert-circle" size={48} color="#EF4444" />
+            </View>
+            <Text style={styles.errorDialogTitle}>Something went wrong</Text>
+            <Text style={styles.errorDialogMessage}>{errorMessage}</Text>
+            <View style={styles.errorDialogButtons}>
+              <TouchableOpacity
+                style={styles.errorDialogCancelButton}
+                onPress={() => {
+                  setShowErrorDialog(false);
+                  setErrorMessage('');
+                  loadActivityData(); // Refresh to show current state
+                }}
+              >
+                <Text style={styles.errorDialogCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.errorDialogRetryButton}
+                onPress={() => {
+                  setShowErrorDialog(false);
+                  setErrorMessage('');
+                  if (retryAction) {
+                    retryAction();
+                  }
+                }}
+              >
+                <Text style={styles.errorDialogRetryText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Simple Loader for Results */}
       <Modal
         visible={loadingResults}
@@ -756,5 +1031,74 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
+  },
+  // Error Dialog Styles
+  errorDialogBackdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: SCREEN_WIDTH * 0.06,
+  },
+  errorDialogContainer: {
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SCREEN_WIDTH * 0.06,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  errorIconContainer: {
+    marginBottom: SCREEN_WIDTH * 0.04,
+  },
+  errorDialogTitle: {
+    fontSize: SCREEN_WIDTH * 0.05,
+    fontWeight: '700',
+    color: COLORS.text.primary,
+    textAlign: 'center',
+    marginBottom: SCREEN_WIDTH * 0.02,
+  },
+  errorDialogMessage: {
+    fontSize: SCREEN_WIDTH * 0.038,
+    color: COLORS.text.secondary,
+    textAlign: 'center',
+    marginBottom: SCREEN_WIDTH * 0.06,
+    lineHeight: SCREEN_WIDTH * 0.055,
+  },
+  errorDialogButtons: {
+    flexDirection: 'row',
+    width: '100%',
+    gap: SCREEN_WIDTH * 0.03,
+  },
+  errorDialogCancelButton: {
+    flex: 1,
+    paddingVertical: SCREEN_WIDTH * 0.035,
+    borderRadius: BORDER_RADIUS.md,
+    backgroundColor: COLORS.gray[100],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  errorDialogCancelText: {
+    fontSize: SCREEN_WIDTH * 0.04,
+    fontWeight: '600',
+    color: COLORS.text.secondary,
+  },
+  errorDialogRetryButton: {
+    flex: 1,
+    paddingVertical: SCREEN_WIDTH * 0.035,
+    borderRadius: BORDER_RADIUS.md,
+    backgroundColor: BRAND,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  errorDialogRetryText: {
+    fontSize: SCREEN_WIDTH * 0.04,
+    fontWeight: '600',
+    color: COLORS.white,
   },
 });
