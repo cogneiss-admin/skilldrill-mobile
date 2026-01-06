@@ -80,6 +80,7 @@ export interface StartAssessmentResponse {
 
 export interface SubmitAnswerResponse {
   sessionId: string;
+  scoringJobId?: string;
   isComplete: boolean;
   question?: {
     scenario: string;

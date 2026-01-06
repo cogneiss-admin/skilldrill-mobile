@@ -28,10 +28,11 @@
  * } = useDrillProgress(assignmentId);
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import apiService from '../services/api';
 import { useAIJobPolling } from './useAIJobPolling';
+import { useResponseScoringPolling } from './useResponseScoringPolling';
 import { AIJobStatusType } from '../types/api';
 
 interface DrillItem {
@@ -143,12 +144,37 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
       }
     },
     onError: (errorMessage) => {
-      setError(`Feedback generation failed: ${errorMessage}`);
+      // Log technical error to console
+      console.error('[useDrillProgress] Feedback generation failed:', errorMessage);
+      // Set clean error message for user
+      setError('Something went wrong. Please try again.');
     },
   });
 
   // Computed state for isLoadingOverallFeedback (for backward compatibility)
   const isLoadingOverallFeedback = isPollingFeedback;
+
+  // State for pending assignment update after scoring
+  const [pendingAssignment, setPendingAssignment] = useState<Assignment | null>(null);
+  const nextDrillRef = useRef<(() => void) | null>(null);
+
+  // Response scoring polling hook
+  const { startPolling: startScoringPolling, isPolling: isScoringPolling } = useResponseScoringPolling({
+    onComplete: () => {
+      // Race completed - update assignment and advance to next drill
+      if (pendingAssignment) {
+        setAssignment(pendingAssignment);
+        setPendingAssignment(null);
+        setSubmitting(false);
+
+        // Auto-advance to next drill
+        if (nextDrillRef.current) {
+          nextDrillRef.current();
+          nextDrillRef.current = null;
+        }
+      }
+    },
+  });
 
   // Helper function to fetch results and navigate to results screen
   const fetchAndNavigateToResults = useCallback(async (assignmentIdForResults: string) => {
@@ -198,7 +224,10 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch results';
-      setError(message);
+      // Log technical error to console
+      console.error('[useDrillProgress] Failed to fetch and navigate to results:', message);
+      // Set clean error message for user
+      setError('Something went wrong. Please try again.');
     }
   }, [assignment, router, resetFeedbackPolling]);
 
@@ -252,7 +281,6 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
   const loadAssignment = useCallback(async () => {
     try {
       setLoading(true);
-      setError(null);
 
       const res = await apiService.getDrillAssignment(assignmentId);
 
@@ -285,7 +313,10 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
 
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load drills';
-      setError(message);
+      // Log technical error to console
+      console.error('[useDrillProgress] Failed to load assignment:', message, err);
+      // Set clean error message for user
+      setError('Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -353,6 +384,41 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
         completionPercentage: result.progress.completionPercentage
       };
 
+      const scoringJobId = result.scoringJobId;
+
+      // For non-100% completion, use response scoring polling
+      if (result.progress.completionPercentage !== 100) {
+        // Store updated assignment in pending state
+        setPendingAssignment(updatedAssignment);
+
+        if (scoringJobId) {
+          // Start polling for response scoring completion
+          // Will advance to next drill when: min(5 seconds, scoring completed)
+          const nextDrillCallback = () => {
+            const allCompleted = updatedItems.every(item => item.isCompleted);
+            if (allCompleted && sessionId) {
+              try {
+                apiService.completeDrillSession(sessionId);
+                setSessionId(null);
+              } catch {
+                // Session completion failed silently - non-critical
+              }
+            }
+            nextDrill();
+          };
+          nextDrillRef.current = nextDrillCallback;
+          startScoringPolling(scoringJobId);
+        } else {
+          // No jobId (shouldn't happen with updated backend), proceed immediately
+          console.warn('[useDrillProgress] No scoringJobId in response');
+          setAssignment(updatedAssignment);
+          setSubmitting(false);
+          nextDrill();
+        }
+        return;
+      }
+
+      // For 100% completion, immediately update state
       setAssignment(updatedAssignment);
 
       if (result.progress.completionPercentage === 100) {
@@ -473,14 +539,16 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
               } else if (attempt < maxAttempts) {
                 setTimeout(() => pollForResults(attempt + 1), delay);
               } else {
-                setError('Feedback generation timed out. Please try again.');
+                console.warn('[useDrillProgress] Feedback generation timed out');
+                setError('Something went wrong. Please try again.');
                 resetFeedbackPolling();
               }
             } catch {
               if (attempt < maxAttempts) {
                 setTimeout(() => pollForResults(attempt + 1), delay);
               } else {
-                setError('Failed to fetch feedback. Please try again.');
+                console.warn('[useDrillProgress] Failed to fetch feedback after max attempts');
+                setError('Something went wrong. Please try again.');
                 resetFeedbackPolling();
               }
             }
@@ -489,21 +557,6 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
           pollForResults();
         }
         return;
-      }
-
-      if (result.progress.completionPercentage !== 100) {
-        const allCompleted = updatedItems.every(item => item.isCompleted);
-        if (allCompleted && sessionId) {
-          try {
-            await apiService.completeDrillSession(sessionId);
-            setSessionId(null);
-          } catch {
-            // Session completion failed silently - non-critical
-          }
-        }
-
-        setSubmitting(false);
-        nextDrill();
       }
 
     } catch (err: unknown) {
@@ -583,7 +636,7 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
   if (!assignment) {
     return {
       loading,
-      error: error || 'Assignment not loaded',
+      error,
       assignment: null,
       drills: [],
       currentDrill: null,

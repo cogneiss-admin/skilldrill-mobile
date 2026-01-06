@@ -21,6 +21,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 import { useAssessmentSession } from "../../hooks/useAssessmentSession";
 import { useAIJobPolling } from "../../hooks/useAIJobPolling";
+import { useResponseScoringPolling } from "../../hooks/useResponseScoringPolling";
 import { apiService } from "../../services/api";
 
 import ScenarioInteraction from './ScenarioInteraction';
@@ -72,8 +73,24 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   const [showAiLoader, setShowAiLoader] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
+  const [pendingNextQuestion, setPendingNextQuestion] = useState<any>(null);
+  const [pendingProgress, setPendingProgress] = useState<any>(null);
 
   const [parsedResults, setParsedResults] = useState<any>(null);
+
+  // Response scoring polling hook
+  const { startPolling: startScoringPolling, isPolling: isScoringPolling } = useResponseScoringPolling({
+    onComplete: () => {
+      // Race completed - show next question
+      if (pendingNextQuestion && pendingProgress) {
+        setCurrentQuestion(pendingNextQuestion);
+        setProgress(pendingProgress);
+        setPendingNextQuestion(null);
+        setPendingProgress(null);
+      }
+      setIsSubmitting(false);
+    },
+  });
 
   // Helper function to navigate to results
   const navigateToResults = useCallback((resultsData: import('../../types/assessment').AssessmentResults, sessionId: string, resolvedSkillName: string) => {
@@ -116,7 +133,10 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
     onError: (errorMessage) => {
       setShowAiLoader(false);
       setIsLoadingResults(false);
-      Alert.alert('Error', `Failed to generate results: ${errorMessage}`);
+      // Log technical error to console
+      console.error('[AssessmentScreen] Failed to generate results:', errorMessage);
+      // Show clean error message to user
+      Alert.alert('Error', 'Something went wrong. Please try again.');
     },
   });
 
@@ -149,7 +169,10 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
     } catch (err) {
       setShowAiLoader(false);
       setIsLoadingResults(false);
-      Alert.alert('Error', 'Failed to load results. Please try again.');
+      // Log technical error to console
+      console.error('[AssessmentScreen] Failed to load results:', err);
+      // Show clean error message to user
+      Alert.alert('Error', 'Something went wrong. Please try again.');
     }
   }, [skillName, navigateToResults]);
 
@@ -170,14 +193,32 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
 
       if (response.success) {
         if (response.data.isComplete) {
+          // Last question - show completion dialog
           if (!response.data.sessionId) {
             throw new Error('Session ID not found in response');
           }
           setCompletedSessionId(response.data.sessionId);
           setShowCompletionDialog(true);
+          setIsSubmitting(false);
         } else {
-          setCurrentQuestion(response.data.question);
-          setProgress(response.data.progress);
+          // More questions - start response scoring polling
+          const { scoringJobId, question, progress } = response.data;
+
+          // Store next question in pending state
+          setPendingNextQuestion(question);
+          setPendingProgress(progress);
+
+          if (scoringJobId) {
+            // Start polling for response scoring completion
+            // Will show next question when: min(5 seconds, scoring completed)
+            startScoringPolling(scoringJobId);
+          } else {
+            // No jobId (shouldn't happen with updated backend), show immediately
+            console.warn('[AssessmentScreen] No scoringJobId in response');
+            setCurrentQuestion(question);
+            setProgress(progress);
+            setIsSubmitting(false);
+          }
         }
       } else {
         throw new Error(response.message || 'Failed to submit answer');
@@ -186,7 +227,6 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
       // Log error for debugging but don't show to user for smoother experience
       const message = error instanceof Error ? error.message : 'Failed to submit answer';
       console.warn('[AssessmentScreen] Submit error:', message);
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -271,7 +311,8 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
           } else {
             setShowAiLoader(false);
             setIsLoadingResults(false);
-            Alert.alert('Timeout', 'Results generation is taking longer than expected. Please try again later.');
+            console.warn('[AssessmentScreen] Results generation timeout - taking longer than expected');
+            Alert.alert('Timeout', 'Something went wrong. Please try again.');
           }
         } catch {
           if (attempt < maxAttempts) {
@@ -279,16 +320,20 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
           } else {
             setShowAiLoader(false);
             setIsLoadingResults(false);
-            Alert.alert('Error', 'Failed to fetch results. Please try again.');
+            console.warn('[AssessmentScreen] Failed to fetch results after max polling attempts');
+            Alert.alert('Error', 'Something went wrong. Please try again.');
           }
         }
       };
 
       pollForResults();
-    } catch {
+    } catch (error) {
       setShowAiLoader(false);
       setIsLoadingResults(false);
-      Alert.alert('Error', 'Failed to fetch results. Please try again.');
+      // Log technical error to console
+      console.error('[AssessmentScreen] Failed to initiate results polling:', error);
+      // Show clean error message to user
+      Alert.alert('Error', 'Something went wrong. Please try again.');
     }
   };
 

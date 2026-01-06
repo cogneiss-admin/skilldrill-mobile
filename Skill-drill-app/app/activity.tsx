@@ -49,15 +49,12 @@ export default function Activity() {
   const handleError = useCallback((error: any, context: string) => {
     // Log technical error to console for debugging
     logError(error, context);
+    console.error(`[Activity] ${context}:`, error);
 
-    // Parse and format user-friendly message
-    const parsedError = parseApiError(error);
-    const userMessage = formatErrorMessage(parsedError);
-
-    // Show error dialog
+    // Show clean user-friendly error dialog (not technical details)
     setShowAiLoader(false);
     setProgressMessage('');
-    setErrorMessage(userMessage);
+    setErrorMessage('Something went wrong. Please try again.');
     setShowErrorDialog(true);
   }, []);
 

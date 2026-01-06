@@ -144,7 +144,7 @@ const DrillsScreen: React.FC<DrillsScreenProps> = ({
               marginBottom: SPACING.xs,
             }}>Oops!</Text>
             <Text style={styles.errorText}>
-              {error || 'Failed to load drills'}
+              Something went wrong. Please try again.
             </Text>
             <Button
               variant="primary"
