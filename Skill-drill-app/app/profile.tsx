@@ -847,7 +847,7 @@ export default function ProfileScreen() {
 
               // Role Type - validate: must have a value if provided
               if (roleTypeId) {
-                updatePayload.roleType = roleTypeId;
+                updatePayload.roleTypeId = roleTypeId;
               }
 
               // Handle phone number - validate: must be verified and not empty

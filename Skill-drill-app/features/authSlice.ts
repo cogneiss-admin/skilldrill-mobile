@@ -154,7 +154,7 @@ export const updateProfileUser = createAsyncThunk(
 
       const payload: Record<string, unknown> = {};
       if (userData.careerLevelId) payload.careerLevelId = userData.careerLevelId;
-      if (userData.roleType) payload.roleType = userData.roleType;
+      if (userData.roleTypeId) payload.roleTypeId = userData.roleTypeId;
       if (userData.onboardingStep) payload.onboardingStep = userData.onboardingStep;
       if (userData.name) payload.name = userData.name;
       if (userData.email) payload.email = userData.email;

@@ -263,7 +263,7 @@ class AuthService {
 
   public async updateProfileViaAPI(profileData: { 
     careerLevelId?: string; 
-    roleType?: string; 
+    roleTypeId?: string; 
     onboardingStep?: string; 
     name?: string; 
     email?: string; 
@@ -278,7 +278,7 @@ class AuthService {
     try {
       const payload: Record<string, unknown> = {};
       if (profileData.careerLevelId) payload.careerLevelId = profileData.careerLevelId;
-      if (profileData.roleType) payload.roleType = profileData.roleType;
+      if (profileData.roleTypeId) payload.roleTypeId = profileData.roleTypeId;
       if (profileData.onboardingStep) payload.onboardingStep = profileData.onboardingStep;
       if (profileData.name) payload.name = profileData.name;
       if (profileData.email !== undefined) payload.email = profileData.email;
