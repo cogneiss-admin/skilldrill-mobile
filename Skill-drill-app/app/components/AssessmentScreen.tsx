@@ -23,6 +23,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 import { useAssessmentSession } from "../../hooks/useAssessmentSession";
 import { useAIJobPolling } from "../../hooks/useAIJobPolling";
 import { useResponseScoringPolling } from "../../hooks/useResponseScoringPolling";
+import { useAllScoringPolling } from "../../hooks/useAllScoringPolling";
 import { apiService } from "../../services/api";
 
 import ScenarioInteraction from './ScenarioInteraction';
@@ -84,7 +85,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   const [errorMessage, setErrorMessage] = useState('');
   const [retryAction, setRetryAction] = useState<(() => void) | null>(null);
 
-  // Response scoring polling hook
+  // Response scoring polling hook (for non-last questions - 5 second max wait)
   const { startPolling: startScoringPolling, isPolling: isScoringPolling } = useResponseScoringPolling({
     onComplete: () => {
       // Race completed - show next question
@@ -95,6 +96,41 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
         setPendingProgress(null);
       }
       setIsSubmitting(false);
+    },
+  });
+
+  // State for last question - waiting for all scoring
+  const [isWaitingForAllScoring, setIsWaitingForAllScoring] = useState(false);
+  const [pendingCompletedSessionId, setPendingCompletedSessionId] = useState<string | null>(null);
+
+  // All scoring polling hook (for last question - wait for all scoring to complete)
+  const { startPolling: startAllScoringPolling, progress: scoringProgress } = useAllScoringPolling({
+    onComplete: async () => {
+      // All scoring completed successfully - show completion dialog and trigger final feedback
+      setIsWaitingForAllScoring(false);
+      
+      const sessionId = pendingCompletedSessionId;
+      if (sessionId) {
+        setCompletedSessionId(sessionId);
+        setPendingCompletedSessionId(null);
+        setShowCompletionDialog(true);
+        
+        // Trigger final feedback generation in background
+        try {
+          await apiService.generateFinalFeedback(sessionId);
+        } catch (error) {
+          // Silent fail - feedback generation will be retried when user clicks "See Results"
+          console.warn('[AssessmentScreen] Failed to trigger final feedback:', error);
+        }
+      }
+    },
+    onError: (errorMessage) => {
+      // Scoring failed - show error dialog
+      setIsWaitingForAllScoring(false);
+      setPendingCompletedSessionId(null);
+      setErrorMessage(errorMessage);
+      setRetryAction(null);
+      setShowErrorDialog(true);
     },
   });
 
@@ -202,13 +238,18 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
 
       if (response.success) {
         if (response.data.isComplete) {
-          // Last question - show completion dialog
+          // Last question - wait for ALL scoring to complete before showing completion dialog
           if (!response.data.sessionId) {
             throw new Error('Session ID not found in response');
           }
-          setCompletedSessionId(response.data.sessionId);
-          setShowCompletionDialog(true);
+          
+          // Store session ID and show loader while waiting for all scoring
+          setPendingCompletedSessionId(response.data.sessionId);
+          setIsWaitingForAllScoring(true);
           setIsSubmitting(false);
+          
+          // Start polling for all scoring jobs to complete
+          startAllScoringPolling(response.data.sessionId);
         } else {
           // More questions - start response scoring polling
           const { scoringJobId, question, progress } = response.data;
@@ -514,6 +555,33 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
           <BlurView intensity={80} tint="dark" style={styles.submittingBlurContainer}>
             <View style={styles.submittingLoaderContainer}>
               <ActivityIndicator size={40} color={BRAND} />
+            </View>
+          </BlurView>
+        </Modal>
+
+        {/* Last question - waiting for all scoring to complete */}
+        <Modal
+          visible={isWaitingForAllScoring}
+          transparent
+          animationType="fade"
+          statusBarTranslucent
+        >
+          <BlurView intensity={100} tint="dark" style={styles.blurContainer}>
+            <View style={styles.aiLoaderContent}>
+              <View style={styles.aiAnimationContainer}>
+                <LottieView
+                  source={AI_LOADING_ANIMATION}
+                  autoPlay
+                  loop
+                  style={styles.aiAnimation}
+                />
+              </View>
+              <Text style={styles.aiLoaderTitle}>
+                Analyzing your responses
+              </Text>
+              <Text style={styles.aiLoaderSubtitle}>
+                {scoringProgress?.message || 'Please wait while we process your answers...'}
+              </Text>
             </View>
           </BlurView>
         </Modal>

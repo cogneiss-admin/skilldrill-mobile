@@ -1,8 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { MotiView } from 'moti';
+import { ProgressBar } from 'react-native-paper';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, BRAND, BRAND_LIGHT } from './Brand';
 
 export interface ActivityCardProps {
@@ -98,28 +97,11 @@ export default function ActivityCard({ type, data, onAction }: ActivityCardProps
                     {/* Progress Bar & Question Count (Only for In Progress) */}
                     {isInProgress && data.progress && (
                         <View style={styles.progressContainer}>
-                            <View style={styles.progressBarBg}>
-                                <LinearGradient
-                                    colors={['#0A66C2', '#3B82F6']} // Brand Primary -> Brand Accent
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 0 }}
-                                    style={[styles.progressBarFill, { width: `${data.progress.percentage}%` }]}
-                                >
-                                    <MotiView
-                                        from={{ translateX: -100 }}
-                                        animate={{ translateX: 200 }}
-                                        transition={{ type: 'timing', duration: 1500, loop: true }}
-                                        style={{ width: '50%', height: '100%', position: 'absolute', opacity: 0.3 }}
-                                    >
-                                        <LinearGradient
-                                            colors={['transparent', '#FFFFFF', 'transparent']}
-                                            start={{ x: 0, y: 0 }}
-                                            end={{ x: 1, y: 0 }}
-                                            style={{ flex: 1 }}
-                                        />
-                                    </MotiView>
-                                </LinearGradient>
-                            </View>
+                            <ProgressBar
+                                progress={data.progress.percentage / 100}
+                                color="#0A66C2"
+                                style={styles.paperProgressBar}
+                            />
                             <Text style={styles.progressText}>
                                 <Text style={styles.progressHighlight}>{data.progress.current}</Text>/<Text style={styles.progressHighlight}>{data.progress.total}</Text> Answered
                             </Text>
@@ -237,28 +219,11 @@ export default function ActivityCard({ type, data, onAction }: ActivityCardProps
                     {/* Progress Bar - show for active drills with progress */}
                     {data.progress && !isUnlocked && !isPending && (
                         <View style={styles.progressSection}>
-                            <View style={styles.progressBarBg}>
-                                <LinearGradient
-                                    colors={['#0A66C2', '#3B82F6']}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 0 }}
-                                    style={[styles.progressBarFill, { width: `${data.progress.percentage}%` }]}
-                                >
-                                    <MotiView
-                                        from={{ translateX: -100 }}
-                                        animate={{ translateX: 200 }}
-                                        transition={{ type: 'timing', duration: 1500, loop: true }}
-                                        style={{ width: '50%', height: '100%', position: 'absolute', opacity: 0.3 }}
-                                    >
-                                        <LinearGradient
-                                            colors={['transparent', '#FFFFFF', 'transparent']}
-                                            start={{ x: 0, y: 0 }}
-                                            end={{ x: 1, y: 0 }}
-                                            style={{ flex: 1 }}
-                                        />
-                                    </MotiView>
-                                </LinearGradient>
-                            </View>
+                            <ProgressBar
+                                progress={data.progress.percentage / 100}
+                                color="#0A66C2"
+                                style={styles.paperProgressBar}
+                            />
                             <Text style={styles.progressText}>
                                 <Text style={styles.progressHighlight}>{data.progress.current}/{data.progress.total}</Text> drills completed • <Text style={styles.progressHighlight}>{data.progress.percentage}%</Text>
                             </Text>
@@ -383,22 +348,10 @@ const styles = StyleSheet.create({
     progressContainer: {
         marginBottom: SPACING.padding.lg,
     },
-    progressBarBg: {
-        height: 10,
-        backgroundColor: '#F1F5F9', // Slate 100 
-        borderRadius: 5,
-        overflow: 'hidden',
-    },
-    progressBarFill: {
-        height: '100%',
-        borderRadius: 5,
-        overflow: 'hidden', // Ensure shimmer stays inside
-        // Glow Effect
-        shadowColor: '#3B82F6',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.6,
-        shadowRadius: 6,
-        elevation: 3,
+    paperProgressBar: {
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#E2E8F0',
     },
 
     // Buttons

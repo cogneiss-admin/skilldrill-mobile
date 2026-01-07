@@ -510,6 +510,10 @@ class ApiService {
   public async retryDrillScoring(drillItemId: string): Promise<ApiResponse> {
     return this.post(`/drills/${drillItemId}/retry-scoring`, {});
   }
+
+  public async getAssessmentScoringStatus(assessmentId: string): Promise<ApiResponse> {
+    return this.get(`/assessment/${assessmentId}/scoring-status`);
+  }
 }
 
 export const apiService = new ApiService();
