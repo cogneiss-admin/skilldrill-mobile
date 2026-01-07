@@ -143,11 +143,12 @@ export const useDrillProgress = (assignmentId: string): UseDrillProgressReturn =
         await fetchAndNavigateToResults(pendingResultsAssignmentId);
       }
     },
-    onError: (errorMessage) => {
+    onError: (err, jobStatus) => {
       // Log technical error to console
-      console.error('[useDrillProgress] Feedback generation failed:', errorMessage);
-      // Set clean error message for user
-      setError('Something went wrong. Please try again.');
+      console.error('[useDrillProgress] Feedback generation failed:', err);
+      // Use backend error message if available
+      const errorMsg = jobStatus?.error || err?.message || 'Unable to generate feedback. Please try again.';
+      setError(errorMsg);
     },
   });
 

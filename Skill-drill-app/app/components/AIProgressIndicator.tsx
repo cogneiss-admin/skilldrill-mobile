@@ -12,10 +12,11 @@ interface AIProgressIndicatorProps {
   showCancel?: boolean;
 }
 
+// Simplified status colors - no distinction between primary/secondary
 const STATUS_COLORS: Record<AIJobStatusType, string> = {
   pending: '#FFA500',           // Orange
   running: BRAND,               // Brand blue
-  runningSecondary: '#8B4513',  // Brown (fallback indicator)
+  runningSecondary: BRAND,      // Same as running (deprecated status)
   completed: COLORS.success,    // Green
   failed: COLORS.error          // Red
 };
@@ -25,8 +26,7 @@ const getStatusLabel = (status: AIJobStatusType): string => {
     case 'pending':
       return 'Preparing...';
     case 'running':
-      return 'Processing...';
-    case 'runningSecondary':
+    case 'runningSecondary': // Deprecated, treat same as running
       return 'Processing...';
     case 'completed':
       return 'Complete';

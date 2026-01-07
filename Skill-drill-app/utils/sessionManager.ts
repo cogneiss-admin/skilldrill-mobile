@@ -1,4 +1,3 @@
-import { Alert } from 'react-native';
 import { router } from 'expo-router';
 import tokenManager from './tokenManager';
 
@@ -31,7 +30,7 @@ export class SessionManager {
     return this.isLoggingOut;
   }
 
-  static async handleSessionExpiration(reason: string = 'Session expired') {
+  static async handleSessionExpiration() {
     if (this.isLoggingOut) {
       return;
     }
@@ -52,20 +51,7 @@ export class SessionManager {
 
     try {
       await this.clearAuthData();
-
-      Alert.alert(
-        'Session Expired',
-        `${reason}. Please log in again.`,
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              this.redirectToLogin();
-            }
-          }
-        ],
-        { cancelable: false }
-      );
+      this.redirectToLogin();
     } catch {
       this.redirectToLogin();
     } finally {
@@ -108,19 +94,19 @@ export class SessionManager {
   }
 
   static async handleTokenRefreshFailure(): Promise<void> {
-    await this.handleSessionExpiration('Your session has expired');
+    await this.handleSessionExpiration();
   }
 
   static async handleInvalidToken(): Promise<void> {
-    await this.handleSessionExpiration('Invalid session token');
+    await this.handleSessionExpiration();
   }
 
   static async handleUnauthorized(): Promise<void> {
-    await this.handleSessionExpiration('Unauthorized access');
+    await this.handleSessionExpiration();
   }
 
-  static async triggerSessionExpiration(reason: string = 'Session expired'): Promise<void> {
-    await this.handleSessionExpiration(reason);
+  static async triggerSessionExpiration(): Promise<void> {
+    await this.handleSessionExpiration();
   }
 
   static resetFlags(): void {

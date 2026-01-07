@@ -78,6 +78,11 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
 
   const [parsedResults, setParsedResults] = useState<any>(null);
 
+  // Error dialog state
+  const [showErrorDialog, setShowErrorDialog] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [retryAction, setRetryAction] = useState<(() => void) | null>(null);
+
   // Response scoring polling hook
   const { startPolling: startScoringPolling, isPolling: isScoringPolling } = useResponseScoringPolling({
     onComplete: () => {
@@ -130,13 +135,16 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
         await fetchAndNavigateToResults(pendingSessionId);
       }
     },
-    onError: (errorMessage) => {
+    onError: (error, jobStatus) => {
       setShowAiLoader(false);
       setIsLoadingResults(false);
       // Log technical error to console
-      console.error('[AssessmentScreen] Failed to generate results:', errorMessage);
-      // Show clean error message to user
-      Alert.alert('Error', 'Something went wrong. Please try again.');
+      console.error('[AssessmentScreen] Failed to generate results:', error);
+      // Show error dialog with message from backend
+      const errorMsg = jobStatus?.error || error?.message || 'Unable to generate results. Please try again.';
+      setErrorMessage(errorMsg);
+      setRetryAction(() => retryResultsPolling);
+      setShowErrorDialog(true);
     },
   });
 
@@ -509,6 +517,51 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
             </View>
           </View>
         </Modal>
+
+        {/* Error Dialog */}
+        <Modal
+          visible={showErrorDialog}
+          transparent
+          animationType="fade"
+          statusBarTranslucent
+        >
+          <View style={styles.errorDialogBackdrop}>
+            <View style={styles.errorDialogContainer}>
+              <View style={styles.errorIconContainer}>
+                <Text style={styles.errorIcon}>⚠️</Text>
+              </View>
+              <Text style={styles.errorDialogTitle}>Something went wrong</Text>
+              <Text style={styles.errorDialogMessage}>{errorMessage}</Text>
+              <View style={styles.errorDialogButtons}>
+                <TouchableOpacity
+                  style={styles.errorDialogCancelButton}
+                  onPress={() => {
+                    setShowErrorDialog(false);
+                    setErrorMessage('');
+                    resetResultsPolling();
+                    if (onExit) onExit();
+                    else router.back();
+                  }}
+                >
+                  <Text style={styles.errorDialogCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.errorDialogRetryButton}
+                  onPress={() => {
+                    setShowErrorDialog(false);
+                    setErrorMessage('');
+                    if (retryAction) {
+                      setShowAiLoader(true);
+                      retryAction();
+                    }
+                  }}
+                >
+                  <Text style={styles.errorDialogRetryText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </>
     );
   }
@@ -585,6 +638,78 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: SCREEN_WIDTH * 0.025,
     fontSize: SCREEN_WIDTH * 0.04,
+  },
+  // Error Dialog Styles
+  errorDialogBackdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: SCREEN_WIDTH * 0.06,
+  },
+  errorDialogContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: SCREEN_WIDTH * 0.06,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  errorIconContainer: {
+    marginBottom: SCREEN_WIDTH * 0.04,
+  },
+  errorIcon: {
+    fontSize: 48,
+  },
+  errorDialogTitle: {
+    fontSize: SCREEN_WIDTH * 0.05,
+    fontWeight: '700',
+    color: '#1F2937',
+    textAlign: 'center',
+    marginBottom: SCREEN_WIDTH * 0.02,
+  },
+  errorDialogMessage: {
+    fontSize: SCREEN_WIDTH * 0.038,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: SCREEN_WIDTH * 0.06,
+    lineHeight: SCREEN_WIDTH * 0.055,
+  },
+  errorDialogButtons: {
+    flexDirection: 'row',
+    width: '100%',
+    gap: SCREEN_WIDTH * 0.03,
+  },
+  errorDialogCancelButton: {
+    flex: 1,
+    paddingVertical: SCREEN_WIDTH * 0.035,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  errorDialogCancelText: {
+    fontSize: SCREEN_WIDTH * 0.04,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  errorDialogRetryButton: {
+    flex: 1,
+    paddingVertical: SCREEN_WIDTH * 0.035,
+    borderRadius: 8,
+    backgroundColor: BRAND,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  errorDialogRetryText: {
+    fontSize: SCREEN_WIDTH * 0.04,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });
 

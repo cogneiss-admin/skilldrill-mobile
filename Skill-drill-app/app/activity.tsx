@@ -51,10 +51,13 @@ export default function Activity() {
     logError(error, context);
     console.error(`[Activity] ${context}:`, error);
 
-    // Show clean user-friendly error dialog (not technical details)
+    // Show clean user-friendly error dialog
     setShowAiLoader(false);
     setProgressMessage('');
-    setErrorMessage('Something went wrong. Please try again.');
+    
+    // Use backend error message if available, otherwise show generic message
+    const errorMsg = error?.message || error?.data?.message || 'Something went wrong. Please try again.';
+    setErrorMessage(errorMsg);
     setShowErrorDialog(true);
   }, []);
 

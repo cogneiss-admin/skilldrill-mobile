@@ -56,11 +56,13 @@ export interface Country {
 
 /**
  * AI Job Status Types - matches backend AIGenerationJob model
+ * Note: 'runningSecondary' is kept for backward compatibility but deprecated.
+ * OpenRouter now handles model fallback automatically via models[] array.
  */
 export type AIJobStatusType =
   | 'pending'
   | 'running'
-  | 'runningSecondary'
+  | 'runningSecondary' // Deprecated - kept for backward compatibility
   | 'completed'
   | 'failed';
 
@@ -73,12 +75,10 @@ export interface AIJobStatus {
   message: string;
   attemptCount: number;
   maxAttempts: number;
-  modelTier: 'primary' | 'secondary';
   completed: boolean;
   failed: boolean;
   error: string | null;
   retryable: boolean;
-  retryCount?: number;
   createdAt?: string;
   updatedAt?: string;
 }
