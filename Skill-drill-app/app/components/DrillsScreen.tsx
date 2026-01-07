@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  ActivityIndicator,
   StyleSheet,
   Modal,
   Dimensions,
   TextStyle,
 } from 'react-native';
+import { ActivityIndicator } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -178,12 +178,11 @@ const DrillsScreen: React.FC<DrillsScreenProps> = ({
           animationType="fade"
           statusBarTranslucent
         >
-          <View style={styles.blurContainer}>
-            <View style={styles.modalLoadingContainer}>
-              <ActivityIndicator size="large" color="#FFFFFF" />
-              <Text style={[styles.modalLoadingText, { color: '#FFFFFF', marginTop: SCREEN_WIDTH * 0.04 }]}>Processing your response...</Text>
+          <BlurView intensity={80} tint="dark" style={styles.submittingBlurContainer}>
+            <View style={styles.submittingLoaderContainer}>
+              <ActivityIndicator size={40} color={BRAND} />
             </View>
-          </View>
+          </BlurView>
         </Modal>
 
         <Modal
@@ -273,17 +272,21 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.8)',
   },
-  modalLoadingContainer: {
+  submittingBlurContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: SCREEN_WIDTH * 0.06,
   },
-  modalLoadingText: {
-    marginTop: SCREEN_WIDTH * 0.025,
-    fontSize: SCREEN_WIDTH * 0.04,
+  submittingLoaderContainer: {
+    padding: 24,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
   aiLoaderContent: {
     alignItems: 'center',

@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ScrollView, RefreshControl, ActivityIndicator, Modal, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ScrollView, RefreshControl, Modal, Dimensions } from 'react-native';
+import { ActivityIndicator } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
@@ -778,23 +779,33 @@ export default function Activity() {
         animationType="fade"
         statusBarTranslucent
       >
-        <BlurView intensity={100} tint="dark" style={styles.blurContainer}>
-          <View style={styles.aiLoaderContent}>
-            <View style={styles.aiAnimationContainer}>
-              <LottieView
-                source={AI_LOADING_ANIMATION}
-                autoPlay
-                loop
-                style={styles.aiAnimation}
-              />
+        {isResuming ? (
+          /* Clean loader for resume actions */
+          <BlurView intensity={80} tint="dark" style={styles.blurContainer}>
+            <View style={styles.resumeLoaderContainer}>
+              <ActivityIndicator size={40} color={BRAND} />
             </View>
-            <Text style={styles.aiLoaderTitle}>Generating...</Text>
-            {/* Dynamic progress message from backend */}
-            {progressMessage ? (
-              <Text style={styles.aiLoaderSubtitle}>{progressMessage}</Text>
-            ) : null}
-          </View>
-        </BlurView>
+          </BlurView>
+        ) : (
+          /* Lottie animation for generation actions - original styling */
+          <BlurView intensity={100} tint="dark" style={styles.blurContainer}>
+            <View style={styles.aiLoaderContent}>
+              <View style={styles.aiAnimationContainer}>
+                <LottieView
+                  source={AI_LOADING_ANIMATION}
+                  autoPlay
+                  loop
+                  style={styles.aiAnimation}
+                />
+              </View>
+              <Text style={styles.aiLoaderTitle}>Generating...</Text>
+              {/* Dynamic progress message from backend */}
+              {progressMessage ? (
+                <Text style={styles.aiLoaderSubtitle}>{progressMessage}</Text>
+              ) : null}
+            </View>
+          </BlurView>
+        )}
       </Modal>
 
       {/* Error Dialog */}
@@ -846,12 +857,11 @@ export default function Activity() {
         animationType="fade"
         statusBarTranslucent
       >
-        <View style={styles.blurContainer}>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#FFFFFF" />
-            <Text style={[styles.loadingText, { color: '#FFFFFF', marginTop: SCREEN_WIDTH * 0.04 }]}>Fetching Results...</Text>
+        <BlurView intensity={80} tint="dark" style={styles.blurContainer}>
+          <View style={styles.resumeLoaderContainer}>
+            <ActivityIndicator size={40} color={BRAND} />
           </View>
-        </View>
+        </BlurView>
       </Modal>
     </SafeAreaView>
   );
@@ -991,7 +1001,17 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.8)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  resumeLoaderContainer: {
+    padding: 24,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
   aiLoaderContent: {
     alignItems: 'center',

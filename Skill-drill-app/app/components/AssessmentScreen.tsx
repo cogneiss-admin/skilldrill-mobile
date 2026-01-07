@@ -9,7 +9,8 @@
  */
 
 import React, { useState, useEffect, useCallback } from "react";
-import { View, Text, Alert, Modal, StyleSheet, ActivityIndicator, Dimensions, TouchableOpacity } from "react-native";
+import { View, Text, Alert, Modal, StyleSheet, Dimensions, TouchableOpacity } from "react-native";
+import { ActivityIndicator } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "react-native";
 import * as Haptics from "expo-haptics";
@@ -510,12 +511,11 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
           animationType="fade"
           statusBarTranslucent
         >
-          <View style={styles.blurContainer}>
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#FFFFFF" />
-              <Text style={[styles.loadingText, { color: '#FFFFFF', marginTop: SCREEN_WIDTH * 0.04 }]}>Processing your response...</Text>
+          <BlurView intensity={80} tint="dark" style={styles.submittingBlurContainer}>
+            <View style={styles.submittingLoaderContainer}>
+              <ActivityIndicator size={40} color={BRAND} />
             </View>
-          </View>
+          </BlurView>
         </Modal>
 
         {/* Error Dialog */}
@@ -629,15 +629,20 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
   },
-  loadingContainer: {
+  submittingBlurContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: SCREEN_WIDTH * 0.06,
   },
-  loadingText: {
-    marginTop: SCREEN_WIDTH * 0.025,
-    fontSize: SCREEN_WIDTH * 0.04,
+  submittingLoaderContainer: {
+    padding: 24,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
   // Error Dialog Styles
   errorDialogBackdrop: {
