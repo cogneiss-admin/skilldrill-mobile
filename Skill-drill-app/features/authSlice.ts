@@ -6,8 +6,6 @@ export interface AuthState {
   user: User | null;
   isLoading: boolean;
   error: string;
-  token: string;
-  refreshToken: string;
   lastAuthCheck: number;
 }
 
@@ -16,12 +14,9 @@ const initialState: AuthState = {
   user: null,
   isLoading: true,
   error: '',
-  token: '',
-  refreshToken: '',
   lastAuthCheck: 0,
 };
 
-// Async thunks for better performance
 export const checkAuthStatus = createAsyncThunk(
   'auth/checkStatus',
   async (_, { rejectWithValue }) => {
@@ -183,7 +178,6 @@ export const updateOnboardingStepUser = createAsyncThunk(
     try {
       const { default: authService } = await import('../services/authService');
       await authService.updateOnboardingStep(step);
-      // Re-check auth status to get updated user data
       dispatch(checkAuthStatus());
       return step;
     } catch (error: unknown) {
@@ -208,27 +202,20 @@ const authSlice = createSlice({
         state.user = { ...state.user, ...action.payload };
       }
     },
-    setToken: (state, action: PayloadAction<string>) => {
-      state.token = action.payload;
-    },
-    setRefreshToken: (state, action: PayloadAction<string>) => {
-      state.refreshToken = action.payload;
-    },
-    setTokens: (state, action: PayloadAction<{ accessToken: string; refreshToken: string }>) => {
-      state.token = action.payload.accessToken;
-      state.refreshToken = action.payload.refreshToken;
+    setAuthenticated: (state, action: PayloadAction<boolean>) => {
+      state.isAuthenticated = action.payload;
     },
     clearAuth: (state) => {
       state.isAuthenticated = false;
       state.user = null;
-      state.token = '';
-      state.refreshToken = '';
       state.error = '';
+    },
+    setLoading: (state, action: PayloadAction<boolean>) => {
+      state.isLoading = action.payload;
     },
   },
   extraReducers: (builder) => {
     builder
-      // Check auth status
       .addCase(checkAuthStatus.pending, (state) => {
         state.isLoading = true;
         state.error = '';
@@ -245,8 +232,6 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
         state.user = null;
       })
-
-      // Login
       .addCase(loginUser.pending, (state) => {
         state.isLoading = true;
         state.error = '';
@@ -261,8 +246,6 @@ const authSlice = createSlice({
         state.isLoading = false;
         state.error = action.payload as string;
       })
-
-      // Verify OTP
       .addCase(verifyOtpUser.pending, (state) => {
         state.isLoading = true;
         state.error = '';
@@ -277,17 +260,11 @@ const authSlice = createSlice({
         state.isLoading = false;
         state.error = action.payload as string;
       })
-
-      // Logout
       .addCase(logoutUser.fulfilled, (state) => {
         state.isAuthenticated = false;
         state.user = null;
-        state.token = '';
-        state.refreshToken = '';
         state.error = '';
       })
-
-      // Signup
       .addCase(signupUser.pending, (state) => {
         state.isLoading = true;
         state.error = '';
@@ -304,8 +281,6 @@ const authSlice = createSlice({
         state.isLoading = false;
         state.error = action.payload as string;
       })
-
-      // Update Profile
       .addCase(updateProfileUser.pending, (state) => {
         state.isLoading = true;
         state.error = '';
@@ -319,8 +294,6 @@ const authSlice = createSlice({
         state.isLoading = false;
         state.error = action.payload as string;
       })
-
-      // Update Onboarding Step
       .addCase(updateOnboardingStepUser.pending, (state) => {
         state.isLoading = true;
         state.error = '';
@@ -340,9 +313,8 @@ export const {
   clearError,
   setUser,
   updateUserProfile,
-  setToken,
-  setRefreshToken,
-  setTokens,
-  clearAuth
+  setAuthenticated,
+  clearAuth,
+  setLoading
 } = authSlice.actions;
 export default authSlice.reducer;

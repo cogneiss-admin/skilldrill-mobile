@@ -1,5 +1,8 @@
 import apiService, { ApiResponse, User, ApiError } from './api';
+import tokenManager from '../utils/tokenManager';
 import SessionManager from '../utils/sessionManager';
+import { store } from '../store';
+import { setUser, setAuthenticated, clearAuth } from '../features/authSlice';
 
 export interface PhoneSignupRequest {
   phoneNo: string;
@@ -121,56 +124,50 @@ export interface TokenRefreshResponse {
 class AuthService {
   private isUpdatingProfile = false;
 
-  public async getAccessToken(): Promise<string> {
-    const { store } = await import('../store');
-    const state = store.getState();
-    return state.auth.token;
+  public getAccessToken(): string | null {
+    return tokenManager.getAccessToken();
   }
 
-  public async setAccessToken(token: string): Promise<void> {
-    const { store } = await import('../store');
-    const { setToken } = await import('../features/authSlice');
-    store.dispatch(setToken(token));
+  public async getRefreshToken(): Promise<string | null> {
+    return tokenManager.getRefreshToken();
   }
 
-  public async getRefreshToken(): Promise<string> {
-    const { store } = await import('../store');
-    const state = store.getState();
-    return state.auth.refreshToken;
+  public async hasValidSession(): Promise<boolean> {
+    return tokenManager.hasValidSession();
   }
 
-  public async setRefreshTokenValue(token: string): Promise<void> {
-    const { store } = await import('../store');
-    const { setRefreshToken } = await import('../features/authSlice');
-    store.dispatch(setRefreshToken(token));
+  public getUserData(): User | null {
+    return store.getState().auth.user;
   }
 
-  public async getUserData(): Promise<User | null> {
-    const { store } = await import('../store');
-    const state = store.getState();
-    return state.auth.user;
-  }
-
-  public async setUserData(user: User): Promise<void> {
-    const { store } = await import('../store');
-    const { setUser } = await import('../features/authSlice');
+  public setUserData(user: User): void {
     store.dispatch(setUser(user));
   }
 
   public async clearAuthData(): Promise<void> {
-    try {
-      const { store } = await import('../store');
-      const { clearAuth } = await import('../features/authSlice');
-      store.dispatch(clearAuth());
-      await SessionManager.clearAuthData();
-    } catch (error) {
-    }
+    store.dispatch(clearAuth());
+    await tokenManager.clearAllTokens();
   }
 
   public async isAuthenticated(): Promise<boolean> {
-    const token = await this.getAccessToken();
-    return !!token;
+    const hasSession = await this.hasValidSession();
+    const hasAccessToken = !!this.getAccessToken();
+    return hasSession || hasAccessToken;
   }
+
+  private async handleAuthSuccess(authData: AuthSuccessResponse): Promise<void> {
+    if (authData.accessToken) {
+      tokenManager.setAccessToken(authData.accessToken);
+    }
+    if (authData.refreshToken) {
+      await tokenManager.setRefreshToken(authData.refreshToken);
+    }
+    if (authData.user) {
+      this.setUserData(authData.user);
+    }
+    store.dispatch(setAuthenticated(true));
+  }
+
   public async signupWithPhone(data: PhoneSignupRequest): Promise<ApiResponse<SignupResponse>> {
     return apiService.post<SignupResponse>('/multi-auth/signup/phone', data);
   }
@@ -181,31 +178,17 @@ class AuthService {
 
   public async signupWithPassword(data: PasswordSignupRequest): Promise<ApiResponse<AuthSuccessResponse>> {
     const response = await apiService.post<AuthSuccessResponse>('/multi-auth/signup/password', data);
-
-    if (response.success) {
-      const authData = response.data as AuthSuccessResponse;
-      const at = authData?.accessToken;
-      const rt = authData?.refreshToken;
-      if (at) await this.setAccessToken(at);
-      if (rt) await this.setRefreshTokenValue(rt);
-      if (authData?.user) await this.setUserData(authData.user);
+    if (response.success && response.data) {
+      await this.handleAuthSuccess(response.data);
     }
-
     return response;
   }
 
   public async signupWithSocial(data: SocialSignupRequest): Promise<ApiResponse<AuthSuccessResponse>> {
     const response = await apiService.post<AuthSuccessResponse>('/multi-auth/signup/social', data);
-
-    if (response.success) {
-      const authData = response.data as AuthSuccessResponse;
-      const at = authData?.accessToken;
-      const rt = authData?.refreshToken;
-      if (at) await this.setAccessToken(at);
-      if (rt) await this.setRefreshTokenValue(rt);
-      if (authData?.user) await this.setUserData(authData.user);
+    if (response.success && response.data) {
+      await this.handleAuthSuccess(response.data);
     }
-
     return response;
   }
 
@@ -219,31 +202,17 @@ class AuthService {
 
   public async loginWithPassword(data: PasswordLoginRequest): Promise<ApiResponse<AuthSuccessResponse>> {
     const response = await apiService.post<AuthSuccessResponse>('/multi-auth/login/password', data);
-
-    if (response.success) {
-      const authData = response.data as AuthSuccessResponse;
-      const at = authData?.accessToken;
-      const rt = authData?.refreshToken;
-      if (at) await this.setAccessToken(at);
-      if (rt) await this.setRefreshTokenValue(rt);
-      if (authData?.user) await this.setUserData(authData.user);
+    if (response.success && response.data) {
+      await this.handleAuthSuccess(response.data);
     }
-
     return response;
   }
 
   public async verifyOtp(data: OtpVerificationRequest): Promise<ApiResponse<AuthSuccessResponse>> {
     const response = await apiService.post<AuthSuccessResponse>('/multi-auth/verify-otp', data);
-
-    if (response.success) {
-      const authData = response.data as AuthSuccessResponse;
-      const at = authData?.accessToken;
-      const rt = authData?.refreshToken;
-      if (at) await this.setAccessToken(at);
-      if (rt) await this.setRefreshTokenValue(rt);
-      if (authData?.user) await this.setUserData(authData.user);
+    if (response.success && response.data) {
+      await this.handleAuthSuccess(response.data);
     }
-
     return response;
   }
 
@@ -252,43 +221,31 @@ class AuthService {
   }
 
   public async refreshToken(refreshToken: string): Promise<ApiResponse<TokenRefreshResponse>> {
-    const response = await apiService.post<TokenRefreshResponse>('/multi-auth/refresh-token', {
+    return apiService.post<TokenRefreshResponse>('/multi-auth/refresh-token', {
       refreshToken: refreshToken
     });
-
-    if (response.success) {
-      const authData = response.data as TokenRefreshResponse;
-      const at = authData?.accessToken;
-      const rt = authData?.refreshToken;
-      if (at) await this.setAccessToken(at);
-      if (rt) await this.setRefreshTokenValue(rt);
-    }
-
-    return response;
   }
 
   public async logout(): Promise<ApiResponse> {
     try {
       SessionManager.setLoggingOut(true);
-
       const refreshToken = await this.getRefreshToken();
       if (refreshToken) {
         await apiService.post('/multi-auth/logout', { refreshToken });
       }
-    } catch (error) {
+    } catch {
     } finally {
       await this.clearAuthData();
       SessionManager.setLoggingOut(false);
     }
-
     return { success: true, data: {}, message: 'Logout successful' };
   }
 
   public async updateUserProfile(userData: Partial<User>): Promise<void> {
-    const currentUser = await this.getUserData();
+    const currentUser = this.getUserData();
     if (currentUser) {
       const updatedUser = { ...currentUser, ...userData };
-      await this.setUserData(updatedUser);
+      this.setUserData(updatedUser);
     }
   }
 
@@ -330,7 +287,7 @@ class AuthService {
       const response = await apiService.put<User>('/multi-auth/profile', payload);
 
       if (response.success && response.data) {
-        await this.setUserData(response.data);
+        this.setUserData(response.data);
       }
 
       return response;
@@ -355,7 +312,7 @@ class AuthService {
       const response = await apiService.get<{ user: User }>('/multi-auth/profile');
 
       if (response.success && response.data?.user) {
-        await this.setUserData(response.data.user);
+        this.setUserData(response.data.user);
         return {
           success: response.success,
           data: response.data.user,
@@ -375,7 +332,7 @@ class AuthService {
 
   public async validateTokenAndGetUser(): Promise<{ isValid: boolean; user: User | null }> {
     try {
-      const token = await this.getAccessToken();
+      const token = this.getAccessToken();
 
       if (!token) {
         return { isValid: false, user: null };
@@ -442,4 +399,3 @@ class AuthService {
 
 export const authService = new AuthService();
 export default authService;
-

@@ -1,5 +1,6 @@
 import { useEffect, useCallback } from 'react';
-import { useAppDispatch, useAppSelector } from './index';
+import { useDispatch, useSelector } from 'react-redux';
+import type { RootState, AppDispatch } from '../store';
 import {
   selectUser,
   selectIsAuthenticated,
@@ -29,14 +30,14 @@ export interface AuthState {
 }
 
 export const useAuth = () => {
-  const dispatch = useAppDispatch();
+  const dispatch = useDispatch<AppDispatch>();
 
-  const user = useAppSelector(selectUser);
-  const isAuthenticated = useAppSelector(selectIsAuthenticated);
-  const isLoading = useAppSelector(selectAuthLoading);
-  const error = useAppSelector(selectAuthError);
-  const isOnboardingCompleteValue = useAppSelector(selectIsOnboardingComplete);
-  const onboardingNextStep = useAppSelector(selectOnboardingNextStep);
+  const user = useSelector((state: RootState) => selectUser(state));
+  const isAuthenticated = useSelector((state: RootState) => selectIsAuthenticated(state));
+  const isLoading = useSelector((state: RootState) => selectAuthLoading(state));
+  const error = useSelector((state: RootState) => selectAuthError(state));
+  const isOnboardingCompleteValue = useSelector((state: RootState) => selectIsOnboardingComplete(state));
+  const onboardingNextStep = useSelector((state: RootState) => selectOnboardingNextStep(state));
 
   useEffect(() => {
     dispatch(checkAuthStatus());

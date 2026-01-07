@@ -1,4 +1,3 @@
-// Ensure Reanimated is initialized
 import "react-native-reanimated";
 import React, { Suspense, useEffect, useMemo, useState } from "react";
 import "./global.css";
@@ -7,11 +6,11 @@ import { View, Animated as RNAnimated, StatusBar as RNStatusBar, Platform } from
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Provider as PaperProvider, MD3LightTheme } from "react-native-paper";
 import { Provider as ReduxProvider } from "react-redux";
-import { PersistGate } from 'redux-persist/integration/react';
 import { useFonts } from "expo-font";
 import { Ionicons } from "@expo/vector-icons";
-import { store, persistor } from "../store";
+import { store } from "../store";
 import { useAuth } from "../hooks/useAuth";
+import { useAuthBootstrap } from "../hooks/useAuthBootstrap";
 import { BRAND, LOGO_SRC, SCREEN_CONTAINER_BACKGROUND } from "./components/Brand";
 import SessionManager from "../utils/sessionManager";
 
@@ -26,7 +25,7 @@ const theme = {
 const logoSrc = LOGO_SRC;
 
 function GlobalOtpSheet() {
-  return null; // reserved for future global portal
+  return null;
 }
 
 const SmallLogo = React.memo(() => {
@@ -48,7 +47,14 @@ const SmallLogo = React.memo(() => {
 
 SmallLogo.displayName = 'SmallLogo';
 
-// Authentication middleware component
+const LoadingScreen = React.memo(() => (
+  <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: BRAND }}>
+    <SmallLogo />
+  </View>
+));
+
+LoadingScreen.displayName = 'LoadingScreen';
+
 const AuthMiddleware = React.memo(({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, user, isLoading, isOnboardingComplete, getOnboardingNextStep } = useAuth();
   const segments = useSegments();
@@ -147,22 +153,31 @@ const AuthMiddleware = React.memo(({ children }: { children: React.ReactNode }) 
 
 AuthMiddleware.displayName = 'AuthMiddleware';
 
+const AuthBootstrapWrapper = React.memo(({ children }: { children: React.ReactNode }) => {
+  const { isInitialized } = useAuthBootstrap();
+
+  if (!isInitialized) {
+    return <LoadingScreen />;
+  }
+
+  return <>{children}</>;
+});
+
+AuthBootstrapWrapper.displayName = 'AuthBootstrapWrapper';
+
 const RootLayout = React.memo(() => {
   const navState = useRootNavigationState();
   const segments = useSegments();
   const [routeOverlayVisible, setRouteOverlayVisible] = useState(false);
 
-  // Load Ionicons font to prevent "?" rendering
   const [fontsLoaded] = useFonts({
     ...Ionicons.font,
   });
 
-  // Initialize SessionManager when app starts
   useEffect(() => {
     SessionManager.initialize();
   }, []);
 
-  // Set a consistent status bar baseline across screens
   useEffect(() => {
     RNStatusBar.setBarStyle("dark-content");
     if (Platform.OS === "android") {
@@ -171,7 +186,6 @@ const RootLayout = React.memo(() => {
     }
   }, []);
 
-  // Disable previous blue flash overlay during navigation for smoother transitions
   const segmentKey = useMemo(() => segments.join("/"), [segments]);
   useEffect(() => {
     if (!segmentKey) return;
@@ -181,32 +195,22 @@ const RootLayout = React.memo(() => {
   return (
     <SafeAreaProvider>
       <ReduxProvider store={store}>
-        <PersistGate
-          loading={
-            <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: BRAND }}>
-              <SmallLogo />
-            </View>
-          }
-          persistor={persistor}
-        >
+        <AuthBootstrapWrapper>
           <PaperProvider theme={theme}>
             {navState?.key ? (
               <>
-                <Suspense fallback={<View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: BRAND }}><SmallLogo /></View>}>
+                <Suspense fallback={<LoadingScreen />}>
                   <AuthMiddleware>
                     <Slot />
                   </AuthMiddleware>
                 </Suspense>
-                {/* Global OTP Bottom Sheet Portal */}
                 <GlobalOtpSheet />
               </>
             ) : (
-              <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: BRAND }}>
-                <SmallLogo />
-              </View>
+              <LoadingScreen />
             )}
           </PaperProvider>
-        </PersistGate>
+        </AuthBootstrapWrapper>
       </ReduxProvider>
     </SafeAreaProvider>
   );

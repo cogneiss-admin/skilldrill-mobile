@@ -1,16 +1,14 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+import tokenManager from '../utils/tokenManager';
 import SessionManager from '../utils/sessionManager';
 
-// Environment variables with platform detection
 const getApiBaseUrl = () => {
-  // Use environment variable first, then fallback to Android emulator IP
   if (Constants.expoConfig?.extra?.API_BASE_URL) {
     return Constants.expoConfig.extra.API_BASE_URL;
   }
 
-  // Platform-specific fallbacks - use Android emulator special IP
   if (Platform.OS === 'android') {
     return 'http://10.0.2.2:3000/api';
   } else if (Platform.OS === 'ios') {
@@ -21,9 +19,8 @@ const getApiBaseUrl = () => {
 };
 
 const API_BASE_URL = getApiBaseUrl();
-const API_TIMEOUT = Constants.expoConfig?.extra?.API_TIMEOUT || 60000; // Increased timeout for assessment creation (60 seconds)
+const API_TIMEOUT = Constants.expoConfig?.extra?.API_TIMEOUT || 60000;
 
-// API Response types
 export interface ApiResponse<T = any> {
   success: boolean;
   data: T;
@@ -69,7 +66,6 @@ export interface User {
   region?: string;
 }
 
-// API Error class
 export class ApiError extends Error {
   public status: number;
   public code?: string;
@@ -83,6 +79,16 @@ export class ApiError extends Error {
     this.data = data;
   }
 }
+
+const PUBLIC_ENDPOINTS = [
+  '/multi-auth/login',
+  '/multi-auth/signup',
+  '/multi-auth/verify-otp',
+  '/multi-auth/refresh-token',
+  '/multi-auth/resend-otp',
+  '/multi-auth/forgot-password',
+  '/multi-auth/reset-password',
+];
 
 class ApiService {
   private api: AxiosInstance;
@@ -103,92 +109,102 @@ class ApiService {
     this.setupInterceptors();
   }
 
+  private isPublicEndpoint(url?: string): boolean {
+    if (!url) return false;
+    return PUBLIC_ENDPOINTS.some(endpoint => url.includes(endpoint));
+  }
+
   private setupInterceptors() {
-    // Request interceptor to add auth token
     this.api.interceptors.request.use(
-      async (config) => {
-        const token = await this.getAccessToken();
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
+      async (config: InternalAxiosRequestConfig) => {
+        if (this.isPublicEndpoint(config.url)) {
+          return config;
         }
+
+        let accessToken = tokenManager.getAccessToken();
+
+        if (tokenManager.isAccessTokenExpired()) {
+          try {
+            accessToken = await this.performTokenRefresh();
+          } catch {
+          }
+        }
+
+        if (accessToken) {
+          config.headers.Authorization = `Bearer ${accessToken}`;
+        }
+
         return config;
       },
-      (error) => {
-        return Promise.reject(error);
-      }
+      (error) => Promise.reject(error)
     );
 
-    // Response interceptor to handle token refresh
     this.api.interceptors.response.use(
-      (response) => {
-        return response;
-      },
+      (response) => response,
       async (error) => {
         const originalRequest = error.config;
 
-        if (error.response?.status === 401 && !originalRequest._retry) {
-          // If already refreshing, queue this request
-          if (this.isRefreshing) {
-            return new Promise((resolve, reject) => {
-              this.failedQueue.push({ resolve, reject });
-            })
-              .then((token) => {
-                if (token) {
-                  originalRequest.headers.Authorization = `Bearer ${token}`;
-                  return this.api(originalRequest);
-                }
-                return Promise.reject(new Error('Token refresh failed'));
-              })
-              .catch((err) => {
-                // Don't trigger session expiration for queued requests
-                // The main refresh attempt already handled it
-                return Promise.reject(err);
-              });
-          }
-
-          originalRequest._retry = true;
-          this.isRefreshing = true;
-
-          try {
-            const refreshToken = await this.getRefreshToken();
-            if (!refreshToken) {
-              throw new Error('No refresh token available');
-            }
-
-            // Import authService to handle token refresh
-            const { default: authService } = await import('./authService');
-            const response = await authService.refreshToken(refreshToken);
-            const { accessToken, refreshToken: newRefreshToken } = response.data as { accessToken: string; refreshToken: string };
-
-            await this.setAccessToken(accessToken);
-            await this.setRefreshTokenValue(newRefreshToken);
-
-            this.api.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
-            this.processQueue(null, accessToken);
-
-            return this.api(originalRequest);
-          } catch (refreshError) {
-            // Clear the queue first
-            this.processQueue(refreshError, null);
-
-            // Clear tokens
-            await this.clearTokens();
-
-            // Handle session expiration ONLY if not logging out
-            // SessionManager has its own flag to prevent duplicate alerts
-            if (!SessionManager.isCurrentlyLoggingOut()) {
-              await SessionManager.handleTokenRefreshFailure();
-            }
-
-            throw refreshError;
-          } finally {
-            this.isRefreshing = false;
-          }
+        if (error.response?.status !== 401 || originalRequest._retry) {
+          return Promise.reject(error);
         }
 
-        return Promise.reject(error);
+        if (this.isRefreshing) {
+          return new Promise((resolve, reject) => {
+            this.failedQueue.push({ resolve, reject });
+          }).then((token) => {
+            if (token) {
+              originalRequest.headers.Authorization = `Bearer ${token}`;
+              return this.api(originalRequest);
+            }
+            return Promise.reject(new Error('Token refresh failed'));
+          });
+        }
+
+        originalRequest._retry = true;
+
+        try {
+          const newToken = await this.performTokenRefresh();
+          originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          return this.api(originalRequest);
+        } catch (refreshError) {
+          if (!SessionManager.isCurrentlyLoggingOut()) {
+            await SessionManager.handleTokenRefreshFailure();
+          }
+          return Promise.reject(refreshError);
+        }
       }
     );
+  }
+
+  private async performTokenRefresh(): Promise<string> {
+    this.isRefreshing = true;
+
+    try {
+      const newToken = await tokenManager.refreshAccessToken(async (refreshToken) => {
+        const response = await axios.post(
+          `${API_BASE_URL}/multi-auth/refresh-token`,
+          { refreshToken },
+          { headers: { 'Content-Type': 'application/json' } }
+        );
+
+        if (!response.data.success) {
+          throw new Error(response.data.message || 'Token refresh failed');
+        }
+
+        return {
+          accessToken: response.data.data.accessToken,
+          refreshToken: response.data.data.refreshToken,
+        };
+      });
+
+      this.processQueue(null, newToken);
+      return newToken;
+    } catch (error) {
+      this.processQueue(error, null);
+      throw error;
+    } finally {
+      this.isRefreshing = false;
+    }
   }
 
   private processQueue(error: unknown, token: string | null) {
@@ -199,42 +215,13 @@ class ApiService {
         resolve(token);
       }
     });
-
     this.failedQueue = [];
   }
 
-  // Token management (using Redux store)
-  private async getAccessToken(): Promise<string> {
-    const { store } = await import('../store');
-    const state = store.getState();
-    return state.auth.token || '';
-  }
-
-  private async setAccessToken(token: string): Promise<void> {
-    const { store } = await import('../store');
-    const { setToken } = await import('../features/authSlice');
-    store.dispatch(setToken(token));
-  }
-
-  private async getRefreshToken(): Promise<string> {
-    const { store } = await import('../store');
-    const state = store.getState();
-    return state.auth.refreshToken || '';
-  }
-
-  private async setRefreshTokenValue(token: string): Promise<void> {
-    const { store } = await import('../store');
-    const { setRefreshToken } = await import('../features/authSlice');
-    store.dispatch(setRefreshToken(token));
-  }
-
   public async clearTokens(): Promise<void> {
-    const { store } = await import('../store');
-    const { clearAuth } = await import('../features/authSlice');
-    store.dispatch(clearAuth());
+    await tokenManager.clearAllTokens();
   }
 
-  // Generic request methods
   public async get<T = any>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     try {
       const response: AxiosResponse<ApiResponse<T>> = await this.api.get(url, config);
@@ -272,39 +259,28 @@ class ApiService {
   }
 
   private handleError(error: unknown): ApiError {
-    // Type guard for Axios errors
     const isAxiosError = (err: unknown): err is { response?: { status?: number; data?: unknown }; config?: { url?: string; method?: string }; message?: string; code?: string } => {
       return typeof err === 'object' && err !== null;
     };
 
-
     if (isAxiosError(error) && error.response) {
       const { status, data } = error.response;
 
-      // Handle 401 Unauthorized errors
       if (status === 401) {
-        // Don't handle session expiration for auth-related endpoints or during logout
         const url = error.config?.url;
-        const isAuthEndpoint =
-          url?.includes('/login') ||
-          url?.includes('/signup') ||
-          url?.includes('/otp') ||
-          url?.includes('/multi-auth/logout');
+        const isAuthEndpoint = this.isPublicEndpoint(url) || url?.includes('/multi-auth/logout');
 
-        // Don't trigger session expiration if user is logging out
         if (SessionManager.isCurrentlyLoggingOut()) {
           const errorData = typeof data === 'object' && data !== null ? data as Record<string, unknown> : undefined;
           const errorCode = typeof data === 'object' && data !== null && 'code' in data ? String(data.code) : undefined;
           return new ApiError('Logout in progress', status || 401, errorCode, errorData);
         }
 
-        // Only trigger session-expired flow if user is on a protected route and not logging out
         if (!isAuthEndpoint && SessionManager.isOnProtectedRoute()) {
           SessionManager.handleUnauthorized();
         }
       }
 
-      // Handle specific error codes
       const errorData = typeof data === 'object' && data !== null ? data as { message?: string; code?: string } : {};
       let message = errorData.message;
 
@@ -335,21 +311,18 @@ class ApiService {
           break;
         case 'INVALID_REFRESH_TOKEN':
           message = 'Session expired. Please login again.';
-          // Handle session expiration only if not logging out
           if (!SessionManager.isCurrentlyLoggingOut()) {
             SessionManager.handleTokenRefreshFailure();
           }
           break;
         case 'INVALID_TOKEN':
           message = 'Invalid session token. Please login again.';
-          // Handle invalid token only if not logging out
           if (!SessionManager.isCurrentlyLoggingOut()) {
             SessionManager.handleInvalidToken();
           }
           break;
         case 'UNAUTHORIZED':
           message = 'Unauthorized access. Please login again.';
-          // Handle unauthorized access only on protected routes and not during logout
           if (SessionManager.isOnProtectedRoute() && !SessionManager.isCurrentlyLoggingOut()) {
             SessionManager.handleUnauthorized();
           }
@@ -359,7 +332,6 @@ class ApiService {
       const errorDataObj = typeof data === 'object' && data !== null ? data as Record<string, unknown> : undefined;
       return new ApiError(message || 'An error occurred', status || 500, errorData.code, errorDataObj);
     } else if (isAxiosError(error) && 'request' in error) {
-      // Network error - provide more specific information
       if (error.code === 'ECONNABORTED') {
         return new ApiError('Request timeout - server is not responding', 0, 'TIMEOUT');
       } else if (error.code === 'ERR_NETWORK') {
@@ -368,33 +340,19 @@ class ApiService {
         return new ApiError('Network error - no response received from server', 0, 'NETWORK_ERROR');
       }
     } else if (error instanceof Error) {
-      // Standard Error object
       return new ApiError(error.message || 'An unexpected error occurred', 0);
     } else {
-      // Unknown error
       return new ApiError('An unexpected error occurred', 0);
     }
   }
 
-  // Health check
   public async healthCheck(): Promise<ApiResponse> {
     return this.get('/auth/health');
   }
 
-  // ===========================================
-  // ROLE TYPES METHODS
-  // ===========================================
-
-  /**
-   * Fetch all active role types
-   */
   public async fetchRoleTypes(): Promise<ApiResponse> {
     return this.get('/role-types');
   }
-
-  // ===========================================
-  // ADAPTIVE ASSESSMENT METHODS
-  // ===========================================
 
   public async startAssessment(skillId: string): Promise<ApiResponse> {
     return this.post('/assessment/start', { skillId });
@@ -404,9 +362,6 @@ class ApiService {
     return this.post('/assessment/resume', { skillId });
   }
 
-  /**
-   * Submit answer and get next question (Sequential)
-   */
   public async submitAnswerAndGetNext(sessionId: string, answer: string): Promise<ApiResponse> {
     return this.post('/assessment/adaptive/answer', {
       sessionId,
@@ -414,77 +369,42 @@ class ApiService {
     });
   }
 
-
-  /**
-   * Get adaptive assessment results
-   */
   public async getAdaptiveResults(sessionId: string): Promise<ApiResponse> {
     return this.get(`/assessment/results/${sessionId}`);
   }
 
-  /**
-   * Get drill recommendations for a completed assessment
-   */
   public async getDrillRecommendations(assessmentId: string): Promise<ApiResponse> {
     return this.get(`/assessment/${assessmentId}/recommendations`);
   }
 
-  // ===========================================
-  // PAYMENT & COMMERCE METHODS
-  // ===========================================
-
-  /**
-   * Create checkout session for payment
-   */
   public async createCheckout(params: import('../types/pricing').CheckoutRequest): Promise<ApiResponse> {
     return this.post('/commerce/checkout', params);
   }
 
-  /**
-   * Get user's active subscription
-   */
   public async getSubscription(): Promise<ApiResponse> {
     return this.get('/commerce/subscription');
   }
 
-  /**
-   * Get subscription pricing plans
-   */
   public async getPricingPlans(): Promise<ApiResponse> {
     return this.get('/commerce/pricing');
   }
 
-  /**
-   * Get subscription plans for user's career level
-   */
   public async getSubscriptionPlans(): Promise<ApiResponse> {
     return this.get('/commerce/subscription-plans');
   }
 
-  /**
-   * Change user's subscription plan
-   */
   public async changeSubscription(planId: string): Promise<ApiResponse> {
     return this.post('/commerce/subscription/change', { planId });
   }
 
-  /**
-   * Cancel user's subscription (default: cancel at period end)
-   */
   public async cancelSubscription(params?: { cancelAtPeriodEnd?: boolean }): Promise<ApiResponse> {
     return this.post('/commerce/subscription/cancel', params || {});
   }
 
-  /**
-   * Get payment history
-   */
   public async getPaymentHistory(): Promise<ApiResponse> {
     return this.get('/commerce/payment-history');
   }
 
-  /**
-   * Validate coupon code against an order amount
-   */
   public async validateCoupon(params: {
     code: string;
     orderAmount: number;
@@ -494,13 +414,6 @@ class ApiService {
     return this.post('/commerce/validate-coupon', params);
   }
 
-  // ===========================================
-  // DRILL ASSIGNMENT METHODS
-  // ===========================================
-
-  /**
-   * Get all drill assignments for user
-   */
   public async getDrillAssignments(params?: {
     cursor?: string;
     limit?: number;
@@ -513,16 +426,10 @@ class ApiService {
     return this.get(`/drills/assignments${queryString ? `?${queryString}` : ''}`);
   }
 
-  /**
-   * Get single drill assignment with items
-   */
   public async getDrillAssignment(assignmentId: string): Promise<ApiResponse> {
     return this.get(`/drills/assignments/${assignmentId}`);
   }
 
-  /**
-   * Create new drill assignment
-   */
   public async createDrillAssignment(params: {
     skillId: string;
     source: string;
@@ -532,9 +439,6 @@ class ApiService {
     return this.post('/drills/assign', params);
   }
 
-  /**
-   * Submit drill attempt
-   */
   public async submitDrillAttempt(params: {
     drillItemId: string;
     textContent?: string;
@@ -545,118 +449,62 @@ class ApiService {
     return this.post('/drills/attempt', params);
   }
 
-  /**
-   * Get drill aggregate/progress data
-   */
   public async getDrillAggregate(assignmentId: string): Promise<ApiResponse> {
     return this.get(`/drills/aggregate?assignmentId=${assignmentId}`);
   }
 
-  /**
-   * Get drill results (overall feedback) for completed drills
-   */
   public async getDrillResults(assignmentId: string): Promise<ApiResponse> {
     return this.get(`/drills/results/${assignmentId}`);
   }
 
-  /**
-   * Start or resume drill session
-   */
   public async startDrillSession(assignmentId: string): Promise<ApiResponse> {
     return this.post('/drills/session/start', { assignmentId });
   }
 
-  /**
-   * Get drill session status
-   */
   public async getDrillSessionStatus(assignmentId: string): Promise<ApiResponse> {
     return this.get(`/drills/session/status?assignmentId=${assignmentId}`);
   }
 
-  /**
-   * Update drill session activity (current drill position)
-   */
   public async updateDrillSessionActivity(sessionId: string, currentDrillIndex: number): Promise<ApiResponse> {
     return this.put(`/drills/session/${sessionId}/activity`, { currentDrillIndex });
   }
 
-  /**
-   * Complete drill session
-   */
   public async completeDrillSession(sessionId: string): Promise<ApiResponse> {
     return this.put(`/drills/session/${sessionId}/complete`, {});
   }
 
-  /**
-   * Check if user has existing drill assignment for skill
-   */
   public async checkExistingDrills(skillId: string): Promise<ApiResponse> {
     return this.get(`/drills/check-existing?skillId=${skillId}`);
   }
 
-  /**
-   * Generate drill items for an unlocked assignment
-   * Called when user clicks "Start Drills Practice" on an unlocked drill
-   */
   public async generateDrillItems(assignmentId: string): Promise<ApiResponse> {
     return this.post(`/drills/assignments/${assignmentId}/generate`, {});
   }
 
-  /**
-   * Get user's recommendations (pending assessments + unpurchased drill packs)
-   */
   public async getUserRecommendations(): Promise<ApiResponse> {
     return this.get('/user/recommendations');
   }
 
-  // ===========================================
-  // AI JOB STATUS METHODS
-  // ===========================================
-
-  /**
-   * Get AI job status with progress information
-   * Used for polling AI processing jobs (scoring, feedback generation)
-   */
   public async getJobStatus(jobId: string): Promise<ApiResponse> {
     return this.get(`/assessment/jobs/${jobId}/status`);
   }
 
-  /**
-   * Trigger final feedback generation for assessment
-   * Called when assessment is complete to start AI feedback processing
-   */
   public async generateFinalFeedback(assessmentId: string): Promise<ApiResponse> {
     return this.post(`/assessment/${assessmentId}/generate-final-feedback`, {});
   }
 
-  /**
-   * Cancel stuck feedback generation
-   * Allows user to cancel a job that's taking too long
-   */
   public async cancelFeedbackGeneration(assessmentId: string): Promise<ApiResponse> {
     return this.post(`/assessment/${assessmentId}/cancel-feedback-generation`, {});
   }
 
-  /**
-   * Get assessment result with state detection
-   * Returns result status and data if available
-   */
   public async getAssessmentResult(assessmentId: string): Promise<ApiResponse> {
     return this.get(`/assessment/${assessmentId}/result`);
   }
 
-  /**
-   * Retry failed drill scoring
-   * Called when AI scoring failed and user wants to retry
-   */
   public async retryDrillScoring(drillItemId: string): Promise<ApiResponse> {
     return this.post(`/drills/${drillItemId}/retry-scoring`, {});
   }
-
 }
 
-// Create and export singleton instance
 export const apiService = new ApiService();
 export default apiService;
-
-
