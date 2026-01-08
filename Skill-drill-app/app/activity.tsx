@@ -11,6 +11,7 @@ import BottomNavigation from '../components/BottomNavigation';
 import ActivityCard, { ActivityCardProps } from './components/ActivityCard';
 import { apiService } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+import { useAllScoringPolling } from '../hooks/useAllScoringPolling';
 import { logError, parseApiError, formatErrorMessage } from '../utils/errorHandler';
 
 const AI_LOADING_ANIMATION = require('../assets/lottie/AiLoadingAnime.json');
@@ -42,6 +43,11 @@ export default function Activity() {
   const [retryAction, setRetryAction] = useState<(() => void) | null>(null);
   const [loadingType, setLoadingType] = useState<'assessment' | 'drill'>('assessment');
   const [currentSkillId, setCurrentSkillId] = useState<string>('');
+
+  // Scoring retry state for assessments
+  const [assessmentIdForRetry, setAssessmentIdForRetry] = useState<string>('');
+  const [isWaitingForScoring, setIsWaitingForScoring] = useState(false);
+  const [scoringProgressMessage, setScoringProgressMessage] = useState<string>('');
 
   const { user } = useAuth();
   const router = useRouter();
@@ -333,24 +339,133 @@ export default function Activity() {
       const response = await apiService.resumeAssessment(skillId);
 
       if (response.success && response.data) {
-        setShowAiLoader(false);
-        router.push({
-          pathname: '/assessmentScenarios',
-          params: {
-            skillId,
-            sessionId: response.data.sessionId,
-            skillName: response.data.skillName,
-            question: JSON.stringify(response.data.question),
-            progress: JSON.stringify(response.data.progress)
-          }
-        });
+        const { state } = response.data;
+
+        switch (state) {
+          case 'SCORING_FAILED':
+            // Show error dialog with retry option
+            setShowAiLoader(false);
+            setIsResuming(false);
+            setAssessmentIdForRetry(response.data.assessmentId);
+            setErrorMessage(response.data.errorMessage || 'Unable to analyze some responses. Please try again.');
+            setRetryAction(() => () => handleRetryScoring(response.data.assessmentId));
+            setShowErrorDialog(true);
+            break;
+
+          case 'SCORING_IN_PROGRESS':
+            // Show scoring progress loader and poll
+            setIsResuming(false);
+            setIsWaitingForScoring(true);
+            setScoringProgressMessage(response.data.progress?.message || 'Processing responses...');
+            setAssessmentIdForRetry(response.data.assessmentId);
+            startAllScoringPolling(response.data.assessmentId);
+            break;
+
+          case 'FEEDBACK_PENDING':
+            // Scoring done, need to generate final feedback
+            setLoadingSkillName(skillName);
+            setShowAiLoader(true);
+            setIsResuming(false);
+            try {
+              await apiService.generateFinalFeedback(response.data.assessmentId);
+              // Navigate to results - polling handled there
+              router.push({
+                pathname: '/assessmentResults',
+                params: {
+                  assessmentId: response.data.assessmentId,
+                  skillName: response.data.skillName
+                }
+              });
+            } catch (error) {
+              setShowAiLoader(false);
+              handleError(error, 'Generate Final Feedback');
+            }
+            break;
+
+          case 'COMPLETED':
+            // Already complete - go to results
+            setShowAiLoader(false);
+            router.push({
+              pathname: '/assessmentResults',
+              params: {
+                assessmentId: response.data.assessmentId,
+                skillName: response.data.skillName
+              }
+            });
+            break;
+
+          case 'IN_PROGRESS':
+          default:
+            // Normal resume - navigate to questions
+            setShowAiLoader(false);
+            router.push({
+              pathname: '/assessmentScenarios',
+              params: {
+                skillId,
+                sessionId: response.data.assessmentId,
+                skillName: response.data.skillName,
+                question: JSON.stringify(response.data.question),
+                progress: JSON.stringify(response.data.progress)
+              }
+            });
+            break;
+        }
       } else {
         throw new Error(response.message || 'Failed to resume assessment');
       }
     } catch (error: any) {
       setShowAiLoader(false);
+      setIsResuming(false);
+      handleError(error, 'Resume Assessment');
     }
   };
+
+  // Handle retry scoring for assessments
+  const handleRetryScoring = async (assessmentId: string) => {
+    setShowErrorDialog(false);
+    setIsWaitingForScoring(true);
+    setScoringProgressMessage('Retrying...');
+
+    try {
+      await apiService.retryResponseScoring(assessmentId);
+      // Start polling for completion
+      startAllScoringPolling(assessmentId);
+    } catch (error: any) {
+      setIsWaitingForScoring(false);
+      handleError(error, 'Retry Scoring');
+    }
+  };
+
+  // Scoring polling hook
+  const { startPolling: startAllScoringPolling, progress: scoringProgress } = useAllScoringPolling({
+    onComplete: async () => {
+      // All scoring completed - trigger final feedback and navigate
+      setIsWaitingForScoring(false);
+      if (assessmentIdForRetry) {
+        setShowAiLoader(true);
+        try {
+          await apiService.generateFinalFeedback(assessmentIdForRetry);
+          router.push({
+            pathname: '/assessmentResults',
+            params: {
+              assessmentId: assessmentIdForRetry,
+              skillName: loadingSkillName
+            }
+          });
+        } catch (error) {
+          setShowAiLoader(false);
+          handleError(error, 'Generate Final Feedback');
+        }
+      }
+    },
+    onError: (errorMessage) => {
+      // Scoring failed again - show error dialog
+      setIsWaitingForScoring(false);
+      setErrorMessage(errorMessage);
+      setRetryAction(() => () => handleRetryScoring(assessmentIdForRetry));
+      setShowErrorDialog(true);
+    },
+  });
 
   // Drill handlers - similar to assessment but navigates to drillsScenarios
   const handleStartDrill = async (assignmentId: string, skillName: string, backendStatus?: string) => {
@@ -860,6 +975,23 @@ export default function Activity() {
         <BlurView intensity={80} tint="dark" style={styles.blurContainer}>
           <View style={styles.resumeLoaderContainer}>
             <ActivityIndicator size={40} color={BRAND} />
+          </View>
+        </BlurView>
+      </Modal>
+
+      {/* Scoring Progress Modal - Simple loader for retry/scoring */}
+      <Modal
+        visible={isWaitingForScoring}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+      >
+        <BlurView intensity={80} tint="dark" style={styles.blurContainer}>
+          <View style={styles.resumeLoaderContainer}>
+            <ActivityIndicator size={40} color={BRAND} />
+            <Text style={{ marginTop: 16, fontSize: 14, color: '#6B7280', textAlign: 'center' }}>
+              {scoringProgress?.message || scoringProgressMessage || 'Processing...'}
+            </Text>
           </View>
         </BlurView>
       </Modal>

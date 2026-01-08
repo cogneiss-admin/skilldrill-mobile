@@ -125,11 +125,31 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
       }
     },
     onError: (errorMessage) => {
-      // Scoring failed - show error dialog
+      // Scoring failed - show error dialog with retry option
       setIsWaitingForAllScoring(false);
-      setPendingCompletedSessionId(null);
       setErrorMessage(errorMessage);
-      setRetryAction(null);
+
+      // Set retry action to retry scoring and re-poll
+      const sessionId = pendingCompletedSessionId;
+      setRetryAction(() => async () => {
+        if (!sessionId) return;
+
+        setShowErrorDialog(false);
+        setErrorMessage('');
+        setIsWaitingForAllScoring(true);
+
+        try {
+          // Call retry endpoint
+          await apiService.retryResponseScoring(sessionId);
+          // Re-start polling
+          startAllScoringPolling(sessionId);
+        } catch (error) {
+          setIsWaitingForAllScoring(false);
+          setErrorMessage('Failed to retry. Please try again.');
+          setShowErrorDialog(true);
+        }
+      });
+
       setShowErrorDialog(true);
     },
   });
@@ -566,20 +586,10 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
           animationType="fade"
           statusBarTranslucent
         >
-          <BlurView intensity={100} tint="dark" style={styles.blurContainer}>
-            <View style={styles.aiLoaderContent}>
-              <View style={styles.aiAnimationContainer}>
-                <LottieView
-                  source={AI_LOADING_ANIMATION}
-                  autoPlay
-                  loop
-                  style={styles.aiAnimation}
-                />
-              </View>
-              <Text style={styles.aiLoaderTitle}>
-                Analyzing your responses
-              </Text>
-              <Text style={styles.aiLoaderSubtitle}>
+          <BlurView intensity={80} tint="dark" style={styles.submittingBlurContainer}>
+            <View style={styles.submittingLoaderContainer}>
+              <ActivityIndicator size={40} color={BRAND} />
+              <Text style={{ marginTop: 16, fontSize: 14, color: '#6B7280', textAlign: 'center' }}>
                 {scoringProgress?.message || 'Please wait while we process your answers...'}
               </Text>
             </View>
@@ -619,7 +629,6 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
                     setShowErrorDialog(false);
                     setErrorMessage('');
                     if (retryAction) {
-                      setShowAiLoader(true);
                       retryAction();
                     }
                   }}
