@@ -382,6 +382,35 @@ export default function Activity() {
             }
             break;
 
+          case 'FEEDBACK_FAILED':
+            // Final feedback generation failed - show error dialog with retry
+            setShowAiLoader(false);
+            setIsResuming(false);
+            setAssessmentIdForRetry(response.data.assessmentId);
+            setLoadingSkillName(response.data.skillName || skillName);
+            setErrorMessage(response.data.errorMessage || 'Failed to generate final feedback. Please try again.');
+            setRetryAction(() => async () => {
+              setShowErrorDialog(false);
+              setShowAiLoader(true);
+              setLoadingSkillName(response.data.skillName || skillName);
+              try {
+                await apiService.generateFinalFeedback(response.data.assessmentId);
+                // Navigate to results page which will poll for completion
+                router.push({
+                  pathname: '/assessmentResults',
+                  params: {
+                    assessmentId: response.data.assessmentId,
+                    skillName: response.data.skillName
+                  }
+                });
+              } catch (error) {
+                setShowAiLoader(false);
+                handleError(error, 'Retry Final Feedback');
+              }
+            });
+            setShowErrorDialog(true);
+            break;
+
           case 'COMPLETED':
             // Already complete - go to results
             setShowAiLoader(false);

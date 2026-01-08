@@ -499,6 +499,10 @@ class ApiService {
     return this.post(`/assessment/${assessmentId}/generate-final-feedback`, {});
   }
 
+  public async getFinalFeedbackStatus(assessmentId: string): Promise<ApiResponse> {
+    return this.get(`/assessment/${assessmentId}/final-feedback-status`);
+  }
+
   public async cancelFeedbackGeneration(assessmentId: string): Promise<ApiResponse> {
     return this.post(`/assessment/${assessmentId}/cancel-feedback-generation`, {});
   }

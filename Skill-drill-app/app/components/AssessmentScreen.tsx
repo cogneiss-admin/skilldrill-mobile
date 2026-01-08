@@ -221,6 +221,10 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
         skillName: resolvedSkillName,
         finalScore: response.data.finalScore || 0,
         subskillScores: [],
+        // Flat feedback properties for Results component
+        feedbackGood: response.data.feedbackGood || '',
+        feedbackImprove: response.data.feedbackImprove || '',
+        feedbackSummary: response.data.feedbackSummary || '',
         feedback: {
           good: response.data.feedbackGood || '',
           improve: response.data.feedbackImprove || '',
@@ -350,61 +354,90 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
     setShowAiLoader(true);
     setIsLoadingResults(true);
 
-    // Try to get results directly first - they might already be ready
-    try {
-      const response = await apiService.getAdaptiveResults(sessionId);
+    // Poll for final feedback status
+    const pollFinalFeedbackStatus = async (attempt = 0): Promise<void> => {
+      const maxAttempts = 60; // ~2 minutes with 2s intervals
+      const delay = 2000;
 
-      if (response.success && response.data.status === 'ready') {
-        // Results are ready, navigate directly
-        await fetchAndNavigateToResults(sessionId);
-        return;
-      }
+      try {
+        const statusResponse = await apiService.getFinalFeedbackStatus(sessionId);
 
-      // If backend returns a jobId, use the polling hook
-      if (response.data?.jobId) {
-        startResultsPolling(response.data.jobId);
-        return;
-      }
+        if (statusResponse.success && statusResponse.data) {
+          const { state, errorMessage } = statusResponse.data;
 
-      // Fallback: poll the results endpoint with exponential backoff
-      const pollForResults = async (attempt = 0): Promise<void> => {
-        const maxAttempts = 30;
-        const delay = Math.min(1000 * Math.pow(1.5, attempt), 10000); // Exponential backoff
-
-        try {
-          const pollResponse = await apiService.getAdaptiveResults(sessionId);
-
-          if (pollResponse.success && pollResponse.data.status === 'ready') {
+          if (state === 'READY') {
+            // Final feedback is ready - fetch and navigate to results
             await fetchAndNavigateToResults(sessionId);
-          } else if (attempt < maxAttempts) {
-            setTimeout(() => pollForResults(attempt + 1), delay);
-          } else {
-            setShowAiLoader(false);
-            setIsLoadingResults(false);
-            console.warn('[AssessmentScreen] Results generation timeout - taking longer than expected');
-            Alert.alert('Timeout', 'Something went wrong. Please try again.');
+            return;
           }
-        } catch {
-          if (attempt < maxAttempts) {
-            setTimeout(() => pollForResults(attempt + 1), delay);
-          } else {
-            setShowAiLoader(false);
-            setIsLoadingResults(false);
-            console.warn('[AssessmentScreen] Failed to fetch results after max polling attempts');
-            Alert.alert('Error', 'Something went wrong. Please try again.');
-          }
-        }
-      };
 
-      pollForResults();
-    } catch (error) {
-      setShowAiLoader(false);
-      setIsLoadingResults(false);
-      // Log technical error to console
-      console.error('[AssessmentScreen] Failed to initiate results polling:', error);
-      // Show clean error message to user
-      Alert.alert('Error', 'Something went wrong. Please try again.');
-    }
+          if (state === 'FAILED') {
+            // Final feedback generation failed - show error dialog
+            setShowAiLoader(false);
+            setIsLoadingResults(false);
+            setErrorMessage(errorMessage || 'Failed to generate final feedback. Please try again.');
+            setRetryAction(() => async () => {
+              setShowErrorDialog(false);
+              setErrorMessage('');
+              setShowAiLoader(true);
+              setIsLoadingResults(true);
+
+              try {
+                // Trigger retry
+                await apiService.generateFinalFeedback(sessionId);
+                // Resume polling
+                pollFinalFeedbackStatus(0);
+              } catch (error) {
+                setShowAiLoader(false);
+                setIsLoadingResults(false);
+                setErrorMessage('Failed to retry. Please try again.');
+                setShowErrorDialog(true);
+              }
+            });
+            setShowErrorDialog(true);
+            return;
+          }
+
+          if (state === 'NOT_STARTED') {
+            // Final feedback hasn't started - trigger it and start polling
+            try {
+              await apiService.generateFinalFeedback(sessionId);
+              setTimeout(() => pollFinalFeedbackStatus(0), delay);
+            } catch (error) {
+              setShowAiLoader(false);
+              setIsLoadingResults(false);
+              console.error('[AssessmentScreen] Failed to trigger final feedback:', error);
+              Alert.alert('Error', 'Failed to generate results. Please try again.');
+            }
+            return;
+          }
+
+          // State is PROCESSING - continue polling
+          if (attempt < maxAttempts) {
+            setTimeout(() => pollFinalFeedbackStatus(attempt + 1), delay);
+          } else {
+            setShowAiLoader(false);
+            setIsLoadingResults(false);
+            console.warn('[AssessmentScreen] Final feedback generation timeout');
+            Alert.alert('Timeout', 'Results generation is taking longer than expected. Please try again later.');
+          }
+        } else {
+          throw new Error('Failed to check feedback status');
+        }
+      } catch (error) {
+        if (attempt < maxAttempts) {
+          setTimeout(() => pollFinalFeedbackStatus(attempt + 1), delay);
+        } else {
+          setShowAiLoader(false);
+          setIsLoadingResults(false);
+          console.error('[AssessmentScreen] Failed to poll final feedback status:', error);
+          Alert.alert('Error', 'Something went wrong. Please try again.');
+        }
+      }
+    };
+
+    // Start polling for final feedback status
+    pollFinalFeedbackStatus(0);
   };
 
   // Retry results generation
@@ -532,38 +565,40 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
           animationType="fade"
           statusBarTranslucent
         >
-          <BlurView intensity={100} tint="dark" style={styles.blurContainer}>
-            <View style={styles.aiLoaderContent}>
-              <View style={styles.aiAnimationContainer}>
-                <LottieView
-                  source={AI_LOADING_ANIMATION}
-                  autoPlay
-                  loop
-                  style={styles.aiAnimation}
-                />
-              </View>
-              <Text style={styles.aiLoaderTitle}>
-                Generating your results for {skillName}
-              </Text>
-              {/* Show AI progress indicator with status messages */}
-              {aiJobStatus && (
-                <AIProgressIndicator
-                  status={aiJobStatus.status}
-                  message={aiProgressMessage || 'Processing your assessment...'}
-                  showRetry={canRetryResults}
-                  showCancel={isPollingResults}
-                  onRetry={handleRetryResults}
-                  onCancel={handleCancelResults}
-                />
-              )}
-              {/* Fallback message when no job status */}
-              {!aiJobStatus && (
-                <Text style={styles.aiLoaderSubtitle}>
-                  This may take a moment...
+          <View style={styles.blurOverlay}>
+            <BlurView intensity={100} tint="dark" style={styles.blurContainer}>
+              <View style={styles.aiLoaderContent}>
+                <View style={styles.aiAnimationContainer}>
+                  <LottieView
+                    source={AI_LOADING_ANIMATION}
+                    autoPlay
+                    loop
+                    style={styles.aiAnimation}
+                  />
+                </View>
+                <Text style={styles.aiLoaderTitle}>
+                  Generating your results for {skillName}
                 </Text>
-              )}
-            </View>
-          </BlurView>
+                {/* Show AI progress indicator with status messages */}
+                {aiJobStatus && (
+                  <AIProgressIndicator
+                    status={aiJobStatus.status}
+                    message={aiProgressMessage || 'Processing your assessment...'}
+                    showRetry={canRetryResults}
+                    showCancel={isPollingResults}
+                    onRetry={handleRetryResults}
+                    onCancel={handleCancelResults}
+                  />
+                )}
+                {/* Fallback message when no job status */}
+                {!aiJobStatus && (
+                  <Text style={styles.aiLoaderSubtitle}>
+                    This may take a moment...
+                  </Text>
+                )}
+              </View>
+            </BlurView>
+          </View>
         </Modal>
 
         <Modal
@@ -649,12 +684,55 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
       : undefined;
 
     if (!parsedResults?.skillName) {
+      // If error dialog not already showing, trigger it via effect
+      // But for now, show loading while we wait for proper data or error dialog is handled elsewhere
+      if (isLoadingResultsPage) {
+        return (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F9FAFB' }}>
+            <ActivityIndicator size="large" color="#0A66C2" />
+          </View>
+        );
+      }
+      // Results failed to load - show the existing error dialog
+      // We need to return the error dialog modal here since we can't render Results
       return (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-          <Text style={{ color: '#FF0000', textAlign: 'center' }}>
-            Error: Skill name is missing from assessment results.
-          </Text>
-        </View>
+        <>
+          <View style={{ flex: 1, backgroundColor: '#F9FAFB' }} />
+          <Modal
+            visible={true}
+            transparent
+            animationType="fade"
+            statusBarTranslucent
+          >
+            <View style={styles.errorDialogBackdrop}>
+              <View style={styles.errorDialogContainer}>
+                <View style={styles.errorIconContainer}>
+                  <Text style={styles.errorIcon}>⚠️</Text>
+                </View>
+                <Text style={styles.errorDialogTitle}>Something went wrong</Text>
+                <Text style={styles.errorDialogMessage}>Could not load assessment results. Please try again.</Text>
+                <View style={styles.errorDialogButtons}>
+                  <TouchableOpacity
+                    style={styles.errorDialogCancelButton}
+                    onPress={() => router.replace('/activity?tab=assessments')}
+                  >
+                    <Text style={styles.errorDialogCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.errorDialogRetryButton}
+                    onPress={() => {
+                      if (assessmentIdProp) {
+                        fetchResultsByAssessmentId(assessmentIdProp);
+                      }
+                    }}
+                  >
+                    <Text style={styles.errorDialogRetryText}>Retry</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        </>
       );
     }
 
@@ -676,6 +754,10 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
 };
 
 const styles = StyleSheet.create({
+  blurOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
   blurContainer: {
     flex: 1,
     justifyContent: 'center',
