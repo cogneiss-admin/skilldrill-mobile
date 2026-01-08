@@ -74,6 +74,11 @@ type RecommendationResponse = {
   status?: string;
   createdAt?: string;
   pricing?: APIPricingResponse;
+  // Top-level fields returned by backend
+  totalPrice?: number;
+  currency?: string;
+  pricePerDrill?: number;
+  pricingMode?: string;
 };
 
 type DrillItem = {
@@ -334,28 +339,21 @@ const RecommendedDrillsScreen = () => {
       return;
     }
 
-    // Otherwise create new assignment
-    try {
-      const res = await apiService.createDrillAssignment({
+    // Navigate to subscription screen for payment
+    // The payment webhook will create the drill assignment after successful payment
+    router.push({
+      pathname: '/subscriptionScreen',
+      params: {
+        recommendationId: recommendation.recommendationId || recommendation.id || assessmentId,
         skillId: recommendation.skillId || '',
-        source: 'DrillPack',
-        recommendationId: recommendation.recommendationId || recommendation.id || assessmentId
-      });
-
-      if (!res.success) {
-        throw new Error(res.message || 'Failed to create drill assignment');
+        assessmentId: assessmentId,
+        drillCount: String(drillCount),
+        price: String(recommendation.totalPrice || pricingData?.finalPrice || 0),
+        currency: recommendation.currency || 'USD'
       }
-
-      const assignmentId = res.data.id;
-
-      router.push({
-        pathname: '/drillsScenarios',
-        params: { assignmentId }
-      });
-    } catch (error: unknown) {
-      // Handle error silently
-    }
+    });
   };
+
 
   const renderContent = () => {
     if (isLoading) {
