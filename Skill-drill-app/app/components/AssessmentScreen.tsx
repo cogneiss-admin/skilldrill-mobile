@@ -240,8 +240,23 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
       setIsLoadingResults(false);
       // Log technical error to console
       console.error('[AssessmentScreen] Failed to load results:', err);
-      // Show clean error message to user
-      Alert.alert('Error', 'Something went wrong. Please try again.');
+      // Show error dialog with retry option instead of Alert
+      setErrorMessage('Unable to load results. Please try again.');
+      setRetryAction(() => async () => {
+        setShowErrorDialog(false);
+        setErrorMessage('');
+        setShowAiLoader(true);
+        setIsLoadingResults(true);
+        try {
+          await fetchAndNavigateToResults(sessionId);
+        } catch (retryError) {
+          setShowAiLoader(false);
+          setIsLoadingResults(false);
+          setErrorMessage('Still unable to load results. Please try again later.');
+          setShowErrorDialog(true);
+        }
+      });
+      setShowErrorDialog(true);
     }
   }, [skillName, navigateToResults]);
 
