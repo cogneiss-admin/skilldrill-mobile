@@ -55,7 +55,7 @@ export default function Activity() {
     // Show clean user-friendly error dialog
     setShowAiLoader(false);
     setProgressMessage('');
-    
+
     // Use backend error message if available, otherwise show generic message
     const errorMsg = error?.message || error?.data?.message || 'Something went wrong. Please try again.';
     setErrorMessage(errorMsg);
@@ -578,7 +578,7 @@ export default function Activity() {
         if (!drill?.skillId || !drill?.pricing?.amount || !drill?.pricing?.currency || !drill?.drillCount) {
           return;
         }
-        
+
         // Always navigate to subscription screen - it will handle conditional rendering
         // based on subscription status (shows credits view for subscribers, purchase view for non-subscribers)
         router.push({

@@ -108,13 +108,13 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
     onComplete: async () => {
       // All scoring completed successfully - show completion dialog and trigger final feedback
       setIsWaitingForAllScoring(false);
-      
+
       const sessionId = pendingCompletedSessionId;
       if (sessionId) {
         setCompletedSessionId(sessionId);
         setPendingCompletedSessionId(null);
         setShowCompletionDialog(true);
-        
+
         // Trigger final feedback generation in background
         try {
           await apiService.generateFinalFeedback(sessionId);
@@ -242,12 +242,12 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
           if (!response.data.sessionId) {
             throw new Error('Session ID not found in response');
           }
-          
+
           // Store session ID and show loader while waiting for all scoring
           setPendingCompletedSessionId(response.data.sessionId);
           setIsWaitingForAllScoring(true);
           setIsSubmitting(false);
-          
+
           // Start polling for all scoring jobs to complete
           startAllScoringPolling(response.data.sessionId);
         } else {
