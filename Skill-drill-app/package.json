@@ -5,7 +5,7 @@
   "scripts": {
     "lint:unused": "ts-prune -p tsconfig.json | grep -v 'index' || true",
     "lint:imports": "eslint --ext .ts,.tsx --rule 'no-unused-vars: error' --rule 'no-unused-expressions: off' --rule 'no-console: off' . | cat",
-    "start": "expo start --port 3001",
+    "start": "node init && expo start --port 3001",
     "android": "expo start --android --port 3001",
     "ios": "expo start --ios --port 3001",
     "web": "expo start --web --port 3001",
